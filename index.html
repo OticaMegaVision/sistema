@@ -9670,13 +9670,24 @@ tr:hover td { background: rgba(255,107,0,0.03) !important; }
                 if (remote.config        && typeof remote.config        === 'object') Object.assign(state.config        || (state.config        = {}), remote.config);
                 if (remote.lastOsCounter && typeof remote.lastOsCounter === 'object') state.lastOsCounter = { ...(state.lastOsCounter || {}), ...remote.lastOsCounter };
                 // FIX: restaura contas financeiras do Drive
+                // FIX SYNC BUG: so sobrescreve se a nuvem for mais recente que o ultimo save local.
+                // Antes: sobrescrita cega apagava baixas registradas antes do push chegar a nuvem.
                 if (Array.isArray(remote.contasFinanceiras) && remote.contasFinanceiras.length > 0) {
-                    state._contasManuais = remote.contasFinanceiras;
-                    try {
-                        const storeKey = 'contas_financeiras_' + storeId;
-                        if (window.IDB && IDB._cache) IDB._cache[storeKey] = JSON.stringify(remote.contasFinanceiras);
-                        if (window.ContasManager) ContasManager.saveAll(remote.contasFinanceiras).catch(()=>{});
-                    } catch(e) {}
+                    const localSavedAt = (() => { try { return localStorage.getItem('contas_fs_savedAt_' + storeId) || '0'; } catch(_e) { return '0'; } })();
+                    const remoteTs     = remote._ts || '0';
+                    const remoteIsNewer = remoteTs >= localSavedAt;
+                    if (remoteIsNewer) {
+                        state._contasManuais = remote.contasFinanceiras;
+                        try {
+                            const storeKey = 'contas_financeiras_' + storeId;
+                            if (window.IDB && IDB._cache) IDB._cache[storeKey] = JSON.stringify(remote.contasFinanceiras);
+                            if (window.ContasManager) ContasManager.saveAll(remote.contasFinanceiras).catch(()=>{});
+                        } catch(e) {}
+                    } else {
+                        // Nuvem esta desatualizada: agenda push para sincronizar os dados locais
+                        console.log('[ContasManager] FIX SYNC: dados locais mais recentes que a nuvem — mantendo local e re-agendando push.');
+                        if (window.LocalFirst) try { LocalFirst._scheduleCloudSync(); } catch(_e) {}
+                    }
                 }
                 // FIX LOOP: rewriteAll(true) = persiste no IDB (incluindo logo/company)
                 // SEM toasts e SEM cloud push-back, quebrando o ciclo pull→push→pull
@@ -10403,11 +10414,14 @@ tr:hover td { background: rgba(255,107,0,0.03) !important; }
                 // Atualiza cache em memória imediatamente
                 IDB._cache[this._storeKey] = JSON.stringify(contas);
                 state._contasManuais = contas;
+                // ✅ FIX SYNC: registra timestamp do último save local para proteger contra overwrite da nuvem
+                const nowIso = new Date().toISOString();
+                try { localStorage.setItem('contas_fs_savedAt_' + storeId, nowIso); } catch(_e) {}
                 try {
                     await sbUpsertDoc(storeId, 'config', 'contas_financeiras', {
                         _doc_id:    'contas_financeiras',
                         items:      contas,
-                        _updatedAt: new Date().toISOString(),
+                        _updatedAt: nowIso,
                         _store:     storeId
                     });
                     // ✅ Dispara cloud sync para que outros dispositivos recebam as contas atualizadas
