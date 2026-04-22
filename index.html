@@ -10093,7 +10093,7 @@ tr:hover td { background: rgba(255,107,0,0.03) !important; }
             // ── Push agendado com debounce (chamado após cada save) ───────────
             function _schedulePush() {
                 clearTimeout(_pushTimer);
-                _pushTimer = setTimeout(() => { _silentPush(); }, PUSH_DEBOUNCE_MS);
+                _pushTimer = setTimeout(() => { _pushTimer = null; _silentPush(); }, PUSH_DEBOUNCE_MS);
             }
 
             function _silentPush() {

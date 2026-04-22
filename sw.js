@@ -4,19 +4,19 @@
 //             Network-First para dados dinâmicos
 // ====================================================
 
-const CACHE_NAME = 'oticavision-v1';
-const STATIC_CACHE = 'oticavision-static-v1';
-const DYNAMIC_CACHE = 'oticavision-dynamic-v1';
+const CACHE_NAME = 'oticavision-v2';
+const STATIC_CACHE = 'oticavision-static-v2';
+const DYNAMIC_CACHE = 'oticavision-dynamic-v2';
 
 // Assets que serão cacheados na instalação (shell da aplicação)
 const PRECACHE_ASSETS = [
   './',
   './index.html',
   './manifest.json',
-  './icons/icon-192x192.png',
-  './icons/icon-512x512.png',
-  './icons/apple-touch-icon.png',
-  './icons/favicon-32x32.png',
+  './icon-192x192.png',
+  './icon-512x512.png',
+  './apple-touch-icon.png',
+  './favicon-32x32.png',
   // FontAwesome via CDN será cacheado dinamicamente na primeira visita
 ];
 
@@ -145,8 +145,8 @@ self.addEventListener('push', (event) => {
   const data = event.data.json();
   self.registration.showNotification(data.title || 'ÓticaVision Pro', {
     body: data.body || '',
-    icon: './icons/icon-192x192.png',
-    badge: './icons/icon-72x72.png',
+    icon: './icon-192x192.png',
+    badge: './icon-72x72.png',
     vibrate: [200, 100, 200],
     data: data,
   });
