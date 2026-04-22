@@ -10130,6 +10130,7 @@ tr:hover td { background: rgba(255,107,0,0.03) !important; }
             }
 
             function _silentPush() {
+                _pushTimer = null; // FIX: reset timer ID para null após disparo — sem isso _silentPull() bloqueava pulls indefinidamente
                 try {
                     if (_activeProvider === 'gdrive'   && _gdriveToken   && !_isExpired(_gdriveToken))   gdrivePush(true).catch(()=>{});
                     if (_activeProvider === 'onedrive' && _onedriveToken && !_isExpired(_onedriveToken)) onedrivePush(true).catch(()=>{});
