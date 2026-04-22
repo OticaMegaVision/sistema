@@ -10699,14 +10699,20 @@ tr:hover td { background: rgba(255,107,0,0.03) !important; }
                     set('aging90plus', aging.a90plus);
                 }
 
-                this._renderList('contasReceberList', receber, hoje);
-                this._renderList('contasPagarList', pagar, hoje);
                 // Cache completo para filtro em tempo real
                 this._allReceber = receber;
                 this._allPagar   = pagar;
                 this._hoje       = hoje;
                 // ✅ Cache dos totais originais (antes de qualquer filtro)
                 this._totaisBase = { totalRec, totalPag, recVencidas, recAVencer, pagVencidas, pagAVencer };
+                // FIX FILTRO: re-aplica o filtro ativo (ex: Pagos) apos cada renderAll
+                // Antes: renderAll sempre exibia a lista completa, ignorando o filtro selecionado
+                const filtroAtualRec = document.getElementById('contasReceberFiltro')?.value || 'todos';
+                const buscaAtualRec  = (document.getElementById('contasReceberBusca')?.value || '').trim();
+                const filtroAtualPag = document.getElementById('contasPagarFiltro')?.value || 'todos';
+                const buscaAtualPag  = (document.getElementById('contasPagarBusca')?.value || '').trim();
+                const temFiltroAtivo = filtroAtualRec !== 'todos' || buscaAtualRec || filtroAtualPag !== 'todos' || buscaAtualPag;
+                if (temFiltroAtivo) { this.filtrar(); } else { this._renderList('contasReceberList', receber, hoje); this._renderList('contasPagarList', pagar, hoje); }
                 // Atualiza indicador de última sincronização
                 this._atualizarIndicadorSync();
                 } finally {
