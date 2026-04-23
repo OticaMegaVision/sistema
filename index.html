@@ -4782,7 +4782,7 @@ tr:hover td { background: rgba(255,107,0,0.03) !important; }
                                 style="flex:1;min-width:100px;padding:6px 8px;border:1px solid #ddd;border-radius:8px;font-size:0.82rem;">
                                 <option value="todos">Todos</option>
                                 <option value="vencida">Vencidas</option>
-                                <option value="pendente">A Vencer</option>
+                                <option value="pendente" selected>Pendentes</option>
                                 <option value="pago">Pagos</option>
                             </select>
                         </div>
@@ -4831,7 +4831,7 @@ tr:hover td { background: rgba(255,107,0,0.03) !important; }
                                 style="flex:1;min-width:100px;padding:6px 8px;border:1px solid #ddd;border-radius:8px;font-size:0.82rem;">
                                 <option value="todos">Todos</option>
                                 <option value="vencida">Vencidas</option>
-                                <option value="pendente">A Vencer</option>
+                                <option value="pendente" selected>Pendentes</option>
                                 <option value="pago">Pagos</option>
                             </select>
                         </div>
@@ -10460,7 +10460,8 @@ tr:hover td { background: rgba(255,107,0,0.03) !important; }
                 // (return dentro de forEach encerra apenas o callback, não a função pai)
                 for (const sale of (state.sales || [])) {
                     if (sale.status === 'cancelado') continue;
-                    if (sale.paymentStatus === 'pago') continue;
+                    // BUG FIX: não pula vendas totalmente pagas — parcelas pagas devem aparecer com badge "Pago"
+                    // if (sale.paymentStatus === 'pago') continue;
 
                     const client       = clientsMapById.get(sale.clientId);
                     const nomeCliente  = client ? client.name : 'Cliente';
@@ -10497,22 +10498,25 @@ tr:hover td { background: rgba(255,107,0,0.03) !important; }
                             const mLbl = {pix:'PIX',cash:'Dinheiro',debit:'Débito',credit:'Crédito',installment:'Crediário'}[slot.method] || slot.method;
                             if (slot.method === 'installment') {
                                 // Parcelas do crediário desta forma
+                                // BUG FIX: inclui parcelas pagas com pago:true (igual a Contas a Pagar manuais)
                                 (slot.parcelas || []).forEach(p => {
-                                    if (p.paid || p.status === 'pago' || p.status === 'paid') return;
+                                    const isParcPago = !!(p.paid || p.status === 'pago' || p.status === 'paid');
                                     contasVendas.push({
                                         id: `venda_${sale.id}_dual${idx}_p${p.number}`,
                                         tipo: 'receber',
                                         descricao: `OS ${sale.number} — ${slotLabel} Forma (Crediário) Parcela ${p.number}/${slot.nParcelas||slot.parcelas.length}`,
                                         parte: nomeCliente,
                                         categoria: 'Crediário',
-                                        valor: parseFloat(p.value || 0),
+                                        valor: parseFloat(isParcPago ? (p.paidValue || p.value || 0) : (p.value || 0)),
                                         vencimento: p.dueDate || '',
-                                        pago: false,
+                                        pago: isParcPago,
+                                        paidValue: isParcPago ? (p.paidValue || p.value || 0) : undefined,
                                         _readonly: true
                                     });
                                 });
                                 // Retirada desta forma de crediário
-                                if ((slot.retirada || 0) > 0.01 && !sale[`retiradaPaga_dual${idx}`]) {
+                                const retPagaDual = !!sale[`retiradaPaga_dual${idx}`];
+                                if ((slot.retirada || 0) > 0.01) {
                                     contasVendas.push({
                                         id: `venda_${sale.id}_dual${idx}_retirada`,
                                         tipo: 'receber',
@@ -10521,13 +10525,14 @@ tr:hover td { background: rgba(255,107,0,0.03) !important; }
                                         categoria: 'Retirada',
                                         valor: parseFloat(slot.retirada),
                                         vencimento: sale.deliveryForecast || sale.date || '',
-                                        pago: false,
+                                        pago: retPagaDual,
                                         _readonly: true
                                     });
                                 }
                             } else {
-                                // À vista com retirada pendente (não precisa de entrada > 0)
-                                if ((slot.retirada || 0) > 0.01 && !sale[`retiradaPaga_dual${idx}`]) {
+                                // À vista com retirada — BUG FIX: inclui paga com pago:true
+                                if ((slot.retirada || 0) > 0.01) {
+                                    const retPagaDualAV = !!sale[`retiradaPaga_dual${idx}`];
                                     contasVendas.push({
                                         id: `venda_${sale.id}_dual${idx}_retirada`,
                                         tipo: 'receber',
@@ -10536,7 +10541,7 @@ tr:hover td { background: rgba(255,107,0,0.03) !important; }
                                         categoria: 'Retirada',
                                         valor: parseFloat(slot.retirada),
                                         vencimento: sale.deliveryForecast || sale.date || '',
-                                        pago: false,
+                                        pago: retPagaDualAV,
                                         _readonly: true
                                     });
                                 }
@@ -10547,26 +10552,28 @@ tr:hover td { background: rgba(255,107,0,0.03) !important; }
                     }
                     // ── Crediário ──────────────────────────────────────────────
                     if (method === 'installment') {
-                        // Parcelas pendentes
+                        // BUG FIX: inclui todas as parcelas (pagas e pendentes) — pagas aparecem com badge "Pago"
                         parcelas.forEach(p => {
-                            if (p.paid || p.status === 'pago' || p.status === 'paid') return;
+                            const isParcPago = !!(p.paid || p.status === 'pago' || p.status === 'paid');
+                            // BUG FIX: usa isParcPago calculado acima para valor e flag corretos
                             contasVendas.push({
                                 id: 'venda_' + sale.id + '_p' + p.number,
                                 tipo: 'receber',
                                 descricao: `OS ${sale.number} — Parcela ${p.number}/${parcelas.length}`,
                                 parte: nomeCliente,
                                 categoria: 'Crediário',
-                                valor: parseFloat(p.value || 0),
+                                valor: parseFloat(isParcPago ? (p.paidValue || p.value || 0) : (p.value || 0)),
                                 vencimento: p.dueDate || '',
-                                pago: false,
+                                pago: isParcPago,
+                                paidValue: isParcPago ? (p.paidValue || p.value || 0) : undefined,
                                 _readonly: true
                             });
                         });
 
                         // Valor na retirada do crediário
-                        // Pode estar salvo em det.retiradaEntry (instFromValue) OU det.retiradaValue (instFromPercent)
+                        // BUG FIX: inclui retirada paga com pago:true
                         const retiradaCrediario = parseFloat(det.retiradaEntry || 0) || parseFloat(det.retiradaValue || 0);
-                        if (retiradaCrediario > 0.01 && !sale.retiradaPaga) {
+                        if (retiradaCrediario > 0.01) {
                             contasVendas.push({
                                 id: 'venda_' + sale.id + '_retirada',
                                 tipo: 'receber',
@@ -10575,7 +10582,7 @@ tr:hover td { background: rgba(255,107,0,0.03) !important; }
                                 categoria: 'Retirada',
                                 valor: retiradaCrediario,
                                 vencimento: sale.deliveryForecast || sale.date || '',
-                                pago: false,
+                                pago: !!sale.retiradaPaga,
                                 _readonly: true
                             });
                         }
@@ -10584,13 +10591,9 @@ tr:hover td { background: rgba(255,107,0,0.03) !important; }
 
                     // ── À vista (PIX / Dinheiro / Débito / Crédito) ────────────
                     if (metodosAVista.includes(method)) {
-                        // FIX BUG ENTREGUE: status 'entregue' NÃO significa pagamento quitado —
-                        // uma venda pode ser entregue e ainda ter saldo pendente na retirada.
-                        // Só pula se retiradaPaga=true (marcado manualmente ao receber).
-                        if (sale.status === 'entregue' && sale.retiradaPaga) continue;
-                        // Só gera conta a receber se foi explicitamente salvo um saldo de retirada
+                        // BUG FIX: inclui retirada paga com pago:true em vez de pular
                         const retiradaAVista = parseFloat(det.retiradaValue || 0);
-                        if (retiradaAVista > 0.01 && !sale.retiradaPaga) {
+                        if (retiradaAVista > 0.01) {
                             contasVendas.push({
                                 id: 'venda_' + sale.id + '_retirada',
                                 tipo: 'receber',
@@ -10599,11 +10602,11 @@ tr:hover td { background: rgba(255,107,0,0.03) !important; }
                                 categoria: 'Retirada',
                                 valor: retiradaAVista,
                                 vencimento: sale.deliveryForecast || sale.date || '',
-                                pago: false,
+                                pago: !!sale.retiradaPaga,
                                 _readonly: true
                             });
                         }
-                        // PIX/Dinheiro/Débito/Crédito integralmente pago → não gera nada
+                        // PIX/Dinheiro/Débito/Crédito integralmente pago → não gera nada (retirada já tratada acima)
                         continue; // Fix Bug #1
                     }
 
@@ -10617,19 +10620,20 @@ tr:hover td { background: rgba(255,107,0,0.03) !important; }
                             categoria: 'Venda',
                             valor: parseFloat(sale.total || 0),
                             vencimento: sale.deliveryForecast || sale.date || '',
-                            pago: false,
+                            pago: !!(sale.paymentStatus === 'pago' || sale.pago),
                             _readonly: true
                         });
                     }
                 } // end for...of sales (Fix Bug #1)
 
-                // ── Injeta despesas pendentes em Contas a Pagar ────────────────
+                // ── Injeta despesas em Contas a Pagar (pagas e pendentes) ─────
                 const contasDespesas = [];
                 // Fix: mapeia fornecedores para lookup de nome por ID
                 const supplierMap = {};
                 (state.suppliers || []).forEach(s => { if (s.id) supplierMap[s.id] = s.name || s.id; });
+                // BUG FIX: inclui despesas pagas com pago:true (igual às contas manuais)
                 (state.expenses || []).forEach(exp => {
-                    if (exp.status === 'pago' || exp.pago || exp.paid) return;
+                    const isExpPago = !!(exp.status === 'pago' || exp.pago || exp.paid);
                     // Fix Bug #4: resolve nome do fornecedor em vez de expor UUID
                     const parteRaw = exp.supplierId || exp.supplier || '';
                     const parteNome = supplierMap[parteRaw] || parteRaw || '';
@@ -10641,7 +10645,7 @@ tr:hover td { background: rgba(255,107,0,0.03) !important; }
                         categoria: exp.category || 'Despesa',
                         valor: parseFloat(exp.value || 0),
                         vencimento: exp.date || '',
-                        pago: false,
+                        pago: isExpPago,
                         _readonly: true
                     });
                 });
@@ -10705,14 +10709,25 @@ tr:hover td { background: rgba(255,107,0,0.03) !important; }
                 this._hoje       = hoje;
                 // ✅ Cache dos totais originais (antes de qualquer filtro)
                 this._totaisBase = { totalRec, totalPag, recVencidas, recAVencer, pagVencidas, pagAVencer };
-                // FIX FILTRO: re-aplica o filtro ativo (ex: Pagos) apos cada renderAll
-                // Antes: renderAll sempre exibia a lista completa, ignorando o filtro selecionado
-                const filtroAtualRec = document.getElementById('contasReceberFiltro')?.value || 'todos';
+                // BUG FIX: re-aplica o filtro ativo após cada renderAll
+                // Se filtro estiver em "todos", exibe apenas pendentes por padrão para não sobrecarregar
+                // com histórico de pagamentos. O usuário pode selecionar "Pagos" para ver os quitados.
+                const filtroAtualRec = document.getElementById('contasReceberFiltro')?.value || 'pendente';
                 const buscaAtualRec  = (document.getElementById('contasReceberBusca')?.value || '').trim();
-                const filtroAtualPag = document.getElementById('contasPagarFiltro')?.value || 'todos';
+                const filtroAtualPag = document.getElementById('contasPagarFiltro')?.value || 'pendente';
                 const buscaAtualPag  = (document.getElementById('contasPagarBusca')?.value || '').trim();
-                const temFiltroAtivo = filtroAtualRec !== 'todos' || buscaAtualRec || filtroAtualPag !== 'todos' || buscaAtualPag;
-                if (temFiltroAtivo) { this.filtrar(); } else { this._renderList('contasReceberList', receber, hoje); this._renderList('contasPagarList', pagar, hoje); }
+
+                // Aplica filtro sempre (inclui o caso "todos" que agora contém pagos)
+                const aplicar = (lista, busca, filtro) => lista.filter(c => {
+                    const texto = ((c.descricao||'') + ' ' + (c.parte||'')).toLowerCase();
+                    if (busca && !texto.includes(busca)) return false;
+                    if (filtro === 'pago')    return c.pago;
+                    if (filtro === 'vencida') return !c.pago && c.vencimento && c.vencimento < hoje;
+                    if (filtro === 'pendente') return !c.pago;
+                    return true; // todos
+                });
+                this._renderList('contasReceberList', aplicar(receber, buscaAtualRec, filtroAtualRec), hoje);
+                this._renderList('contasPagarList',   aplicar(pagar,   buscaAtualPag, filtroAtualPag), hoje);
                 // Atualiza indicador de última sincronização
                 this._atualizarIndicadorSync();
                 } finally {
@@ -10818,9 +10833,10 @@ tr:hover td { background: rgba(255,107,0,0.03) !important; }
                                 ${!c.pago && c._readonly ? `<button class="btn btn-sm" style="background:#28a745;color:white;padding:4px 8px;font-size:0.75rem;" title="Dar Baixa" onclick="ContasManager.darBaixaVenda('${c.id}')"><i class="fas fa-check"></i></button>` : ''}
                                 ${wppBtn}
                                 ${!c._readonly ? `<button class="btn btn-sm btn-secondary" style="padding:4px 8px;font-size:0.75rem;" title="Comprovante" onclick="ContasManager.gerarComprovante('${c.id}')"><i class="fas fa-receipt"></i></button>` : ''}
+                                ${c._readonly && c.pago ? `<button class="btn btn-sm btn-secondary" style="padding:4px 8px;font-size:0.75rem;" title="Comprovante de Pagamento" onclick="ContasManager.gerarComprovanteVenda('${c.id}','${(c.descricao||'').replace(/'/g,"\\'")}',${parseFloat(c.paidValue||c.valor||0)},'${(c.parte||'').replace(/'/g,"\\'")}','${(c.categoria||'').replace(/'/g,"\\'")}','${c.vencimento||''}','','')"><i class="fas fa-receipt"></i></button>` : ''}
                                 ${!c._readonly ? `<button class="btn btn-sm" style="background:#17a2b8;color:white;padding:4px 8px;font-size:0.75rem;" title="Editar" onclick="ContasManager.editarConta('${c.id}')"><i class="fas fa-pen"></i></button>` : ''}
                                 ${!c._readonly ? `<button class="btn btn-sm btn-danger" style="padding:4px 8px;font-size:0.75rem;" title="Excluir" onclick="ContasManager.excluirConta('${c.id}')"><i class="fas fa-trash"></i></button>` : ''}
-                                ${c._readonly ? `<span style="font-size:0.7rem;color:var(--gray);padding:2px 5px;" title="Gerado automaticamente pela venda">🔗</span>` : ''}
+                                ${c._readonly && !c.pago ? `<span style="font-size:0.7rem;color:var(--gray);padding:2px 5px;" title="Gerado automaticamente pela venda">🔗</span>` : ''}
                             </div>
                         </div>
                     </div>`;
