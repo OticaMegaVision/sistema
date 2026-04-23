@@ -790,16 +790,23 @@
             color: var(--dark);
             margin-bottom: 0.3rem;
             letter-spacing: -0.5px;
-            /* ✅ Evita corte no mobile */
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
+            /* ✅ Nunca corta o valor — sempre visível */
+            white-space: normal;
+            overflow: visible;
+            word-break: keep-all;
+            overflow-wrap: break-word;
             max-width: 100%;
         }
 
-        /* ✅ Mobile: reduz fonte do valor para caber em 2 colunas */
+        /* ✅ Mobile: font-size fluido com clamp() — cabe em 2 colunas sem "..." */
         @media (max-width: 576px) {
-            .card-value { font-size: 1.15rem; letter-spacing: -0.3px; }
+            .card-value {
+                font-size: clamp(0.82rem, 3.8vw, 1.15rem);
+                letter-spacing: -0.3px;
+                white-space: normal;
+                overflow: visible;
+                text-overflow: clip;
+            }
             .card { padding: 0.9rem 0.85rem 0.75rem; border-radius: 10px; }
             .card-title { font-size: 0.62rem; letter-spacing: 0.4px; }
             .card-icon { width: 28px; height: 28px; font-size: 0.8rem; }
@@ -3841,9 +3848,15 @@ body {
     color: #aaa !important;
 }
 .card-value {
-    font-size: 1.85rem !important;
+    /* clamp(mínimo, fluido, máximo) — escala automaticamente no mobile sem "..." */
+    font-size: clamp(0.82rem, 3.8vw, 1.85rem) !important;
     font-weight: 900 !important;
     letter-spacing: -1px !important;
+    white-space: normal !important;
+    overflow: visible !important;
+    text-overflow: clip !important;
+    word-break: keep-all !important;
+    overflow-wrap: break-word !important;
 }
 .dark-mode .card { background: #1a1208 !important; border-color: rgba(255,107,0,0.12) !important; }
 
