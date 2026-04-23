@@ -10171,27 +10171,18 @@ tr:hover td { background: rgba(255,107,0,0.03) !important; }
             }
 
             function _showSyncIndicator(msg) {
+                // FIX: não exibe widget para polls sem mudanças (✓ Atualizado)
+                // Só mostra quando há dados realmente novos (↓, ↑, 🔄)
+                if (msg.startsWith('✓')) return;
                 _ensureWidget();
                 clearInterval(_rtCountdown);
                 clearTimeout(_autoHideTimer);
                 const w = document.getElementById('cs_rt_widget');
-
-                if (msg.startsWith('✓')) {
-                    // Sem mudanças: mostra "Atualizado" por 3s e depois oculta
-                    _updateWidget('ok', msg);
-                    if (w) { w.style.transition = 'opacity 0.3s'; w.style.opacity = '1'; }
-                    _autoHideTimer = setTimeout(() => {
-                        if (w) { w.style.transition = 'opacity 1.5s'; w.style.opacity = '0'; }
-                    }, 3000);
-                } else {
-                    // Dados novos recebidos (↓ Atualizado, ↑ Salvo, etc.):
-                    // mostra o widget, depois oculta após 6s
-                    _updateWidget('ok', msg);
-                    if (w) { w.style.transition = 'opacity 0.3s'; w.style.opacity = '1'; }
-                    _autoHideTimer = setTimeout(() => {
-                        if (w) { w.style.transition = 'opacity 1.5s'; w.style.opacity = '0'; }
-                    }, 6000);
-                }
+                _updateWidget('ok', msg);
+                if (w) { w.style.transition = 'opacity 0.3s'; w.style.opacity = '1'; }
+                _autoHideTimer = setTimeout(() => {
+                    if (w) { w.style.transition = 'opacity 1.5s'; w.style.opacity = '0'; }
+                }, 6000);
             }
 
             // ── UI ───────────────────────────────────────────────────────────
@@ -10487,9 +10478,9 @@ tr:hover td { background: rgba(255,107,0,0.03) !important; }
                     // ── Pagamento Misto (múltiplas formas) ────────────────────
                     // Bug #2 Fix: mixedPayments não era processado em ContasManager
                     if (sale.paymentMethod === 'mixed' && Array.isArray(sale.mixedPayments) && sale.mixedPayments.length > 0) {
-                        // Vendas mistas são pagas integralmente no ato — só gera conta se houver retirada pendente
+                        // BUG FIX: sempre inclui retirada (paga ou não) para que apareça em "Pagos" após baixa
                         const retiradaMista = parseFloat(det.retiradaValue || 0);
-                        if (retiradaMista > 0.01 && !sale.retiradaPaga) {
+                        if (retiradaMista > 0.01) {
                             const mixLabel = sale.mixedPayments.map(r => ({pix:'PIX',cash:'Dinheiro',debit:'Débito',credit:'Crédito',installment:'Crediário'}[r.method]||r.method)).join('+');
                             contasVendas.push({
                                 id: 'venda_' + sale.id + '_retirada',
@@ -10499,7 +10490,7 @@ tr:hover td { background: rgba(255,107,0,0.03) !important; }
                                 categoria: 'Retirada',
                                 valor: retiradaMista,
                                 vencimento: sale.deliveryForecast || sale.date || '',
-                                pago: false,
+                                pago: !!sale.retiradaPaga, // FIX: reflete estado real após baixa
                                 _readonly: true
                             });
                         }
@@ -10952,13 +10943,13 @@ tr:hover td { background: rgba(255,107,0,0.03) !important; }
                 overlay.querySelector('#_bxCancel').onclick = () => overlay.remove();
                 overlay.onclick = e => { if (e.target === overlay) overlay.remove(); };
                 overlay.querySelector('#_bxConfirm').onclick = function() {
-                    if (this._bxExecuting) return; // FIX: bloqueia duplo clique
+                    if (this._bxExecuting) return;
                     const paidVal    = parseFloat(overlay.querySelector('#_bxVal').value) || 0;
                     const forma      = overlay.querySelector('#_bxForma').value;
                     const obs        = overlay.querySelector('#_bxObs').value.trim();
                     if (paidVal <= 0) { Toast.show('Informe um valor válido', 'warning'); return; }
-                    this._bxExecuting = true; // FIX: marca como em execução
-                    const _bxBtn = this; _bxBtn.disabled = true; _bxBtn.textContent = '⏳ Salvando...';
+                    this._bxExecuting = true;
+                    this.disabled = true; this.textContent = '⏳ Salvando...';
                     const idx2 = contas.findIndex(c => c.id === id);
                     if (idx2 >= 0) {
                         const valorOriginal = parseFloat(contas[idx2].valor || 0);
@@ -10982,7 +10973,6 @@ tr:hover td { background: rgba(255,107,0,0.03) !important; }
                             contas[idx2].formaPagamento = forma || '—';
                             if (obs) contas[idx2].obs = obs;
                             overlay.remove();
-                            // FIX RACE: await saveAll garante IDB atualizado antes do renderAll
                             this.saveAll(contas).then(() => {
                                 this.renderAll().catch(()=>{});
                                 Dashboard.update().catch(()=>{});
@@ -10996,7 +10986,6 @@ tr:hover td { background: rgba(255,107,0,0.03) !important; }
                             contas[idx2].formaPagamento = forma || '—';
                             if (obs) contas[idx2].obs = obs;
                             overlay.remove();
-                            // FIX RACE: await saveAll garante IDB atualizado antes do renderAll
                             this.saveAll(contas).then(() => {
                                 this.renderAll().catch(()=>{});
                                 Dashboard.update().catch(()=>{});
@@ -11058,12 +11047,12 @@ tr:hover td { background: rgba(255,107,0,0.03) !important; }
                 overlay.querySelector('#_vbxCancel').onclick = () => overlay.remove();
                 overlay.onclick = e => { if (e.target === overlay) overlay.remove(); };
                 overlay.querySelector('#_vbxConfirm').onclick = function() {
-                    if (this._vbxExecuting) return; // FIX: bloqueia duplo clique
+                    if (this._vbxExecuting) return;
                     const paidVal = parseFloat(overlay.querySelector('#_vbxVal').value) || 0;
                     const forma   = overlay.querySelector('#_vbxForma').value || '—';
                     const obs     = overlay.querySelector('#_vbxObs')?.value?.trim() || '';
                     if (paidVal <= 0) { Toast.show('Informe um valor válido','warning'); return; }
-                    this._vbxExecuting = true; // FIX: previne segunda execução
+                    this._vbxExecuting = true;
                     this.disabled = true; this.textContent = '⏳ Salvando...';
                     overlay.remove();
                     ContasManager._executarBaixaVenda(itemId, tipo, sale, paidVal, forma, itemValor, itemDescricao, itemCliente, itemCategoria, itemVencimento, obs);
@@ -11089,30 +11078,28 @@ tr:hover td { background: rgba(255,107,0,0.03) !important; }
                                 if (!parc.pagamentosParciais) parc.pagamentosParciais = [];
                                 parc.pagamentosParciais.push({ data: new Date().toISOString(), valor: paidVal, forma, obs });
                 if (isParcial) {
-                                // Pagamento parcial: desconta e mantém pendente
-                                const saldo = Math.max(0, valorParc - paidVal);
-                                parc.valorOriginal = parc.valorOriginal || valorParc;
-                                parc.value  = parseFloat(saldo.toFixed(2));
-                                parc.valor  = parc.value;
-                                parc.paid   = false; parc.status = 'parcial';
-                                parc.formaPagamento = forma;
+                                    // Pagamento parcial: desconta e mantém pendente
+                                    const saldo = Math.max(0, valorParc - paidVal);
+                                    parc.valorOriginal = parc.valorOriginal || valorParc;
+                                    parc.value  = parseFloat(saldo.toFixed(2));
+                                    parc.valor  = parc.value;
+                                    parc.paid   = false; parc.status = 'parcial';
+                                    parc.formaPagamento = forma;
+                                    sale.updated_at = new Date().toISOString();
+                                    const _p1 = window.LocalFirst ? LocalFirst.pushItem('sales', sale) : Promise.resolve();
+                                    _p1.catch(()=>{}).finally(() => { ContasManager.renderAll().catch(()=>{}); Dashboard.update().catch(()=>{}); });
+                                    Toast.show(`💰 Pagamento parcial de R$ ${paidVal.toFixed(2).replace('.',',')} registrado. Saldo: R$ ${saldo.toFixed(2).replace('.',',')}`, 'warning', 5000);
+                                } else {
+                                    parc.paid = true; parc.status = 'pago';
+                                    parc.paidDate = new Date().toISOString().slice(0,10);
+                                    parc.paidValue = paidVal; parc.formaPagamento = forma;
+                                    if (this.checkPaymentComplete(sale)) sale.paymentStatus = 'pago';
+                                    Toast.show(`Parcela ${num} quitada! ✅`, 'success');
+                                    this.gerarComprovanteVenda(itemId, itemDescricao||`Parcela ${num}`, itemValor||valorParc, itemCliente, itemCategoria, itemVencimento, forma, obs);
+                                }
                                 sale.updated_at = new Date().toISOString();
-                                // FIX RACE: aguarda pushItem antes de renderAll
-                                const _push1 = window.LocalFirst ? LocalFirst.pushItem('sales', sale) : Promise.resolve();
-                                _push1.catch(()=>{}).finally(() => { ContasManager.renderAll().catch(()=>{}); Dashboard.update().catch(()=>{}); });
-                                Toast.show(`💰 Pagamento parcial de R$ ${paidVal.toFixed(2).replace('.',',')} registrado. Saldo: R$ ${saldo.toFixed(2).replace('.',',')}`, 'warning', 5000);
-                            } else {
-                                parc.paid = true; parc.status = 'pago';
-                                parc.paidDate = new Date().toISOString().slice(0,10);
-                                parc.paidValue = paidVal; parc.formaPagamento = forma;
-                                if (this.checkPaymentComplete(sale)) sale.paymentStatus = 'pago';
-                                Toast.show(`Parcela ${num} quitada! ✅`, 'success');
-                                this.gerarComprovanteVenda(itemId, itemDescricao||`Parcela ${num}`, itemValor||valorParc, itemCliente, itemCategoria, itemVencimento, forma, obs);
-                            }
-                                sale.updated_at = new Date().toISOString();
-                                // FIX RACE: aguarda pushItem antes de renderAll
-                                const _push1b = window.LocalFirst ? LocalFirst.pushItem('sales', sale) : Promise.resolve();
-                                _push1b.catch(()=>{}).finally(() => { ContasManager.renderAll().catch(()=>{}); Dashboard.update().catch(()=>{}); });
+                                const _p1b = window.LocalFirst ? LocalFirst.pushItem('sales', sale) : Promise.resolve();
+                                _p1b.catch(()=>{}).finally(() => { ContasManager.renderAll().catch(()=>{}); Dashboard.update().catch(()=>{}); });
                             }
                         }
                     } else if (dualSub === 'retirada') {
@@ -11150,9 +11137,8 @@ tr:hover td { background: rgba(255,107,0,0.03) !important; }
                                 parc.status         = 'parcial';
                                 parc.formaPagamento = forma;
                                 sale.updated_at = new Date().toISOString();
-                                // FIX RACE: aguarda pushItem antes de renderAll
-                                const _push2 = window.LocalFirst ? LocalFirst.pushItem('sales', sale) : Promise.resolve();
-                                _push2.catch(()=>{}).finally(() => { ContasManager.renderAll().catch(()=>{}); Dashboard.update().catch(()=>{}); });
+                                const _p2 = window.LocalFirst ? LocalFirst.pushItem('sales', sale) : Promise.resolve();
+                                _p2.catch(()=>{}).finally(() => { ContasManager.renderAll().catch(()=>{}); Dashboard.update().catch(()=>{}); });
                                 Toast.show(`💰 Pagamento parcial de R$ ${paidVal.toFixed(2).replace('.',',')} registrado. Saldo: R$ ${saldo.toFixed(2).replace('.',',')}`, 'warning', 5000);
                             } else {
                                 parc.paid     = true;
@@ -11167,9 +11153,8 @@ tr:hover td { background: rgba(255,107,0,0.03) !important; }
                                 this.gerarComprovanteVenda(itemId, itemDescricao||`Parcela ${num}`, itemValor||valorParc, itemCliente, itemCategoria, itemVencimento, forma, obs);
                             }
                             sale.updated_at = new Date().toISOString();
-                            // FIX RACE: aguarda pushItem antes de renderAll
-                            const _push2b = window.LocalFirst ? LocalFirst.pushItem('sales', sale) : Promise.resolve();
-                            _push2b.catch(()=>{}).finally(() => { ContasManager.renderAll().catch(()=>{}); Dashboard.update().catch(()=>{}); });
+                            const _p2b = window.LocalFirst ? LocalFirst.pushItem('sales', sale) : Promise.resolve();
+                            _p2b.catch(()=>{}).finally(() => { ContasManager.renderAll().catch(()=>{}); Dashboard.update().catch(()=>{}); });
                         }
                     }
                 } else if (tipo === 'retirada') {
@@ -11185,17 +11170,15 @@ tr:hover td { background: rgba(255,107,0,0.03) !important; }
                         sale.paymentStatus = 'pago';
                     }
                     sale.updated_at = new Date().toISOString();
-                    // FIX RACE: aguarda pushItem antes de renderAll
-                    const _pushRet = window.LocalFirst ? LocalFirst.pushItem('sales', sale) : Promise.resolve();
-                    _pushRet.catch(()=>{}).finally(() => { ContasManager.renderAll().catch(()=>{}); Dashboard.update().catch(()=>{}); });
+                    const _pRet = window.LocalFirst ? LocalFirst.pushItem('sales', sale) : Promise.resolve();
+                    _pRet.catch(()=>{}).finally(() => { ContasManager.renderAll().catch(()=>{}); Dashboard.update().catch(()=>{}); });
                     Toast.show('Pagamento na retirada registrado! ✅', 'success');
                     this.gerarComprovanteVenda(itemId, itemDescricao||'Pagamento na Retirada', itemValor, itemCliente, itemCategoria, itemVencimento, forma, obs);
                 } else if (tipo === 'total') {
                     sale.paymentStatus = 'pago';
                     sale.updated_at = new Date().toISOString();
-                    // FIX RACE: aguarda pushItem antes de renderAll
-                    const _pushTot = window.LocalFirst ? LocalFirst.pushItem('sales', sale) : Promise.resolve();
-                    _pushTot.catch(()=>{}).finally(() => { ContasManager.renderAll().catch(()=>{}); Dashboard.update().catch(()=>{}); });
+                    const _pTot = window.LocalFirst ? LocalFirst.pushItem('sales', sale) : Promise.resolve();
+                    _pTot.catch(()=>{}).finally(() => { ContasManager.renderAll().catch(()=>{}); Dashboard.update().catch(()=>{}); });
                     Toast.show('Pagamento registrado! ✅', 'success');
                     this.gerarComprovanteVenda(itemId, itemDescricao||'Pagamento Total', itemValor||sale.total||0, itemCliente, itemCategoria, itemVencimento, forma, obs);
                 }
