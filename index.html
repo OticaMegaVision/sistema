@@ -17,11 +17,88 @@
     <!-- ===== MANIFEST E ÍCONES PWA (inline) ===== -->
     <script>
     (function() {
-        var iconSvgB64 = 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxMDAgMTAwIj48cmVjdCB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgcng9IjE4IiBmaWxsPSIjRkY2QjAwIi8+PGNpcmNsZSBjeD0iMzQiIGN5PSI1MiIgcj0iMTYiIGZpbGw9Im5vbmUiIHN0cm9rZT0id2hpdGUiIHN0cm9rZS13aWR0aD0iMTAiLz48Y2lyY2xlIGN4PSI2NiIgY3k9IjUyIiByPSIxNiIgZmlsbD0ibm9uZSIgc3Ryb2tlPSJ3aGl0ZSIgc3Ryb2tlLXdpZHRoPSIxMCIvPjxsaW5lIHgxPSIxOCIgeTE9IjQ1IiB4Mj0iMTQiIHkyPSI0MCIgc3Ryb2tlPSJ3aGl0ZSIgc3Ryb2tlLXdpZHRoPSI3IiBzdHJva2UtbGluZWNhcD0icm91bmQiLz48bGluZSB4MT0iODIiIHkxPSI0NSIgeDI9Ijg2IiB5Mj0iNDAiIHN0cm9rZT0id2hpdGUiIHN0cm9rZS13aWR0aD0iNyIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIi8+PC9zdmc+';
-        var manifest = {name:"ÓticaVision Pro",short_name:"ÓticaVision",description:"Sistema Profissional de Gestão para Óticas",start_url:location.href.replace(/\/[^\/]*$/,'/'),scope:location.href.replace(/\/[^\/]*$/,'/'),display:"standalone",background_color:"#ffffff",theme_color:"#ff6b00",orientation:"portrait-primary",icons:[{src:iconSvgB64,sizes:"192x192",type:"image/svg+xml",purpose:"any maskable"},{src:iconSvgB64,sizes:"512x512",type:"image/svg+xml",purpose:"any maskable"}]};
-        var blob = new Blob([JSON.stringify(manifest)],{type:'application/manifest+json'});
-        var ml = document.createElement('link'); ml.rel='manifest'; ml.href=URL.createObjectURL(blob);
-        document.currentScript.parentNode.insertBefore(ml,document.currentScript);
+        // Gera ícone PNG via canvas — necessário para PWA no Windows/Edge/Chrome PC
+        // SVG no manifesto não é renderizado corretamente como ícone instalado no PC
+        function gerarIconePNG(size, callback) {
+            var c = document.createElement('canvas');
+            c.width = size; c.height = size;
+            var ctx = c.getContext('2d');
+            var r = size * 0.18; // raio dos cantos
+
+            // Fundo laranja com bordas arredondadas
+            ctx.beginPath();
+            ctx.moveTo(r, 0);
+            ctx.lineTo(size - r, 0);
+            ctx.quadraticCurveTo(size, 0, size, r);
+            ctx.lineTo(size, size - r);
+            ctx.quadraticCurveTo(size, size, size - r, size);
+            ctx.lineTo(r, size);
+            ctx.quadraticCurveTo(0, size, 0, size - r);
+            ctx.lineTo(0, r);
+            ctx.quadraticCurveTo(0, 0, r, 0);
+            ctx.closePath();
+            ctx.fillStyle = '#FF6B00';
+            ctx.fill();
+
+            // Óculos — lente esquerda
+            var lx = size * 0.34, ly = size * 0.52, lr = size * 0.16, lw = size * 0.10;
+            ctx.beginPath();
+            ctx.arc(lx, ly, lr, 0, Math.PI * 2);
+            ctx.strokeStyle = 'white';
+            ctx.lineWidth = lw;
+            ctx.stroke();
+
+            // Óculos — lente direita
+            var rx2 = size * 0.66;
+            ctx.beginPath();
+            ctx.arc(rx2, ly, lr, 0, Math.PI * 2);
+            ctx.strokeStyle = 'white';
+            ctx.lineWidth = lw;
+            ctx.stroke();
+
+            // Hastes
+            ctx.lineCap = 'round';
+            ctx.lineWidth = size * 0.07;
+            ctx.beginPath();
+            ctx.moveTo(size * 0.18, size * 0.45);
+            ctx.lineTo(size * 0.14, size * 0.40);
+            ctx.stroke();
+            ctx.beginPath();
+            ctx.moveTo(size * 0.82, size * 0.45);
+            ctx.lineTo(size * 0.86, size * 0.40);
+            ctx.stroke();
+
+            callback(c.toDataURL('image/png'));
+        }
+
+        gerarIconePNG(512, function(png512) {
+            gerarIconePNG(192, function(png192) {
+                var manifest = {
+                    name: "ÓticaVision Pro",
+                    short_name: "ÓticaVision",
+                    description: "Sistema Profissional de Gestão para Óticas",
+                    start_url: location.href.replace(/\/[^\/]*$/, '/'),
+                    scope: location.href.replace(/\/[^\/]*$/, '/'),
+                    display: "standalone",
+                    background_color: "#ffffff",
+                    theme_color: "#ff6b00",
+                    orientation: "portrait-primary",
+                    icons: [
+                        { src: png192, sizes: "192x192", type: "image/png", purpose: "any maskable" },
+                        { src: png512, sizes: "512x512", type: "image/png", purpose: "any maskable" }
+                    ]
+                };
+                var blob = new Blob([JSON.stringify(manifest)], { type: 'application/manifest+json' });
+                var existing = document.querySelector('link[rel="manifest"]');
+                if (existing) existing.href = URL.createObjectURL(blob);
+                else {
+                    var ml = document.createElement('link');
+                    ml.rel = 'manifest';
+                    ml.href = URL.createObjectURL(blob);
+                    document.head.appendChild(ml);
+                }
+            });
+        });
     })();
     </script>
     <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='18' fill='%23FF6B00'/%3E%3Ccircle cx='34' cy='52' r='16' fill='none' stroke='white' stroke-width='10'/%3E%3Ccircle cx='66' cy='52' r='16' fill='none' stroke='white' stroke-width='10'/%3E%3Cline x1='18' y1='45' x2='14' y2='40' stroke='white' stroke-width='7' stroke-linecap='round'/%3E%3Cline x1='82' y1='45' x2='86' y2='40' stroke='white' stroke-width='7' stroke-linecap='round'/%3E%3C/svg%3E">
@@ -785,7 +862,7 @@
         }
 
         .card-value {
-            font-size: 1.7rem;
+            font-size: 2.04rem;
             font-weight: 800;
             color: var(--dark);
             margin-bottom: 0.3rem;
@@ -801,7 +878,7 @@
         /* ✅ Mobile: font-size fluido com clamp() — cabe em 2 colunas sem "..." */
         @media (max-width: 576px) {
             .card-value {
-                font-size: clamp(1.6rem, 8.74vw, 2.35rem);
+                font-size: clamp(1.92rem, 10.49vw, 2.82rem);
                 letter-spacing: -0.5px;
                 white-space: normal;
                 overflow: visible;
