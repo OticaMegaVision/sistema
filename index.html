@@ -14,16 +14,31 @@
     <meta name="apple-mobile-web-app-title" content="ÓticaVision">
     <meta name="msapplication-TileColor" content="#ff6b00">
     <meta name="msapplication-tap-highlight" content="no">
-    <!-- ===== MANIFEST E ÍCONES PWA ===== -->
-    <link rel="manifest" href="./manifest.json">
-    <link rel="icon" type="image/svg+xml" href="./favicon.svg">
-    <link rel="icon" type="image/png" sizes="32x32" href="./favicon-32x32.png">
-    <link rel="icon" type="image/png" sizes="16x16" href="./favicon-32x32.png">
-    <link rel="icon" type="image/png" href="./favicon.png">
-    <link rel="apple-touch-icon" sizes="180x180" href="./favicon.png">
-    <link rel="icon" type="image/png" sizes="192x192" href="./favicon.png">
-    <link rel="icon" type="image/png" sizes="512x512" href="./favicon.png">
-    <meta name="msapplication-TileImage" content="./favicon.png">
+    <!-- ===== MANIFEST E ÍCONES PWA (inline — sem dependência de arquivos externos) ===== -->
+    <script>
+    (function() {
+        var iconSvgB64 = 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxMDAgMTAwIj48cmVjdCB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgcng9IjE4IiBmaWxsPSIjRkY2QjAwIi8+PGNpcmNsZSBjeD0iMzQiIGN5PSI1MiIgcj0iMTYiIGZpbGw9Im5vbmUiIHN0cm9rZT0id2hpdGUiIHN0cm9rZS13aWR0aD0iMTAiLz48Y2lyY2xlIGN4PSI2NiIgY3k9IjUyIiByPSIxNiIgZmlsbD0ibm9uZSIgc3Ryb2tlPSJ3aGl0ZSIgc3Ryb2tlLXdpZHRoPSIxMCIvPjxsaW5lIHgxPSIxOCIgeTE9IjQ1IiB4Mj0iMTQiIHkyPSI0MCIgc3Ryb2tlPSJ3aGl0ZSIgc3Ryb2tlLXdpZHRoPSI3IiBzdHJva2UtbGluZWNhcD0icm91bmQiLz48bGluZSB4MT0iODIiIHkxPSI0NSIgeDI9Ijg2IiB5Mj0iNDAiIHN0cm9rZT0id2hpdGUiIHN0cm9rZS13aWR0aD0iNyIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIi8+PC9zdmc+';
+        var manifest = {
+            name: "ÓticaVision Pro", short_name: "ÓticaVision",
+            description: "Sistema Profissional de Gestão para Óticas",
+            start_url: location.href.replace(/\/[^\/]*$/, '/'),
+            scope: location.href.replace(/\/[^\/]*$/, '/'),
+            display: "standalone", background_color: "#ffffff", theme_color: "#ff6b00",
+            orientation: "portrait-primary",
+            icons: [
+                { src: iconSvgB64, sizes: "192x192", type: "image/svg+xml", purpose: "any maskable" },
+                { src: iconSvgB64, sizes: "512x512", type: "image/svg+xml", purpose: "any maskable" }
+            ]
+        };
+        var blob = new Blob([JSON.stringify(manifest)], { type: 'application/manifest+json' });
+        var mLink = document.createElement('link');
+        mLink.rel = 'manifest'; mLink.href = URL.createObjectURL(blob);
+        document.currentScript.parentNode.insertBefore(mLink, document.currentScript);
+    })();
+    </script>
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='18' fill='%23FF6B00'/%3E%3Ccircle cx='34' cy='52' r='16' fill='none' stroke='white' stroke-width='10'/%3E%3Ccircle cx='66' cy='52' r='16' fill='none' stroke='white' stroke-width='10'/%3E%3Cline x1='18' y1='45' x2='14' y2='40' stroke='white' stroke-width='7' stroke-linecap='round'/%3E%3Cline x1='82' y1='45' x2='86' y2='40' stroke='white' stroke-width='7' stroke-linecap='round'/%3E%3C/svg%3E">
+    <link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='18' fill='%23FF6B00'/%3E%3Ccircle cx='34' cy='52' r='16' fill='none' stroke='white' stroke-width='10'/%3E%3Ccircle cx='66' cy='52' r='16' fill='none' stroke='white' stroke-width='10'/%3E%3Cline x1='18' y1='45' x2='14' y2='40' stroke='white' stroke-width='7' stroke-linecap='round'/%3E%3Cline x1='82' y1='45' x2='86' y2='40' stroke='white' stroke-width='7' stroke-linecap='round'/%3E%3C/svg%3E">
+    <link rel="shortcut icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='18' fill='%23FF6B00'/%3E%3Ccircle cx='34' cy='52' r='16' fill='none' stroke='white' stroke-width='10'/%3E%3Ccircle cx='66' cy='52' r='16' fill='none' stroke='white' stroke-width='10'/%3E%3Cline x1='18' y1='45' x2='14' y2='40' stroke='white' stroke-width='7' stroke-linecap='round'/%3E%3Cline x1='82' y1='45' x2='86' y2='40' stroke='white' stroke-width='7' stroke-linecap='round'/%3E%3C/svg%3E">
     <!-- ===== /PWA META TAGS ===== -->
 
     <!-- ===== RxDB v17 LOCAL-FIRST — IndexedDB + OPFS + Cloud Sync ===== -->
@@ -10936,11 +10951,14 @@ tr:hover td { background: rgba(255,107,0,0.03) !important; }
                 document.body.appendChild(overlay);
                 overlay.querySelector('#_bxCancel').onclick = () => overlay.remove();
                 overlay.onclick = e => { if (e.target === overlay) overlay.remove(); };
-                overlay.querySelector('#_bxConfirm').onclick = () => {
+                overlay.querySelector('#_bxConfirm').onclick = function() {
+                    if (this._bxExecuting) return; // FIX: bloqueia duplo clique
                     const paidVal    = parseFloat(overlay.querySelector('#_bxVal').value) || 0;
                     const forma      = overlay.querySelector('#_bxForma').value;
                     const obs        = overlay.querySelector('#_bxObs').value.trim();
                     if (paidVal <= 0) { Toast.show('Informe um valor válido', 'warning'); return; }
+                    this._bxExecuting = true; // FIX: marca como em execução
+                    const _bxBtn = this; _bxBtn.disabled = true; _bxBtn.textContent = '⏳ Salvando...';
                     const idx2 = contas.findIndex(c => c.id === id);
                     if (idx2 >= 0) {
                         const valorOriginal = parseFloat(contas[idx2].valor || 0);
@@ -10964,6 +10982,11 @@ tr:hover td { background: rgba(255,107,0,0.03) !important; }
                             contas[idx2].formaPagamento = forma || '—';
                             if (obs) contas[idx2].obs = obs;
                             overlay.remove();
+                            // FIX RACE: await saveAll garante IDB atualizado antes do renderAll
+                            this.saveAll(contas).then(() => {
+                                this.renderAll().catch(()=>{});
+                                Dashboard.update().catch(()=>{});
+                            }).catch(()=>{});
                             Toast.show(`💰 Pagamento parcial de R$ ${paidVal.toFixed(2).replace('.',',')} registrado. Saldo restante: R$ ${saldo.toFixed(2).replace('.',',')}`, 'warning', 5000);
                         } else {
                             // Pagamento TOTAL: baixa completa
@@ -10973,13 +10996,14 @@ tr:hover td { background: rgba(255,107,0,0.03) !important; }
                             contas[idx2].formaPagamento = forma || '—';
                             if (obs) contas[idx2].obs = obs;
                             overlay.remove();
+                            // FIX RACE: await saveAll garante IDB atualizado antes do renderAll
+                            this.saveAll(contas).then(() => {
+                                this.renderAll().catch(()=>{});
+                                Dashboard.update().catch(()=>{});
+                            }).catch(()=>{});
                             Toast.show('Baixa registrada! ✅', 'success');
                             this.gerarComprovante(id);
                         }
-                        // Salva e re-renderiza em background
-                        this.saveAll(contas).catch(()=>{});
-                        this.renderAll().catch(()=>{});
-                        Dashboard.update().catch(()=>{});
                     }
                 };
             },
@@ -11033,13 +11057,16 @@ tr:hover td { background: rgba(255,107,0,0.03) !important; }
                 document.body.appendChild(overlay);
                 overlay.querySelector('#_vbxCancel').onclick = () => overlay.remove();
                 overlay.onclick = e => { if (e.target === overlay) overlay.remove(); };
-                overlay.querySelector('#_vbxConfirm').onclick = () => {
+                overlay.querySelector('#_vbxConfirm').onclick = function() {
+                    if (this._vbxExecuting) return; // FIX: bloqueia duplo clique
                     const paidVal = parseFloat(overlay.querySelector('#_vbxVal').value) || 0;
                     const forma   = overlay.querySelector('#_vbxForma').value || '—';
                     const obs     = overlay.querySelector('#_vbxObs')?.value?.trim() || '';
                     if (paidVal <= 0) { Toast.show('Informe um valor válido','warning'); return; }
+                    this._vbxExecuting = true; // FIX: previne segunda execução
+                    this.disabled = true; this.textContent = '⏳ Salvando...';
                     overlay.remove();
-                    this._executarBaixaVenda(itemId, tipo, sale, paidVal, forma, itemValor, itemDescricao, itemCliente, itemCategoria, itemVencimento, obs);
+                    ContasManager._executarBaixaVenda(itemId, tipo, sale, paidVal, forma, itemValor, itemDescricao, itemCliente, itemCategoria, itemVencimento, obs);
                 };
             },
 
@@ -11061,29 +11088,31 @@ tr:hover td { background: rgba(255,107,0,0.03) !important; }
                                 // Histórico de pagamentos parciais
                                 if (!parc.pagamentosParciais) parc.pagamentosParciais = [];
                                 parc.pagamentosParciais.push({ data: new Date().toISOString(), valor: paidVal, forma, obs });
-                                if (isParcial) {
-                                    // Pagamento parcial: desconta e mantém pendente
-                                    const saldo = Math.max(0, valorParc - paidVal);
-                                    parc.valorOriginal = parc.valorOriginal || valorParc;
-                                    parc.value  = parseFloat(saldo.toFixed(2));
-                                    parc.valor  = parc.value;
-                                    parc.paid   = false; parc.status = 'parcial';
-                                    parc.formaPagamento = forma;
-                                    sale.updated_at = new Date().toISOString();
-                                    if (window.LocalFirst) LocalFirst.pushItem('sales', sale).catch(()=>{});
-                                    Toast.show(`💰 Pagamento parcial de R$ ${paidVal.toFixed(2).replace('.',',')} registrado. Saldo: R$ ${saldo.toFixed(2).replace('.',',')}`, 'warning', 5000);
-                                } else {
-                                    parc.paid = true; parc.status = 'pago';
-                                    parc.paidDate = new Date().toISOString().slice(0,10);
-                                    parc.paidValue = paidVal; parc.formaPagamento = forma;
-                                    if (this.checkPaymentComplete(sale)) sale.paymentStatus = 'pago';
-                                    Toast.show(`Parcela ${num} quitada! ✅`, 'success');
-                                    this.gerarComprovanteVenda(itemId, itemDescricao||`Parcela ${num}`, itemValor||valorParc, itemCliente, itemCategoria, itemVencimento, forma, obs);
-                                }
+                if (isParcial) {
+                                // Pagamento parcial: desconta e mantém pendente
+                                const saldo = Math.max(0, valorParc - paidVal);
+                                parc.valorOriginal = parc.valorOriginal || valorParc;
+                                parc.value  = parseFloat(saldo.toFixed(2));
+                                parc.valor  = parc.value;
+                                parc.paid   = false; parc.status = 'parcial';
+                                parc.formaPagamento = forma;
                                 sale.updated_at = new Date().toISOString();
-                                if (window.LocalFirst) LocalFirst.pushItem('sales', sale).catch(()=>{});
-                                this.renderAll().catch(()=>{});
-                                Dashboard.update().catch(()=>{});
+                                // FIX RACE: aguarda pushItem antes de renderAll
+                                const _push1 = window.LocalFirst ? LocalFirst.pushItem('sales', sale) : Promise.resolve();
+                                _push1.catch(()=>{}).finally(() => { ContasManager.renderAll().catch(()=>{}); Dashboard.update().catch(()=>{}); });
+                                Toast.show(`💰 Pagamento parcial de R$ ${paidVal.toFixed(2).replace('.',',')} registrado. Saldo: R$ ${saldo.toFixed(2).replace('.',',')}`, 'warning', 5000);
+                            } else {
+                                parc.paid = true; parc.status = 'pago';
+                                parc.paidDate = new Date().toISOString().slice(0,10);
+                                parc.paidValue = paidVal; parc.formaPagamento = forma;
+                                if (this.checkPaymentComplete(sale)) sale.paymentStatus = 'pago';
+                                Toast.show(`Parcela ${num} quitada! ✅`, 'success');
+                                this.gerarComprovanteVenda(itemId, itemDescricao||`Parcela ${num}`, itemValor||valorParc, itemCliente, itemCategoria, itemVencimento, forma, obs);
+                            }
+                                sale.updated_at = new Date().toISOString();
+                                // FIX RACE: aguarda pushItem antes de renderAll
+                                const _push1b = window.LocalFirst ? LocalFirst.pushItem('sales', sale) : Promise.resolve();
+                                _push1b.catch(()=>{}).finally(() => { ContasManager.renderAll().catch(()=>{}); Dashboard.update().catch(()=>{}); });
                             }
                         }
                     } else if (dualSub === 'retirada') {
@@ -11121,7 +11150,9 @@ tr:hover td { background: rgba(255,107,0,0.03) !important; }
                                 parc.status         = 'parcial';
                                 parc.formaPagamento = forma;
                                 sale.updated_at = new Date().toISOString();
-                                if (window.LocalFirst) LocalFirst.pushItem('sales', sale).catch(()=>{});
+                                // FIX RACE: aguarda pushItem antes de renderAll
+                                const _push2 = window.LocalFirst ? LocalFirst.pushItem('sales', sale) : Promise.resolve();
+                                _push2.catch(()=>{}).finally(() => { ContasManager.renderAll().catch(()=>{}); Dashboard.update().catch(()=>{}); });
                                 Toast.show(`💰 Pagamento parcial de R$ ${paidVal.toFixed(2).replace('.',',')} registrado. Saldo: R$ ${saldo.toFixed(2).replace('.',',')}`, 'warning', 5000);
                             } else {
                                 parc.paid     = true;
@@ -11136,9 +11167,9 @@ tr:hover td { background: rgba(255,107,0,0.03) !important; }
                                 this.gerarComprovanteVenda(itemId, itemDescricao||`Parcela ${num}`, itemValor||valorParc, itemCliente, itemCategoria, itemVencimento, forma, obs);
                             }
                             sale.updated_at = new Date().toISOString();
-                            if (window.LocalFirst) LocalFirst.pushItem('sales', sale).catch(()=>{});
-                            this.renderAll().catch(()=>{});
-                            Dashboard.update().catch(()=>{});
+                            // FIX RACE: aguarda pushItem antes de renderAll
+                            const _push2b = window.LocalFirst ? LocalFirst.pushItem('sales', sale) : Promise.resolve();
+                            _push2b.catch(()=>{}).finally(() => { ContasManager.renderAll().catch(()=>{}); Dashboard.update().catch(()=>{}); });
                         }
                     }
                 } else if (tipo === 'retirada') {
@@ -11154,20 +11185,18 @@ tr:hover td { background: rgba(255,107,0,0.03) !important; }
                         sale.paymentStatus = 'pago';
                     }
                     sale.updated_at = new Date().toISOString();
-                    // Salva apenas a venda modificada
-                    if (window.LocalFirst) LocalFirst.pushItem('sales', sale).catch(()=>{});
+                    // FIX RACE: aguarda pushItem antes de renderAll
+                    const _pushRet = window.LocalFirst ? LocalFirst.pushItem('sales', sale) : Promise.resolve();
+                    _pushRet.catch(()=>{}).finally(() => { ContasManager.renderAll().catch(()=>{}); Dashboard.update().catch(()=>{}); });
                     Toast.show('Pagamento na retirada registrado! ✅', 'success');
-                    this.renderAll().catch(()=>{});
-                    Dashboard.update().catch(()=>{});
                     this.gerarComprovanteVenda(itemId, itemDescricao||'Pagamento na Retirada', itemValor, itemCliente, itemCategoria, itemVencimento, forma, obs);
                 } else if (tipo === 'total') {
                     sale.paymentStatus = 'pago';
                     sale.updated_at = new Date().toISOString();
-                    // Salva apenas a venda modificada
-                    if (window.LocalFirst) LocalFirst.pushItem('sales', sale).catch(()=>{});
+                    // FIX RACE: aguarda pushItem antes de renderAll
+                    const _pushTot = window.LocalFirst ? LocalFirst.pushItem('sales', sale) : Promise.resolve();
+                    _pushTot.catch(()=>{}).finally(() => { ContasManager.renderAll().catch(()=>{}); Dashboard.update().catch(()=>{}); });
                     Toast.show('Pagamento registrado! ✅', 'success');
-                    this.renderAll().catch(()=>{});
-                    Dashboard.update().catch(()=>{});
                     this.gerarComprovanteVenda(itemId, itemDescricao||'Pagamento Total', itemValor||sale.total||0, itemCliente, itemCategoria, itemVencimento, forma, obs);
                 }
             },
