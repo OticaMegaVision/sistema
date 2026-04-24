@@ -3935,6 +3935,12 @@ body {
     word-break: keep-all !important;
     overflow-wrap: break-word !important;
 }
+/* ✅ Mobile: aumenta os números dos widgets em 50% — desktop não é afetado */
+@media (max-width: 768px) {
+    .card-value {
+        font-size: clamp(1.23rem, 5.7vw, 2.78rem) !important;
+    }
+}
 .dark-mode .card { background: #1a1208 !important; border-color: rgba(255,107,0,0.12) !important; }
 
 /* ══════════════════════════════════════
