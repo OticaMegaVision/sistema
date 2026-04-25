@@ -3,27 +3,107 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.5, user-scalable=yes">
-    <title>ÓticaVision Pro - Sistema Profissional</title>
+    <title>ÓticaMegaVision Pro - Sistema Profissional</title>
     <!-- ===== PWA META TAGS ===== -->
-    <meta name="application-name" content="ÓticaVision Pro">
+    <meta name="application-name" content="ÓticaMegaVision Pro">
     <meta name="description" content="Sistema Profissional de Gestão para Óticas">
     <meta name="theme-color" content="#ff6b00">
     <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <meta name="apple-mobile-web-app-title" content="ÓticaVision">
+    <meta name="apple-mobile-web-app-title" content="ÓticaMegaVision">
     <meta name="msapplication-TileColor" content="#ff6b00">
     <meta name="msapplication-tap-highlight" content="no">
-    <!-- ===== MANIFEST E ÍCONES PWA ===== -->
-    <link rel="manifest" href="./manifest.json">
-    <link rel="icon" type="image/svg+xml" href="./favicon.svg">
-    <link rel="icon" type="image/png" sizes="32x32" href="./favicon-32x32.png">
-    <link rel="icon" type="image/png" sizes="16x16" href="./favicon-32x32.png">
-    <link rel="icon" type="image/png" href="./favicon.png">
-    <link rel="apple-touch-icon" sizes="180x180" href="./favicon.png">
-    <link rel="icon" type="image/png" sizes="192x192" href="./favicon.png">
-    <link rel="icon" type="image/png" sizes="512x512" href="./favicon.png">
-    <meta name="msapplication-TileImage" content="./favicon.png">
+    <!-- ===== MANIFEST E ÍCONES PWA (inline) ===== -->
+    <script>
+    (function() {
+        // Gera ícone PNG via canvas — necessário para PWA no Windows/Edge/Chrome PC
+        // SVG no manifesto não é renderizado corretamente como ícone instalado no PC
+        function gerarIconePNG(size, callback) {
+            var c = document.createElement('canvas');
+            c.width = size; c.height = size;
+            var ctx = c.getContext('2d');
+            var r = size * 0.18; // raio dos cantos
+
+            // Fundo laranja com bordas arredondadas
+            ctx.beginPath();
+            ctx.moveTo(r, 0);
+            ctx.lineTo(size - r, 0);
+            ctx.quadraticCurveTo(size, 0, size, r);
+            ctx.lineTo(size, size - r);
+            ctx.quadraticCurveTo(size, size, size - r, size);
+            ctx.lineTo(r, size);
+            ctx.quadraticCurveTo(0, size, 0, size - r);
+            ctx.lineTo(0, r);
+            ctx.quadraticCurveTo(0, 0, r, 0);
+            ctx.closePath();
+            ctx.fillStyle = '#FF6B00';
+            ctx.fill();
+
+            // Óculos — lente esquerda
+            var lx = size * 0.34, ly = size * 0.52, lr = size * 0.16, lw = size * 0.10;
+            ctx.beginPath();
+            ctx.arc(lx, ly, lr, 0, Math.PI * 2);
+            ctx.strokeStyle = 'white';
+            ctx.lineWidth = lw;
+            ctx.stroke();
+
+            // Óculos — lente direita
+            var rx2 = size * 0.66;
+            ctx.beginPath();
+            ctx.arc(rx2, ly, lr, 0, Math.PI * 2);
+            ctx.strokeStyle = 'white';
+            ctx.lineWidth = lw;
+            ctx.stroke();
+
+            // Hastes
+            ctx.lineCap = 'round';
+            ctx.lineWidth = size * 0.07;
+            ctx.beginPath();
+            ctx.moveTo(size * 0.18, size * 0.45);
+            ctx.lineTo(size * 0.14, size * 0.40);
+            ctx.stroke();
+            ctx.beginPath();
+            ctx.moveTo(size * 0.82, size * 0.45);
+            ctx.lineTo(size * 0.86, size * 0.40);
+            ctx.stroke();
+
+            callback(c.toDataURL('image/png'));
+        }
+
+        gerarIconePNG(512, function(png512) {
+            gerarIconePNG(192, function(png192) {
+                var manifest = {
+                    name: "ÓticaMegaVision Pro",
+                    short_name: "ÓticaMegaVision",
+                    description: "Sistema Profissional de Gestão para Óticas",
+                    start_url: location.href.replace(/\/[^\/]*$/, '/'),
+                    scope: location.href.replace(/\/[^\/]*$/, '/'),
+                    display: "standalone",
+                    background_color: "#ffffff",
+                    theme_color: "#ff6b00",
+                    orientation: "portrait-primary",
+                    icons: [
+                        { src: png192, sizes: "192x192", type: "image/png", purpose: "any maskable" },
+                        { src: png512, sizes: "512x512", type: "image/png", purpose: "any maskable" }
+                    ]
+                };
+                var blob = new Blob([JSON.stringify(manifest)], { type: 'application/manifest+json' });
+                var existing = document.querySelector('link[rel="manifest"]');
+                if (existing) existing.href = URL.createObjectURL(blob);
+                else {
+                    var ml = document.createElement('link');
+                    ml.rel = 'manifest';
+                    ml.href = URL.createObjectURL(blob);
+                    document.head.appendChild(ml);
+                }
+            });
+        });
+    })();
+    </script>
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='18' fill='%23FF6B00'/%3E%3Ccircle cx='34' cy='52' r='16' fill='none' stroke='white' stroke-width='10'/%3E%3Ccircle cx='66' cy='52' r='16' fill='none' stroke='white' stroke-width='10'/%3E%3Cline x1='18' y1='45' x2='14' y2='40' stroke='white' stroke-width='7' stroke-linecap='round'/%3E%3Cline x1='82' y1='45' x2='86' y2='40' stroke='white' stroke-width='7' stroke-linecap='round'/%3E%3C/svg%3E">
+    <link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='18' fill='%23FF6B00'/%3E%3Ccircle cx='34' cy='52' r='16' fill='none' stroke='white' stroke-width='10'/%3E%3Ccircle cx='66' cy='52' r='16' fill='none' stroke='white' stroke-width='10'/%3E%3Cline x1='18' y1='45' x2='14' y2='40' stroke='white' stroke-width='7' stroke-linecap='round'/%3E%3Cline x1='82' y1='45' x2='86' y2='40' stroke='white' stroke-width='7' stroke-linecap='round'/%3E%3C/svg%3E">
+    <link rel="shortcut icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='18' fill='%23FF6B00'/%3E%3Ccircle cx='34' cy='52' r='16' fill='none' stroke='white' stroke-width='10'/%3E%3Ccircle cx='66' cy='52' r='16' fill='none' stroke='white' stroke-width='10'/%3E%3Cline x1='18' y1='45' x2='14' y2='40' stroke='white' stroke-width='7' stroke-linecap='round'/%3E%3Cline x1='82' y1='45' x2='86' y2='40' stroke='white' stroke-width='7' stroke-linecap='round'/%3E%3C/svg%3E">
     <!-- ===== /PWA META TAGS ===== -->
 
     <!-- ===== RxDB v17 LOCAL-FIRST — IndexedDB + OPFS + Cloud Sync ===== -->
@@ -782,21 +862,28 @@
         }
 
         .card-value {
-            font-size: 1.7rem;
+            font-size: 2.04rem;
             font-weight: 800;
             color: var(--dark);
             margin-bottom: 0.3rem;
             letter-spacing: -0.5px;
-            /* ✅ Evita corte no mobile */
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
+            /* ✅ Nunca corta o valor — sempre visível */
+            white-space: normal;
+            overflow: visible;
+            word-break: keep-all;
+            overflow-wrap: break-word;
             max-width: 100%;
         }
 
-        /* ✅ Mobile: reduz fonte do valor para caber em 2 colunas */
+        /* ✅ Mobile: font-size fluido com clamp() — cabe em 2 colunas sem "..." */
         @media (max-width: 576px) {
-            .card-value { font-size: 1.15rem; letter-spacing: -0.3px; }
+            .card-value {
+                font-size: clamp(1.92rem, 10.49vw, 2.82rem);
+                letter-spacing: -0.5px;
+                white-space: normal;
+                overflow: visible;
+                text-overflow: clip;
+            }
             .card { padding: 0.9rem 0.85rem 0.75rem; border-radius: 10px; }
             .card-title { font-size: 0.62rem; letter-spacing: 0.4px; }
             .card-icon { width: 28px; height: 28px; font-size: 0.8rem; }
@@ -3838,9 +3925,21 @@ body {
     color: #aaa !important;
 }
 .card-value {
-    font-size: 1.85rem !important;
+    /* clamp(mínimo, fluido, máximo) — escala automaticamente no mobile sem "..." */
+    font-size: clamp(0.82rem, 3.8vw, 1.85rem) !important;
     font-weight: 900 !important;
     letter-spacing: -1px !important;
+    white-space: normal !important;
+    overflow: visible !important;
+    text-overflow: clip !important;
+    word-break: keep-all !important;
+    overflow-wrap: break-word !important;
+}
+/* ✅ Mobile: aumenta os números dos widgets em 50% — desktop não é afetado */
+@media (max-width: 768px) {
+    .card-value {
+        font-size: clamp(1.23rem, 5.7vw, 2.78rem) !important;
+    }
 }
 .dark-mode .card { background: #1a1208 !important; border-color: rgba(255,107,0,0.12) !important; }
 
@@ -4782,7 +4881,7 @@ tr:hover td { background: rgba(255,107,0,0.03) !important; }
                                 style="flex:1;min-width:100px;padding:6px 8px;border:1px solid #ddd;border-radius:8px;font-size:0.82rem;">
                                 <option value="todos">Todos</option>
                                 <option value="vencida">Vencidas</option>
-                                <option value="pendente">A Vencer</option>
+                                <option value="pendente" selected>Pendentes</option>
                                 <option value="pago">Pagos</option>
                             </select>
                         </div>
@@ -4831,7 +4930,7 @@ tr:hover td { background: rgba(255,107,0,0.03) !important; }
                                 style="flex:1;min-width:100px;padding:6px 8px;border:1px solid #ddd;border-radius:8px;font-size:0.82rem;">
                                 <option value="todos">Todos</option>
                                 <option value="vencida">Vencidas</option>
-                                <option value="pendente">A Vencer</option>
+                                <option value="pendente" selected>Pendentes</option>
                                 <option value="pago">Pagos</option>
                             </select>
                         </div>
@@ -9670,13 +9769,24 @@ tr:hover td { background: rgba(255,107,0,0.03) !important; }
                 if (remote.config        && typeof remote.config        === 'object') Object.assign(state.config        || (state.config        = {}), remote.config);
                 if (remote.lastOsCounter && typeof remote.lastOsCounter === 'object') state.lastOsCounter = { ...(state.lastOsCounter || {}), ...remote.lastOsCounter };
                 // FIX: restaura contas financeiras do Drive
+                // FIX SYNC BUG: so sobrescreve se a nuvem for mais recente que o ultimo save local.
+                // Antes: sobrescrita cega apagava baixas registradas antes do push chegar a nuvem.
                 if (Array.isArray(remote.contasFinanceiras) && remote.contasFinanceiras.length > 0) {
-                    state._contasManuais = remote.contasFinanceiras;
-                    try {
-                        const storeKey = 'contas_financeiras_' + storeId;
-                        if (window.IDB && IDB._cache) IDB._cache[storeKey] = JSON.stringify(remote.contasFinanceiras);
-                        if (window.ContasManager) ContasManager.saveAll(remote.contasFinanceiras).catch(()=>{});
-                    } catch(e) {}
+                    const localSavedAt = (() => { try { return localStorage.getItem('contas_fs_savedAt_' + storeId) || '0'; } catch(_e) { return '0'; } })();
+                    const remoteTs     = remote._ts || '0';
+                    const remoteIsNewer = remoteTs >= localSavedAt;
+                    if (remoteIsNewer) {
+                        state._contasManuais = remote.contasFinanceiras;
+                        try {
+                            const storeKey = 'contas_financeiras_' + storeId;
+                            if (window.IDB && IDB._cache) IDB._cache[storeKey] = JSON.stringify(remote.contasFinanceiras);
+                            if (window.ContasManager) ContasManager.saveAll(remote.contasFinanceiras).catch(()=>{});
+                        } catch(e) {}
+                    } else {
+                        // Nuvem esta desatualizada: agenda push para sincronizar os dados locais
+                        console.log('[ContasManager] FIX SYNC: dados locais mais recentes que a nuvem — mantendo local e re-agendando push.');
+                        if (window.LocalFirst) try { LocalFirst._scheduleCloudSync(); } catch(_e) {}
+                    }
                 }
                 // FIX LOOP: rewriteAll(true) = persiste no IDB (incluindo logo/company)
                 // SEM toasts e SEM cloud push-back, quebrando o ciclo pull→push→pull
@@ -10108,11 +10218,13 @@ tr:hover td { background: rgba(255,107,0,0.03) !important; }
             // ── Widget de sync em tempo real (canto inferior direito) ─────────
             let _rtWidget = null;
             let _rtCountdown = null;
+            let _syncActivoShown = false; // FIX: exibe "Sync ativo" apenas uma vez
+            let _savedShown      = false; // FIX: exibe "↑ Salvo" apenas uma vez
             function _ensureWidget() {
                 if (_rtWidget) return;
                 _rtWidget = document.createElement('div');
                 _rtWidget.id = 'cs_rt_widget';
-                _rtWidget.style.cssText = 'position:fixed;bottom:14px;right:14px;z-index:9997;background:#0f172a;color:#fff;border:1px solid #334155;border-radius:20px;padding:5px 12px;font-size:0.72rem;font-weight:600;display:flex;align-items:center;gap:6px;box-shadow:0 2px 12px rgba(0,0,0,0.4);min-width:140px;transition:opacity 0.3s;cursor:default;';
+                _rtWidget.style.cssText = 'position:fixed;bottom:14px;right:14px;z-index:9997;background:#0f172a;color:#fff;border:1px solid #334155;border-radius:20px;padding:5px 12px;font-size:0.72rem;font-weight:600;display:flex;align-items:center;gap:6px;box-shadow:0 2px 12px rgba(0,0,0,0.4);min-width:140px;transition:opacity 0.3s;cursor:default;opacity:0;';
                 _rtWidget.innerHTML = '<span id="cs_rt_dot" style="width:8px;height:8px;border-radius:50%;background:#4ade80;flex-shrink:0;transition:background 0.3s;"></span><span id="cs_rt_text">Conectado</span>';
                 document.body.appendChild(_rtWidget);
             }
@@ -10145,27 +10257,23 @@ tr:hover td { background: rgba(255,107,0,0.03) !important; }
             }
 
             function _showSyncIndicator(msg) {
+                // FIX: "↑ Salvo" só aparece uma vez por sessão (primeiro push)
+                if (msg.startsWith('↑')) {
+                    if (_savedShown) return;
+                    _savedShown = true;
+                } else if (msg.startsWith('✓') || msg.startsWith('Sem') || msg.startsWith('Sincroniz')) {
+                    // Polls sem mudança: nunca exibe
+                    return;
+                }
                 _ensureWidget();
                 clearInterval(_rtCountdown);
                 clearTimeout(_autoHideTimer);
                 const w = document.getElementById('cs_rt_widget');
-
-                if (msg.startsWith('✓')) {
-                    // Sem mudanças: mostra "Atualizado" por 3s e depois oculta
-                    _updateWidget('ok', msg);
-                    if (w) { w.style.transition = 'opacity 0.3s'; w.style.opacity = '1'; }
-                    _autoHideTimer = setTimeout(() => {
-                        if (w) { w.style.transition = 'opacity 1.5s'; w.style.opacity = '0'; }
-                    }, 3000);
-                } else {
-                    // Dados novos recebidos (↓ Atualizado, ↑ Salvo, etc.):
-                    // mostra o widget, depois oculta após 6s
-                    _updateWidget('ok', msg);
-                    if (w) { w.style.transition = 'opacity 0.3s'; w.style.opacity = '1'; }
-                    _autoHideTimer = setTimeout(() => {
-                        if (w) { w.style.transition = 'opacity 1.5s'; w.style.opacity = '0'; }
-                    }, 6000);
-                }
+                _updateWidget('ok', msg);
+                if (w) { w.style.transition = 'opacity 0.3s'; w.style.opacity = '1'; }
+                _autoHideTimer = setTimeout(() => {
+                    if (w) { w.style.transition = 'opacity 1.5s'; w.style.opacity = '0'; }
+                }, 6000);
             }
 
             // ── UI ───────────────────────────────────────────────────────────
@@ -10196,13 +10304,21 @@ tr:hover td { background: rgba(255,107,0,0.03) !important; }
                     else if (oOk) status.textContent = '🟢 OneDrive — sync em tempo real ativo (' + POLL_ACTIVE_MS/1000 + 's ativo / ' + POLL_BACKGROUND_MS/1000 + 's bg)';
                     else          status.textContent = '⚫ Nenhum provedor conectado — dados apenas locais';
                 }
-                // Inicializa widget com estado atual
+                // Inicializa widget com estado atual — FIX: exibe apenas na primeira ativação
                 if (gOk || oOk) {
-                    _ensureWidget();
-                    _updateWidget('ok', 'Sync ativo (' + POLL_ACTIVE_MS/1000 + 's)');
+                    if (!_syncActivoShown) {
+                        _syncActivoShown = true;
+                        _ensureWidget();
+                        const w = document.getElementById('cs_rt_widget');
+                        _updateWidget('ok', 'Sync ativo (' + POLL_ACTIVE_MS/1000 + 's)');
+                        if (w) { w.style.transition = 'opacity 0.3s'; w.style.opacity = '1'; }
+                        setTimeout(() => {
+                            if (w) { w.style.transition = 'opacity 1.5s'; w.style.opacity = '0'; }
+                        }, 5000);
+                    }
                 } else {
                     const w = document.getElementById('cs_rt_widget');
-                    if (w) _updateWidget('off', 'Sem sync cloud');
+                    if (w) { _updateWidget('off', 'Sem sync cloud'); w.style.opacity = '1'; setTimeout(() => { w.style.transition = 'opacity 1.5s'; w.style.opacity = '0'; }, 4000); }
                 }
             }
 
@@ -10403,11 +10519,14 @@ tr:hover td { background: rgba(255,107,0,0.03) !important; }
                 // Atualiza cache em memória imediatamente
                 IDB._cache[this._storeKey] = JSON.stringify(contas);
                 state._contasManuais = contas;
+                // ✅ FIX SYNC: registra timestamp do último save local para proteger contra overwrite da nuvem
+                const nowIso = new Date().toISOString();
+                try { localStorage.setItem('contas_fs_savedAt_' + storeId, nowIso); } catch(_e) {}
                 try {
                     await sbUpsertDoc(storeId, 'config', 'contas_financeiras', {
                         _doc_id:    'contas_financeiras',
                         items:      contas,
-                        _updatedAt: new Date().toISOString(),
+                        _updatedAt: nowIso,
                         _store:     storeId
                     });
                     // ✅ Dispara cloud sync para que outros dispositivos recebam as contas atualizadas
@@ -10446,7 +10565,8 @@ tr:hover td { background: rgba(255,107,0,0.03) !important; }
                 // (return dentro de forEach encerra apenas o callback, não a função pai)
                 for (const sale of (state.sales || [])) {
                     if (sale.status === 'cancelado') continue;
-                    if (sale.paymentStatus === 'pago') continue;
+                    // BUG FIX: não pula vendas totalmente pagas — parcelas pagas devem aparecer com badge "Pago"
+                    // if (sale.paymentStatus === 'pago') continue;
 
                     const client       = clientsMapById.get(sale.clientId);
                     const nomeCliente  = client ? client.name : 'Cliente';
@@ -10457,9 +10577,9 @@ tr:hover td { background: rgba(255,107,0,0.03) !important; }
                     // ── Pagamento Misto (múltiplas formas) ────────────────────
                     // Bug #2 Fix: mixedPayments não era processado em ContasManager
                     if (sale.paymentMethod === 'mixed' && Array.isArray(sale.mixedPayments) && sale.mixedPayments.length > 0) {
-                        // Vendas mistas são pagas integralmente no ato — só gera conta se houver retirada pendente
+                        // BUG FIX: sempre inclui retirada (paga ou não) para que apareça em Pagos após baixa
                         const retiradaMista = parseFloat(det.retiradaValue || 0);
-                        if (retiradaMista > 0.01 && !sale.retiradaPaga) {
+                        if (retiradaMista > 0.01) {
                             const mixLabel = sale.mixedPayments.map(r => ({pix:'PIX',cash:'Dinheiro',debit:'Débito',credit:'Crédito',installment:'Crediário'}[r.method]||r.method)).join('+');
                             contasVendas.push({
                                 id: 'venda_' + sale.id + '_retirada',
@@ -10469,7 +10589,7 @@ tr:hover td { background: rgba(255,107,0,0.03) !important; }
                                 categoria: 'Retirada',
                                 valor: retiradaMista,
                                 vencimento: sale.deliveryForecast || sale.date || '',
-                                pago: false,
+                                pago: !!sale.retiradaPaga,
                                 _readonly: true
                             });
                         }
@@ -10483,22 +10603,25 @@ tr:hover td { background: rgba(255,107,0,0.03) !important; }
                             const mLbl = {pix:'PIX',cash:'Dinheiro',debit:'Débito',credit:'Crédito',installment:'Crediário'}[slot.method] || slot.method;
                             if (slot.method === 'installment') {
                                 // Parcelas do crediário desta forma
+                                // BUG FIX: inclui parcelas pagas com pago:true (igual a Contas a Pagar manuais)
                                 (slot.parcelas || []).forEach(p => {
-                                    if (p.paid || p.status === 'pago' || p.status === 'paid') return;
+                                    const isParcPago = !!(p.paid || p.status === 'pago' || p.status === 'paid');
                                     contasVendas.push({
                                         id: `venda_${sale.id}_dual${idx}_p${p.number}`,
                                         tipo: 'receber',
                                         descricao: `OS ${sale.number} — ${slotLabel} Forma (Crediário) Parcela ${p.number}/${slot.nParcelas||slot.parcelas.length}`,
                                         parte: nomeCliente,
                                         categoria: 'Crediário',
-                                        valor: parseFloat(p.value || 0),
+                                        valor: parseFloat(isParcPago ? (p.paidValue || p.value || 0) : (p.value || 0)),
                                         vencimento: p.dueDate || '',
-                                        pago: false,
+                                        pago: isParcPago,
+                                        paidValue: isParcPago ? (p.paidValue || p.value || 0) : undefined,
                                         _readonly: true
                                     });
                                 });
                                 // Retirada desta forma de crediário
-                                if ((slot.retirada || 0) > 0.01 && !sale[`retiradaPaga_dual${idx}`]) {
+                                const retPagaDual = !!sale[`retiradaPaga_dual${idx}`];
+                                if ((slot.retirada || 0) > 0.01) {
                                     contasVendas.push({
                                         id: `venda_${sale.id}_dual${idx}_retirada`,
                                         tipo: 'receber',
@@ -10507,13 +10630,14 @@ tr:hover td { background: rgba(255,107,0,0.03) !important; }
                                         categoria: 'Retirada',
                                         valor: parseFloat(slot.retirada),
                                         vencimento: sale.deliveryForecast || sale.date || '',
-                                        pago: false,
+                                        pago: retPagaDual,
                                         _readonly: true
                                     });
                                 }
                             } else {
-                                // À vista com retirada pendente (não precisa de entrada > 0)
-                                if ((slot.retirada || 0) > 0.01 && !sale[`retiradaPaga_dual${idx}`]) {
+                                // À vista com retirada — BUG FIX: inclui paga com pago:true
+                                if ((slot.retirada || 0) > 0.01) {
+                                    const retPagaDualAV = !!sale[`retiradaPaga_dual${idx}`];
                                     contasVendas.push({
                                         id: `venda_${sale.id}_dual${idx}_retirada`,
                                         tipo: 'receber',
@@ -10522,7 +10646,7 @@ tr:hover td { background: rgba(255,107,0,0.03) !important; }
                                         categoria: 'Retirada',
                                         valor: parseFloat(slot.retirada),
                                         vencimento: sale.deliveryForecast || sale.date || '',
-                                        pago: false,
+                                        pago: retPagaDualAV,
                                         _readonly: true
                                     });
                                 }
@@ -10533,26 +10657,28 @@ tr:hover td { background: rgba(255,107,0,0.03) !important; }
                     }
                     // ── Crediário ──────────────────────────────────────────────
                     if (method === 'installment') {
-                        // Parcelas pendentes
+                        // BUG FIX: inclui todas as parcelas (pagas e pendentes) — pagas aparecem com badge "Pago"
                         parcelas.forEach(p => {
-                            if (p.paid || p.status === 'pago' || p.status === 'paid') return;
+                            const isParcPago = !!(p.paid || p.status === 'pago' || p.status === 'paid');
+                            // BUG FIX: usa isParcPago calculado acima para valor e flag corretos
                             contasVendas.push({
                                 id: 'venda_' + sale.id + '_p' + p.number,
                                 tipo: 'receber',
                                 descricao: `OS ${sale.number} — Parcela ${p.number}/${parcelas.length}`,
                                 parte: nomeCliente,
                                 categoria: 'Crediário',
-                                valor: parseFloat(p.value || 0),
+                                valor: parseFloat(isParcPago ? (p.paidValue || p.value || 0) : (p.value || 0)),
                                 vencimento: p.dueDate || '',
-                                pago: false,
+                                pago: isParcPago,
+                                paidValue: isParcPago ? (p.paidValue || p.value || 0) : undefined,
                                 _readonly: true
                             });
                         });
 
                         // Valor na retirada do crediário
-                        // Pode estar salvo em det.retiradaEntry (instFromValue) OU det.retiradaValue (instFromPercent)
+                        // BUG FIX: inclui retirada paga com pago:true
                         const retiradaCrediario = parseFloat(det.retiradaEntry || 0) || parseFloat(det.retiradaValue || 0);
-                        if (retiradaCrediario > 0.01 && !sale.retiradaPaga) {
+                        if (retiradaCrediario > 0.01) {
                             contasVendas.push({
                                 id: 'venda_' + sale.id + '_retirada',
                                 tipo: 'receber',
@@ -10561,7 +10687,7 @@ tr:hover td { background: rgba(255,107,0,0.03) !important; }
                                 categoria: 'Retirada',
                                 valor: retiradaCrediario,
                                 vencimento: sale.deliveryForecast || sale.date || '',
-                                pago: false,
+                                pago: !!sale.retiradaPaga,
                                 _readonly: true
                             });
                         }
@@ -10570,13 +10696,9 @@ tr:hover td { background: rgba(255,107,0,0.03) !important; }
 
                     // ── À vista (PIX / Dinheiro / Débito / Crédito) ────────────
                     if (metodosAVista.includes(method)) {
-                        // FIX BUG ENTREGUE: status 'entregue' NÃO significa pagamento quitado —
-                        // uma venda pode ser entregue e ainda ter saldo pendente na retirada.
-                        // Só pula se retiradaPaga=true (marcado manualmente ao receber).
-                        if (sale.status === 'entregue' && sale.retiradaPaga) continue;
-                        // Só gera conta a receber se foi explicitamente salvo um saldo de retirada
+                        // BUG FIX: inclui retirada paga com pago:true em vez de pular
                         const retiradaAVista = parseFloat(det.retiradaValue || 0);
-                        if (retiradaAVista > 0.01 && !sale.retiradaPaga) {
+                        if (retiradaAVista > 0.01) {
                             contasVendas.push({
                                 id: 'venda_' + sale.id + '_retirada',
                                 tipo: 'receber',
@@ -10585,11 +10707,11 @@ tr:hover td { background: rgba(255,107,0,0.03) !important; }
                                 categoria: 'Retirada',
                                 valor: retiradaAVista,
                                 vencimento: sale.deliveryForecast || sale.date || '',
-                                pago: false,
+                                pago: !!sale.retiradaPaga,
                                 _readonly: true
                             });
                         }
-                        // PIX/Dinheiro/Débito/Crédito integralmente pago → não gera nada
+                        // PIX/Dinheiro/Débito/Crédito integralmente pago → não gera nada (retirada já tratada acima)
                         continue; // Fix Bug #1
                     }
 
@@ -10603,19 +10725,20 @@ tr:hover td { background: rgba(255,107,0,0.03) !important; }
                             categoria: 'Venda',
                             valor: parseFloat(sale.total || 0),
                             vencimento: sale.deliveryForecast || sale.date || '',
-                            pago: false,
+                            pago: !!(sale.paymentStatus === 'pago' || sale.pago),
                             _readonly: true
                         });
                     }
                 } // end for...of sales (Fix Bug #1)
 
-                // ── Injeta despesas pendentes em Contas a Pagar ────────────────
+                // ── Injeta despesas em Contas a Pagar (pagas e pendentes) ─────
                 const contasDespesas = [];
                 // Fix: mapeia fornecedores para lookup de nome por ID
                 const supplierMap = {};
                 (state.suppliers || []).forEach(s => { if (s.id) supplierMap[s.id] = s.name || s.id; });
+                // BUG FIX: inclui despesas pagas com pago:true (igual às contas manuais)
                 (state.expenses || []).forEach(exp => {
-                    if (exp.status === 'pago' || exp.pago || exp.paid) return;
+                    const isExpPago = !!(exp.status === 'pago' || exp.pago || exp.paid);
                     // Fix Bug #4: resolve nome do fornecedor em vez de expor UUID
                     const parteRaw = exp.supplierId || exp.supplier || '';
                     const parteNome = supplierMap[parteRaw] || parteRaw || '';
@@ -10627,7 +10750,7 @@ tr:hover td { background: rgba(255,107,0,0.03) !important; }
                         categoria: exp.category || 'Despesa',
                         valor: parseFloat(exp.value || 0),
                         vencimento: exp.date || '',
-                        pago: false,
+                        pago: isExpPago,
                         _readonly: true
                     });
                 });
@@ -10685,14 +10808,31 @@ tr:hover td { background: rgba(255,107,0,0.03) !important; }
                     set('aging90plus', aging.a90plus);
                 }
 
-                this._renderList('contasReceberList', receber, hoje);
-                this._renderList('contasPagarList', pagar, hoje);
                 // Cache completo para filtro em tempo real
                 this._allReceber = receber;
                 this._allPagar   = pagar;
                 this._hoje       = hoje;
                 // ✅ Cache dos totais originais (antes de qualquer filtro)
                 this._totaisBase = { totalRec, totalPag, recVencidas, recAVencer, pagVencidas, pagAVencer };
+                // BUG FIX: re-aplica o filtro ativo após cada renderAll
+                // Se filtro estiver em "todos", exibe apenas pendentes por padrão para não sobrecarregar
+                // com histórico de pagamentos. O usuário pode selecionar "Pagos" para ver os quitados.
+                const filtroAtualRec = document.getElementById('contasReceberFiltro')?.value || 'pendente';
+                const buscaAtualRec  = (document.getElementById('contasReceberBusca')?.value || '').trim();
+                const filtroAtualPag = document.getElementById('contasPagarFiltro')?.value || 'pendente';
+                const buscaAtualPag  = (document.getElementById('contasPagarBusca')?.value || '').trim();
+
+                // Aplica filtro sempre (inclui o caso "todos" que agora contém pagos)
+                const aplicar = (lista, busca, filtro) => lista.filter(c => {
+                    const texto = ((c.descricao||'') + ' ' + (c.parte||'')).toLowerCase();
+                    if (busca && !texto.includes(busca)) return false;
+                    if (filtro === 'pago')    return c.pago;
+                    if (filtro === 'vencida') return !c.pago && c.vencimento && c.vencimento < hoje;
+                    if (filtro === 'pendente') return !c.pago;
+                    return true; // todos
+                });
+                this._renderList('contasReceberList', aplicar(receber, buscaAtualRec, filtroAtualRec), hoje);
+                this._renderList('contasPagarList',   aplicar(pagar,   buscaAtualPag, filtroAtualPag), hoje);
                 // Atualiza indicador de última sincronização
                 this._atualizarIndicadorSync();
                 } finally {
@@ -10798,9 +10938,10 @@ tr:hover td { background: rgba(255,107,0,0.03) !important; }
                                 ${!c.pago && c._readonly ? `<button class="btn btn-sm" style="background:#28a745;color:white;padding:4px 8px;font-size:0.75rem;" title="Dar Baixa" onclick="ContasManager.darBaixaVenda('${c.id}')"><i class="fas fa-check"></i></button>` : ''}
                                 ${wppBtn}
                                 ${!c._readonly ? `<button class="btn btn-sm btn-secondary" style="padding:4px 8px;font-size:0.75rem;" title="Comprovante" onclick="ContasManager.gerarComprovante('${c.id}')"><i class="fas fa-receipt"></i></button>` : ''}
+                                ${c._readonly && c.pago ? `<button class="btn btn-sm btn-secondary" style="padding:4px 8px;font-size:0.75rem;" title="Comprovante de Pagamento" onclick="ContasManager.gerarComprovanteVenda('${c.id}','${(c.descricao||'').replace(/'/g,"\\'")}',${parseFloat(c.paidValue||c.valor||0)},'${(c.parte||'').replace(/'/g,"\\'")}','${(c.categoria||'').replace(/'/g,"\\'")}','${c.vencimento||''}','','')"><i class="fas fa-receipt"></i></button>` : ''}
                                 ${!c._readonly ? `<button class="btn btn-sm" style="background:#17a2b8;color:white;padding:4px 8px;font-size:0.75rem;" title="Editar" onclick="ContasManager.editarConta('${c.id}')"><i class="fas fa-pen"></i></button>` : ''}
                                 ${!c._readonly ? `<button class="btn btn-sm btn-danger" style="padding:4px 8px;font-size:0.75rem;" title="Excluir" onclick="ContasManager.excluirConta('${c.id}')"><i class="fas fa-trash"></i></button>` : ''}
-                                ${c._readonly ? `<span style="font-size:0.7rem;color:var(--gray);padding:2px 5px;" title="Gerado automaticamente pela venda">🔗</span>` : ''}
+                                ${c._readonly && !c.pago ? `<span style="font-size:0.7rem;color:var(--gray);padding:2px 5px;" title="Gerado automaticamente pela venda">🔗</span>` : ''}
                             </div>
                         </div>
                     </div>`;
@@ -10900,11 +11041,13 @@ tr:hover td { background: rgba(255,107,0,0.03) !important; }
                 document.body.appendChild(overlay);
                 overlay.querySelector('#_bxCancel').onclick = () => overlay.remove();
                 overlay.onclick = e => { if (e.target === overlay) overlay.remove(); };
-                overlay.querySelector('#_bxConfirm').onclick = () => {
+                overlay.querySelector('#_bxConfirm').onclick = function() {
+                    if (this._bxExecuting) return;
                     const paidVal    = parseFloat(overlay.querySelector('#_bxVal').value) || 0;
                     const forma      = overlay.querySelector('#_bxForma').value;
                     const obs        = overlay.querySelector('#_bxObs').value.trim();
                     if (paidVal <= 0) { Toast.show('Informe um valor válido', 'warning'); return; }
+                    this._bxExecuting = true; this.disabled = true; this.textContent = '⏳ Salvando...';
                     const idx2 = contas.findIndex(c => c.id === id);
                     if (idx2 >= 0) {
                         const valorOriginal = parseFloat(contas[idx2].valor || 0);
@@ -10920,7 +11063,6 @@ tr:hover td { background: rgba(255,107,0,0.03) !important; }
                         });
 
                         if (isParcial) {
-                            // Pagamento PARCIAL: desconta o valor pago e mantém a conta em aberto
                             const saldo = Math.max(0, valorOriginal - paidVal);
                             contas[idx2].valor         = parseFloat(saldo.toFixed(2));
                             contas[idx2].valorOriginal = contas[idx2].valorOriginal || valorOriginal;
@@ -10928,22 +11070,19 @@ tr:hover td { background: rgba(255,107,0,0.03) !important; }
                             contas[idx2].formaPagamento = forma || '—';
                             if (obs) contas[idx2].obs = obs;
                             overlay.remove();
+                            this.saveAll(contas).then(() => { this.renderAll().catch(()=>{}); Dashboard.update().catch(()=>{}); }).catch(()=>{});
                             Toast.show(`💰 Pagamento parcial de R$ ${paidVal.toFixed(2).replace('.',',')} registrado. Saldo restante: R$ ${saldo.toFixed(2).replace('.',',')}`, 'warning', 5000);
                         } else {
-                            // Pagamento TOTAL: baixa completa
                             contas[idx2].pago           = true;
                             contas[idx2].dataPagamento  = new Date().toISOString();
                             contas[idx2].paidValue      = paidVal;
                             contas[idx2].formaPagamento = forma || '—';
                             if (obs) contas[idx2].obs = obs;
                             overlay.remove();
+                            this.saveAll(contas).then(() => { this.renderAll().catch(()=>{}); Dashboard.update().catch(()=>{}); }).catch(()=>{});
                             Toast.show('Baixa registrada! ✅', 'success');
                             this.gerarComprovante(id);
                         }
-                        // Salva e re-renderiza em background
-                        this.saveAll(contas).catch(()=>{});
-                        this.renderAll().catch(()=>{});
-                        Dashboard.update().catch(()=>{});
                     }
                 };
             },
@@ -10997,13 +11136,15 @@ tr:hover td { background: rgba(255,107,0,0.03) !important; }
                 document.body.appendChild(overlay);
                 overlay.querySelector('#_vbxCancel').onclick = () => overlay.remove();
                 overlay.onclick = e => { if (e.target === overlay) overlay.remove(); };
-                overlay.querySelector('#_vbxConfirm').onclick = () => {
+                overlay.querySelector('#_vbxConfirm').onclick = function() {
+                    if (this._vbxExecuting) return;
                     const paidVal = parseFloat(overlay.querySelector('#_vbxVal').value) || 0;
                     const forma   = overlay.querySelector('#_vbxForma').value || '—';
                     const obs     = overlay.querySelector('#_vbxObs')?.value?.trim() || '';
                     if (paidVal <= 0) { Toast.show('Informe um valor válido','warning'); return; }
+                    this._vbxExecuting = true; this.disabled = true; this.textContent = '⏳ Salvando...';
                     overlay.remove();
-                    this._executarBaixaVenda(itemId, tipo, sale, paidVal, forma, itemValor, itemDescricao, itemCliente, itemCategoria, itemVencimento, obs);
+                    ContasManager._executarBaixaVenda(itemId, tipo, sale, paidVal, forma, itemValor, itemDescricao, itemCliente, itemCategoria, itemVencimento, obs);
                 };
             },
 
@@ -11026,15 +11167,12 @@ tr:hover td { background: rgba(255,107,0,0.03) !important; }
                                 if (!parc.pagamentosParciais) parc.pagamentosParciais = [];
                                 parc.pagamentosParciais.push({ data: new Date().toISOString(), valor: paidVal, forma, obs });
                                 if (isParcial) {
-                                    // Pagamento parcial: desconta e mantém pendente
                                     const saldo = Math.max(0, valorParc - paidVal);
                                     parc.valorOriginal = parc.valorOriginal || valorParc;
-                                    parc.value  = parseFloat(saldo.toFixed(2));
-                                    parc.valor  = parc.value;
-                                    parc.paid   = false; parc.status = 'parcial';
-                                    parc.formaPagamento = forma;
+                                    parc.value = parseFloat(saldo.toFixed(2)); parc.valor = parc.value;
+                                    parc.paid = false; parc.status = 'parcial'; parc.formaPagamento = forma;
                                     sale.updated_at = new Date().toISOString();
-                                    if (window.LocalFirst) LocalFirst.pushItem('sales', sale).catch(()=>{});
+                                    (window.LocalFirst ? LocalFirst.pushItem('sales',sale) : Promise.resolve()).catch(()=>{}).finally(()=>{ ContasManager.renderAll().catch(()=>{}); Dashboard.update().catch(()=>{}); });
                                     Toast.show(`💰 Pagamento parcial de R$ ${paidVal.toFixed(2).replace('.',',')} registrado. Saldo: R$ ${saldo.toFixed(2).replace('.',',')}`, 'warning', 5000);
                                 } else {
                                     parc.paid = true; parc.status = 'pago';
@@ -11045,9 +11183,7 @@ tr:hover td { background: rgba(255,107,0,0.03) !important; }
                                     this.gerarComprovanteVenda(itemId, itemDescricao||`Parcela ${num}`, itemValor||valorParc, itemCliente, itemCategoria, itemVencimento, forma, obs);
                                 }
                                 sale.updated_at = new Date().toISOString();
-                                if (window.LocalFirst) LocalFirst.pushItem('sales', sale).catch(()=>{});
-                                this.renderAll().catch(()=>{});
-                                Dashboard.update().catch(()=>{});
+                                (window.LocalFirst ? LocalFirst.pushItem('sales',sale) : Promise.resolve()).catch(()=>{}).finally(()=>{ ContasManager.renderAll().catch(()=>{}); Dashboard.update().catch(()=>{}); });
                             }
                         }
                     } else if (dualSub === 'retirada') {
@@ -11076,33 +11212,23 @@ tr:hover td { background: rgba(255,107,0,0.03) !important; }
                             if (!parc.pagamentosParciais) parc.pagamentosParciais = [];
                             parc.pagamentosParciais.push({ data: new Date().toISOString(), valor: paidVal, forma, obs });
                             if (isParcial) {
-                                // Pagamento parcial: desconta e mantém pendente
                                 const saldo = Math.max(0, valorParc - paidVal);
-                                parc.valorOriginal  = parc.valorOriginal || valorParc;
-                                parc.value          = parseFloat(saldo.toFixed(2));
-                                parc.valor          = parc.value;
-                                parc.paid           = false;
-                                parc.status         = 'parcial';
-                                parc.formaPagamento = forma;
+                                parc.valorOriginal = parc.valorOriginal || valorParc;
+                                parc.value = parseFloat(saldo.toFixed(2)); parc.valor = parc.value;
+                                parc.paid = false; parc.status = 'parcial'; parc.formaPagamento = forma;
                                 sale.updated_at = new Date().toISOString();
-                                if (window.LocalFirst) LocalFirst.pushItem('sales', sale).catch(()=>{});
+                                (window.LocalFirst ? LocalFirst.pushItem('sales',sale) : Promise.resolve()).catch(()=>{}).finally(()=>{ ContasManager.renderAll().catch(()=>{}); Dashboard.update().catch(()=>{}); });
                                 Toast.show(`💰 Pagamento parcial de R$ ${paidVal.toFixed(2).replace('.',',')} registrado. Saldo: R$ ${saldo.toFixed(2).replace('.',',')}`, 'warning', 5000);
                             } else {
-                                parc.paid     = true;
-                                parc.status   = 'pago';
+                                parc.paid = true; parc.status = 'pago';
                                 parc.paidDate = new Date().toISOString().slice(0,10);
-                                parc.paidValue = paidVal;
-                                parc.formaPagamento = forma;
-                                if (this.checkPaymentComplete(sale)) {
-                                    sale.paymentStatus = 'pago';
-                                }
+                                parc.paidValue = paidVal; parc.formaPagamento = forma;
+                                if (this.checkPaymentComplete(sale)) sale.paymentStatus = 'pago';
                                 Toast.show(`Parcela ${num} quitada! ✅`, 'success');
                                 this.gerarComprovanteVenda(itemId, itemDescricao||`Parcela ${num}`, itemValor||valorParc, itemCliente, itemCategoria, itemVencimento, forma, obs);
                             }
                             sale.updated_at = new Date().toISOString();
-                            if (window.LocalFirst) LocalFirst.pushItem('sales', sale).catch(()=>{});
-                            this.renderAll().catch(()=>{});
-                            Dashboard.update().catch(()=>{});
+                            (window.LocalFirst ? LocalFirst.pushItem('sales',sale) : Promise.resolve()).catch(()=>{}).finally(()=>{ ContasManager.renderAll().catch(()=>{}); Dashboard.update().catch(()=>{}); });
                         }
                     }
                 } else if (tipo === 'retirada') {
@@ -11113,25 +11239,16 @@ tr:hover td { background: rgba(255,107,0,0.03) !important; }
                         if (sale.paymentDetails.retiradaValue) sale.paymentDetails.retiradaValue = 0;
                     }
                     sale.retiradaPaga = true;
-                    // Fix Bug #5: verifica quitação completa após registrar retirada
-                    if (this.checkPaymentComplete(sale)) {
-                        sale.paymentStatus = 'pago';
-                    }
+                    if (this.checkPaymentComplete(sale)) sale.paymentStatus = 'pago';
                     sale.updated_at = new Date().toISOString();
-                    // Salva apenas a venda modificada
-                    if (window.LocalFirst) LocalFirst.pushItem('sales', sale).catch(()=>{});
+                    (window.LocalFirst ? LocalFirst.pushItem('sales',sale) : Promise.resolve()).catch(()=>{}).finally(()=>{ ContasManager.renderAll().catch(()=>{}); Dashboard.update().catch(()=>{}); });
                     Toast.show('Pagamento na retirada registrado! ✅', 'success');
-                    this.renderAll().catch(()=>{});
-                    Dashboard.update().catch(()=>{});
                     this.gerarComprovanteVenda(itemId, itemDescricao||'Pagamento na Retirada', itemValor, itemCliente, itemCategoria, itemVencimento, forma, obs);
                 } else if (tipo === 'total') {
                     sale.paymentStatus = 'pago';
                     sale.updated_at = new Date().toISOString();
-                    // Salva apenas a venda modificada
-                    if (window.LocalFirst) LocalFirst.pushItem('sales', sale).catch(()=>{});
+                    (window.LocalFirst ? LocalFirst.pushItem('sales',sale) : Promise.resolve()).catch(()=>{}).finally(()=>{ ContasManager.renderAll().catch(()=>{}); Dashboard.update().catch(()=>{}); });
                     Toast.show('Pagamento registrado! ✅', 'success');
-                    this.renderAll().catch(()=>{});
-                    Dashboard.update().catch(()=>{});
                     this.gerarComprovanteVenda(itemId, itemDescricao||'Pagamento Total', itemValor||sale.total||0, itemCliente, itemCategoria, itemVencimento, forma, obs);
                 }
             },
