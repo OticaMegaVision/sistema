@@ -7467,7 +7467,6 @@ tr:hover td { background: rgba(255,107,0,0.03) !important; }
                                 </button>
                             </div>
                         </div>
-                        </div>
 
                         <!-- ZERAR DADOS LOCAIS -->
                         <div style="background:linear-gradient(135deg,#1a0a0a,#2a1010);border-radius:12px;padding:1.25rem;margin-bottom:1.5rem;border:1.5px solid rgba(220,53,69,0.4);">
@@ -9988,6 +9987,17 @@ tr:hover td { background: rgba(255,107,0,0.03) !important; }
                 }
                 // FIX MULTI-LOJA: NÃO sobrepomos window._currentStore com remote._store.
                 const storeId = window._currentStore || 'barueri';
+
+                // ✅ FIX CRÍTICO — VALIDAÇÃO DE LOJA: rejeita dados do Drive que pertencem
+                // a uma loja diferente da ativa. Impede que dados da Caucaia sejam aplicados
+                // em Barueri e vice-versa quando o arquivo errado é encontrado no Drive.
+                if (remote._store && remote._store !== storeId) {
+                    console.warn('[CloudSync] ⚠️ STORE MISMATCH: arquivo remoto é da loja "' +
+                        remote._store + '" mas loja ativa é "' + storeId +
+                        '". Aplicação bloqueada para evitar mistura de dados.');
+                    if (!silent) Toast.show('⚠️ Arquivo do Drive não pertence a esta loja — ignorado', 'warning', 4000);
+                    return false;
+                }
 
                 // FIX DELETE-SYNC PASSO 1: aplicar tombstones vindos do Drive
                 // Isso propaga deleções feitas em outros navegadores/dispositivos
@@ -21745,6 +21755,8 @@ ${container.innerHTML}
             // ── Executa backup automático ─────────────────────────────────
             autoBackup: async function(isDiario = false) {
                 const timestamp = new Date().toISOString();
+                // ✅ FIX MULTI-LOJA: usa STORAGE_KEY() (store-specific) como chave base
+                const lojaAtiva = window._currentStore || 'barueri';
                 let savedData = {};
                 try { savedData = JSON.parse(await IDB.get(STORAGE_KEY()) || '{}'); } catch(e) {}
 
@@ -21752,11 +21764,12 @@ ${container.innerHTML}
                     timestamp,
                     tipo: isDiario ? 'diario' : 'automatico',
                     versao: '2.0',
+                    _store: lojaAtiva,
                     data: savedData
                 };
 
-                // Salva o backup mais recente
-                try { await IDB.set('ultimo_backup', JSON.stringify(backup)); } catch(e) {}
+                // ✅ FIX: chave inclui loja — 'ultimo_backup_barueri' / 'ultimo_backup_caucaia'
+                try { await IDB.set('ultimo_backup_' + lojaAtiva, JSON.stringify(backup)); } catch(e) {}
 
                 if (isDiario) {
                     // Atualiza timestamp no estado e persiste
@@ -21780,8 +21793,11 @@ ${container.innerHTML}
             // ── Histórico de backups (últimos N dias no IDB) ──────────────
             _salvarNoHistorico: async function(backup) {
                 const cfg = state.backupConfig;
+                // ✅ FIX MULTI-LOJA: historico separado por loja
+                const lojaAtiva = window._currentStore || 'barueri';
+                const historicoKey = 'backup_historico_' + lojaAtiva;
                 let historico = [];
-                try { historico = JSON.parse(await IDB.get('backup_historico') || '[]'); } catch(e) {}
+                try { historico = JSON.parse(await IDB.get(historicoKey) || '[]'); } catch(e) {}
 
                 historico.unshift({
                     timestamp: backup.timestamp,
@@ -21793,12 +21809,14 @@ ${container.innerHTML}
                 const limite = cfg.keepDays || 7;
                 historico = historico.slice(0, limite);
 
-                try { await IDB.set('backup_historico', JSON.stringify(historico)); } catch(e) {}
+                try { await IDB.set(historicoKey, JSON.stringify(historico)); } catch(e) {}
             },
 
             // Retorna histórico de backups
             getHistorico: async function() {
-                try { return JSON.parse(await IDB.get('backup_historico') || '[]'); } catch(e) { return []; }
+                const lojaAtiva = window._currentStore || 'barueri';
+                const historicoKey = 'backup_historico_' + lojaAtiva;
+                try { return JSON.parse(await IDB.get(historicoKey) || '[]'); } catch(e) { return []; }
             },
             
             exportar: async function() {
@@ -21809,8 +21827,14 @@ ${container.innerHTML}
                     try { appData = JSON.parse(await IDB.get(STORAGE_KEY()) || '{}'); } catch(e) {}
                     // Fallback: usa state diretamente se IDB não retornou nada
                     if (!appData || Object.keys(appData).length === 0) appData = state;
+                    // ✅ FIX MULTI-LOJA: inclui _store no JSON para validação no import
+                    // e inclui nome da loja no filename para evitar confusão de arquivos.
+                    const lojaAtiva = window._currentStore || 'barueri';
+                    const lojaLabel = lojaAtiva === 'caucaia' ? 'CaucaiaDoAlto' : 'Barueri';
                     const dados = {
                         versao: '2.0',
+                        _store: lojaAtiva,
+                        _loja: lojaLabel,
                         data_exportacao: new Date().toISOString(),
                         ...appData
                     };
@@ -21819,7 +21843,8 @@ ${container.innerHTML}
                     const url = URL.createObjectURL(blob);
                     const a = document.createElement('a');
                     a.href = url;
-                    a.download = `oticavision_backup_${new Date().toISOString().split('T')[0]}.json`;
+                    // ✅ FIX: nome do arquivo inclui a loja para evitar sobrescrever backup da loja errada
+                    a.download = `oticavision_backup_${lojaLabel}_${new Date().toISOString().split('T')[0]}.json`;
                     a.click();
                     URL.revokeObjectURL(url);
                     
@@ -21843,10 +21868,26 @@ ${container.innerHTML}
                         if (!dados.versao || !dados.data_exportacao) {
                             throw new Error('Arquivo inválido');
                         }
+
+                        // ✅ FIX MULTI-LOJA: valida que o backup pertence à loja ativa
+                        // Impede que backup de Barueri seja restaurado em Caucaia e vice-versa.
+                        const lojaAtiva = window._currentStore || 'barueri';
+                        const lojaLabel = lojaAtiva === 'caucaia' ? 'Loja Caucaia do Alto' : 'Loja Barueri';
+                        if (dados._store && dados._store !== lojaAtiva) {
+                            const lojaBackupLabel = dados._store === 'caucaia' ? 'Loja Caucaia do Alto' : 'Loja Barueri';
+                            LoadingManager.hide();
+                            Toast.show(
+                                '⚠️ Este backup pertence à ' + lojaBackupLabel +
+                                ', mas a loja ativa é ' + lojaLabel +
+                                '. Troque de loja antes de importar.',
+                                'warning', 7000
+                            );
+                            return;
+                        }
                         
                         // Confirmar antes de sobrescrever
-                        if (confirm('⚠️ ATENÇÃO: Isso irá sobrescrever todos os dados atuais. Deseja continuar?')) {
-                            const { versao, data_exportacao, ...appData } = dados;
+                        if (confirm('⚠️ ATENÇÃO: Isso irá sobrescrever todos os dados da ' + lojaLabel + '. Deseja continuar?')) {
+                            const { versao, data_exportacao, _store, _loja, ...appData } = dados;
                             await IDB.set(STORAGE_KEY(), JSON.stringify(appData));
                             
                             LoadingManager.hide();
