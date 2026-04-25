@@ -17,57 +17,134 @@
     <!-- ===== MANIFEST E ÍCONES PWA (inline) ===== -->
     <script>
     (function() {
-        // Gera ícone PNG via canvas — necessário para PWA no Windows/Edge/Chrome PC
-        // SVG no manifesto não é renderizado corretamente como ícone instalado no PC
+        // ===== ÍCONE MATERIAL YOU 2026 — Variante A: Gradient Flare =====
         function gerarIconePNG(size, callback) {
             var c = document.createElement('canvas');
             c.width = size; c.height = size;
             var ctx = c.getContext('2d');
-            var r = size * 0.18; // raio dos cantos
+            var r = size * 0.225; // raio dos cantos Material You (22.5%)
 
-            // Fundo laranja com bordas arredondadas
-            ctx.beginPath();
-            ctx.moveTo(r, 0);
-            ctx.lineTo(size - r, 0);
-            ctx.quadraticCurveTo(size, 0, size, r);
-            ctx.lineTo(size, size - r);
-            ctx.quadraticCurveTo(size, size, size - r, size);
-            ctx.lineTo(r, size);
-            ctx.quadraticCurveTo(0, size, 0, size - r);
-            ctx.lineTo(0, r);
-            ctx.quadraticCurveTo(0, 0, r, 0);
-            ctx.closePath();
-            ctx.fillStyle = '#FF6B00';
-            ctx.fill();
+            // ── Helper: clip arredondado ──
+            function clipRounded() {
+                ctx.beginPath();
+                ctx.moveTo(r, 0);
+                ctx.lineTo(size - r, 0);
+                ctx.quadraticCurveTo(size, 0, size, r);
+                ctx.lineTo(size, size - r);
+                ctx.quadraticCurveTo(size, size, size - r, size);
+                ctx.lineTo(r, size);
+                ctx.quadraticCurveTo(0, size, 0, size - r);
+                ctx.lineTo(0, r);
+                ctx.quadraticCurveTo(0, 0, r, 0);
+                ctx.closePath();
+            }
 
-            // Óculos — lente esquerda
-            var lx = size * 0.34, ly = size * 0.52, lr = size * 0.16, lw = size * 0.10;
+            // ── 1. Fundo degradê laranja ──
+            ctx.save();
+            clipRounded();
+            ctx.clip();
+            var bgGrad = ctx.createLinearGradient(0, 0, size, size);
+            bgGrad.addColorStop(0,   '#FF8C42');
+            bgGrad.addColorStop(0.5, '#FF6B00');
+            bgGrad.addColorStop(1,   '#CC4400');
+            ctx.fillStyle = bgGrad;
+            ctx.fillRect(0, 0, size, size);
+
+            // ── 2. Glow radial (lens flare) ──
+            var glow = ctx.createRadialGradient(size*0.35, size*0.30, 0, size*0.35, size*0.30, size*0.55);
+            glow.addColorStop(0, 'rgba(255,220,150,0.55)');
+            glow.addColorStop(1, 'rgba(255,100,0,0)');
+            ctx.fillStyle = glow;
+            ctx.fillRect(0, 0, size, size);
+            ctx.restore();
+
+            // ── 3. Óculos com clip ──
+            ctx.save();
+            clipRounded();
+            ctx.clip();
+
+            var lw  = size * 0.073;
+            var ly  = size * 0.521;
+            var lr  = size * 0.177;
+            var lx  = size * 0.344;
+            var rx2 = size * 0.656;
+
+            ctx.lineCap  = 'round';
+            ctx.lineJoin = 'round';
+            ctx.strokeStyle = 'white';
+            ctx.globalAlpha = 0.97;
+
+            // Sombra suave
+            ctx.shadowColor   = 'rgba(160,50,0,0.35)';
+            ctx.shadowBlur    = size * 0.04;
+            ctx.shadowOffsetY = size * 0.02;
+
+            // Lente esquerda
+            ctx.lineWidth = lw;
             ctx.beginPath();
             ctx.arc(lx, ly, lr, 0, Math.PI * 2);
-            ctx.strokeStyle = 'white';
-            ctx.lineWidth = lw;
             ctx.stroke();
 
-            // Óculos — lente direita
-            var rx2 = size * 0.66;
+            // Lente direita
             ctx.beginPath();
             ctx.arc(rx2, ly, lr, 0, Math.PI * 2);
-            ctx.strokeStyle = 'white';
-            ctx.lineWidth = lw;
             ctx.stroke();
 
-            // Hastes
-            ctx.lineCap = 'round';
-            ctx.lineWidth = size * 0.07;
+            ctx.shadowColor = 'transparent';
+            ctx.shadowBlur  = 0;
+            ctx.shadowOffsetY = 0;
+
+            // Ponte
+            ctx.lineWidth = size * 0.063;
             ctx.beginPath();
-            ctx.moveTo(size * 0.18, size * 0.45);
-            ctx.lineTo(size * 0.14, size * 0.40);
-            ctx.stroke();
-            ctx.beginPath();
-            ctx.moveTo(size * 0.82, size * 0.45);
-            ctx.lineTo(size * 0.86, size * 0.40);
+            ctx.moveTo(size * 0.479, ly);
+            ctx.quadraticCurveTo(size * 0.5, size * 0.490, size * 0.521, ly);
             ctx.stroke();
 
+            // Haste esquerda
+            ctx.beginPath();
+            ctx.moveTo(size * 0.167, size * 0.458);
+            ctx.lineTo(size * 0.115, size * 0.396);
+            ctx.stroke();
+
+            // Haste direita
+            ctx.beginPath();
+            ctx.moveTo(size * 0.833, size * 0.458);
+            ctx.lineTo(size * 0.885, size * 0.396);
+            ctx.stroke();
+
+            // Reflexo lente esq
+            ctx.fillStyle = 'white';
+            ctx.globalAlpha = 0.22;
+            ctx.beginPath();
+            ctx.arc(lx - size*0.052, ly - size*0.063, size*0.047, 0, Math.PI*2);
+            ctx.fill();
+            ctx.globalAlpha = 0.38;
+            ctx.beginPath();
+            ctx.arc(lx - size*0.073, ly - size*0.083, size*0.021, 0, Math.PI*2);
+            ctx.fill();
+
+            // Reflexo lente dir
+            ctx.globalAlpha = 0.22;
+            ctx.beginPath();
+            ctx.arc(rx2 - size*0.052, ly - size*0.063, size*0.047, 0, Math.PI*2);
+            ctx.fill();
+            ctx.globalAlpha = 0.38;
+            ctx.beginPath();
+            ctx.arc(rx2 - size*0.073, ly - size*0.083, size*0.021, 0, Math.PI*2);
+            ctx.fill();
+
+            // Logotipo
+            if (size >= 192) {
+                ctx.globalAlpha = 0.78;
+                ctx.font = 'bold ' + Math.round(size * 0.094) + 'px "Google Sans","Segoe UI",sans-serif';
+                ctx.fillStyle = 'white';
+                ctx.textAlign = 'center';
+                ctx.fillText('MEGAVISION', size * 0.5, size * 0.802);
+            }
+
+            ctx.restore();
+            ctx.globalAlpha = 1;
             callback(c.toDataURL('image/png'));
         }
 
@@ -101,9 +178,9 @@
         });
     })();
     </script>
-    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='18' fill='%23FF6B00'/%3E%3Ccircle cx='34' cy='52' r='16' fill='none' stroke='white' stroke-width='10'/%3E%3Ccircle cx='66' cy='52' r='16' fill='none' stroke='white' stroke-width='10'/%3E%3Cline x1='18' y1='45' x2='14' y2='40' stroke='white' stroke-width='7' stroke-linecap='round'/%3E%3Cline x1='82' y1='45' x2='86' y2='40' stroke='white' stroke-width='7' stroke-linecap='round'/%3E%3C/svg%3E">
-    <link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='18' fill='%23FF6B00'/%3E%3Ccircle cx='34' cy='52' r='16' fill='none' stroke='white' stroke-width='10'/%3E%3Ccircle cx='66' cy='52' r='16' fill='none' stroke='white' stroke-width='10'/%3E%3Cline x1='18' y1='45' x2='14' y2='40' stroke='white' stroke-width='7' stroke-linecap='round'/%3E%3Cline x1='82' y1='45' x2='86' y2='40' stroke='white' stroke-width='7' stroke-linecap='round'/%3E%3C/svg%3E">
-    <link rel="shortcut icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='18' fill='%23FF6B00'/%3E%3Ccircle cx='34' cy='52' r='16' fill='none' stroke='white' stroke-width='10'/%3E%3Ccircle cx='66' cy='52' r='16' fill='none' stroke='white' stroke-width='10'/%3E%3Cline x1='18' y1='45' x2='14' y2='40' stroke='white' stroke-width='7' stroke-linecap='round'/%3E%3Cline x1='82' y1='45' x2='86' y2='40' stroke='white' stroke-width='7' stroke-linecap='round'/%3E%3C/svg%3E">
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 96 96'%3E%3Cdefs%3E%3ClinearGradient id='bg' x1='0%25' y1='0%25' x2='100%25' y2='100%25'%3E%3Cstop offset='0%25' stop-color='%23FF8C42'/%3E%3Cstop offset='50%25' stop-color='%23FF6B00'/%3E%3Cstop offset='100%25' stop-color='%23CC4400'/%3E%3C/linearGradient%3E%3CradialGradient id='gl' cx='35%25' cy='30%25' r='55%25'%3E%3Cstop offset='0%25' stop-color='rgba(255,220,150,0.55)'/%3E%3Cstop offset='100%25' stop-color='rgba(255,100,0,0)'/%3E%3C/radialGradient%3E%3C/defs%3E%3Crect width='96' height='96' rx='21.6' fill='url(%23bg)'/%3E%3Crect width='96' height='96' rx='21.6' fill='url(%23gl)'/%3E%3Ccircle cx='33' cy='50' r='17' fill='none' stroke='white' stroke-width='7' stroke-linecap='round'/%3E%3Ccircle cx='63' cy='50' r='17' fill='none' stroke='white' stroke-width='7' stroke-linecap='round'/%3E%3Cpath d='M46 50 Q48 47 50 50' fill='none' stroke='white' stroke-width='6' stroke-linecap='round'/%3E%3Cline x1='16' y1='44' x2='11' y2='38' stroke='white' stroke-width='6' stroke-linecap='round'/%3E%3Cline x1='80' y1='44' x2='85' y2='38' stroke='white' stroke-width='6' stroke-linecap='round'/%3E%3Ccircle cx='28' cy='44' r='4.5' fill='white' opacity='0.22'/%3E%3Ccircle cx='26' cy='42' r='2' fill='white' opacity='0.38'/%3E%3Ccircle cx='58' cy='44' r='4.5' fill='white' opacity='0.22'/%3E%3Ccircle cx='56' cy='42' r='2' fill='white' opacity='0.38'/%3E%3C/svg%3E">
+    <link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 96 96'%3E%3Cdefs%3E%3ClinearGradient id='bg' x1='0%25' y1='0%25' x2='100%25' y2='100%25'%3E%3Cstop offset='0%25' stop-color='%23FF8C42'/%3E%3Cstop offset='50%25' stop-color='%23FF6B00'/%3E%3Cstop offset='100%25' stop-color='%23CC4400'/%3E%3C/linearGradient%3E%3CradialGradient id='gl' cx='35%25' cy='30%25' r='55%25'%3E%3Cstop offset='0%25' stop-color='rgba(255,220,150,0.55)'/%3E%3Cstop offset='100%25' stop-color='rgba(255,100,0,0)'/%3E%3C/radialGradient%3E%3C/defs%3E%3Crect width='96' height='96' rx='21.6' fill='url(%23bg)'/%3E%3Crect width='96' height='96' rx='21.6' fill='url(%23gl)'/%3E%3Ccircle cx='33' cy='50' r='17' fill='none' stroke='white' stroke-width='7' stroke-linecap='round'/%3E%3Ccircle cx='63' cy='50' r='17' fill='none' stroke='white' stroke-width='7' stroke-linecap='round'/%3E%3Cpath d='M46 50 Q48 47 50 50' fill='none' stroke='white' stroke-width='6' stroke-linecap='round'/%3E%3Cline x1='16' y1='44' x2='11' y2='38' stroke='white' stroke-width='6' stroke-linecap='round'/%3E%3Cline x1='80' y1='44' x2='85' y2='38' stroke='white' stroke-width='6' stroke-linecap='round'/%3E%3Ccircle cx='28' cy='44' r='4.5' fill='white' opacity='0.22'/%3E%3Ccircle cx='26' cy='42' r='2' fill='white' opacity='0.38'/%3E%3Ccircle cx='58' cy='44' r='4.5' fill='white' opacity='0.22'/%3E%3Ccircle cx='56' cy='42' r='2' fill='white' opacity='0.38'/%3E%3C/svg%3E">
+    <link rel="shortcut icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 96 96'%3E%3Cdefs%3E%3ClinearGradient id='bg' x1='0%25' y1='0%25' x2='100%25' y2='100%25'%3E%3Cstop offset='0%25' stop-color='%23FF8C42'/%3E%3Cstop offset='50%25' stop-color='%23FF6B00'/%3E%3Cstop offset='100%25' stop-color='%23CC4400'/%3E%3C/linearGradient%3E%3CradialGradient id='gl' cx='35%25' cy='30%25' r='55%25'%3E%3Cstop offset='0%25' stop-color='rgba(255,220,150,0.55)'/%3E%3Cstop offset='100%25' stop-color='rgba(255,100,0,0)'/%3E%3C/radialGradient%3E%3C/defs%3E%3Crect width='96' height='96' rx='21.6' fill='url(%23bg)'/%3E%3Crect width='96' height='96' rx='21.6' fill='url(%23gl)'/%3E%3Ccircle cx='33' cy='50' r='17' fill='none' stroke='white' stroke-width='7' stroke-linecap='round'/%3E%3Ccircle cx='63' cy='50' r='17' fill='none' stroke='white' stroke-width='7' stroke-linecap='round'/%3E%3Cpath d='M46 50 Q48 47 50 50' fill='none' stroke='white' stroke-width='6' stroke-linecap='round'/%3E%3Cline x1='16' y1='44' x2='11' y2='38' stroke='white' stroke-width='6' stroke-linecap='round'/%3E%3Cline x1='80' y1='44' x2='85' y2='38' stroke='white' stroke-width='6' stroke-linecap='round'/%3E%3Ccircle cx='28' cy='44' r='4.5' fill='white' opacity='0.22'/%3E%3Ccircle cx='26' cy='42' r='2' fill='white' opacity='0.38'/%3E%3Ccircle cx='58' cy='44' r='4.5' fill='white' opacity='0.22'/%3E%3Ccircle cx='56' cy='42' r='2' fill='white' opacity='0.38'/%3E%3C/svg%3E">
     <!-- ===== /PWA META TAGS ===== -->
 
     <!-- ===== RxDB v17 LOCAL-FIRST — IndexedDB + OPFS + Cloud Sync ===== -->
