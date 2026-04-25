@@ -8946,8 +8946,11 @@ tr:hover td { background: rgba(255,107,0,0.03) !important; }
             // ── Salva com debounce para não salvar a cada keystroke ───────────
             scheduleSave(storeId) {
                 clearTimeout(this._timer);
+                // FIX MULTI-LOJA: resolve storeId AGORA para evitar que uma troca de loja
+                // durante o debounce salve o backup no localStorage da loja errada.
+                const sid = storeId || window._currentStore || 'barueri';
                 this._timer = setTimeout(() => {
-                    this.save(storeId || window._currentStore || 'barueri');
+                    this.save(sid);
                 }, this._DEBOUNCE_MS);
             },
 
@@ -9323,17 +9326,30 @@ tr:hover td { background: rgba(255,107,0,0.03) !important; }
             _cloudSyncTimer: null,
             _scheduleCloudSync() {
                 clearTimeout(this._cloudSyncTimer);
+                // FIX MULTI-LOJA: captura o storeId AGORA (no momento do agendamento)
+                // para evitar race condition onde o usuário troca de loja dentro dos 1500ms
+                // de debounce — sem isso, o autoSync disparava com dados da loja antiga
+                // mas window._currentStore já apontava para a nova loja, causando push
+                // dos dados de Barueri no arquivo da Caucaia no Drive.
+                const scheduledStore = window._currentStore || 'barueri';
                 this._cloudSyncTimer = setTimeout(() => {
+                    // Só executa se a loja não mudou durante o debounce
+                    if ((window._currentStore || 'barueri') !== scheduledStore) return;
                     try { if (window.CloudSync) CloudSync.autoSync(); } catch(e) {}
                     // Agenda snapshot OPFS junto ao cloud sync (debounce 60s)
-                    try { OPFS.scheduleSnapshot(window._currentStore || 'barueri'); } catch(_e) {}
+                    try { OPFS.scheduleSnapshot(scheduledStore); } catch(_e) {}
                 }, 1500); // ✅ CORRIGIDO: reduzido de 5000ms → 1500ms para sync mais rápido
             },
 
             // ── switchStore ───────────────────────────────────────────────────
+            // FIX MULTI-LOJA: o carregamento dos dados da nova loja é feito
+            // inteiramente pelo StoreManager.switchTo() que lê diretamente do IDB.
+            // Esta função não precisa chamar sync() pois isso causava um _fetchAllData
+            // extra com window._currentStore já apontando para a nova loja ANTES de
+            // o state ter sido resetado — resultando em dados mixados entre lojas.
             async switchStore(storeId) {
                 window._currentStore = storeId;
-                await this.sync('switch_store');
+                // Não chamar this.sync() aqui — StoreManager.switchTo() já carrega os dados.
             },
 
             // ── wipeStore ─────────────────────────────────────────────────────
@@ -10768,6 +10784,11 @@ tr:hover td { background: rgba(255,107,0,0.03) !important; }
                 showTab, _updateUI,
                 autoSync() { _schedulePush(); },
                 forcePull() { return _activeProvider === 'gdrive' ? gdrivePull(false) : onedrivePull(false); },
+                // FIX MULTI-LOJA: limpa o cache de file ID de uma loja específica
+                // para forçar re-busca do arquivo correto no Drive após troca de loja.
+                clearStoreFileId(storeId) {
+                    try { if (storeId) { delete _gdriveFileIds[storeId]; delete _odFileIds[storeId]; localStorage.removeItem('cs_gdrive_file_id_' + storeId); localStorage.removeItem('cs_onedrive_file_id_' + storeId); } } catch(_e) {}
+                },
                 _recordDeletion(storeId, col, id) { _recordDeletion(storeId, col, id); },
                 // ── Exposição pública do coletor de dados (para OPFS + exportação) ──
                 _collectAllDataPublic() { return _collectAllData(); },
@@ -23220,8 +23241,10 @@ const StoreManager = {
         // 3. Invalida cache de contas e file ID para a nova loja
         IDB._cache['contas_financeiras_' + lojaId] = null;
         // FIX MULTI-LOJA: limpa file ID em memória da nova loja para forçar
-        // re-busca do arquivo correto no Drive após troca de loja
-        try { if (window.CloudSync) { delete window.CloudSync._gdriveFileIdCache?.[lojaId]; } } catch(_e) {}
+        // re-busca do arquivo correto no Drive após troca de loja.
+        // CORRIGIDO: usa clearStoreFileId() que acessa as variáveis privadas corretas
+        // (_gdriveFileIds e _odFileIds) — antes o delete em _gdriveFileIdCache era no-op.
+        try { if (window.CloudSync) { CloudSync.clearStoreFileId(lojaId); } } catch(_e) {}
 
         // 4. Reseta state imediatamente (UI fica em branco por < 1s)
         const keepMsgs = state.wppMensagens;
