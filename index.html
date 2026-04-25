@@ -17,57 +17,134 @@
     <!-- ===== MANIFEST E ÍCONES PWA (inline) ===== -->
     <script>
     (function() {
-        // Gera ícone PNG via canvas — necessário para PWA no Windows/Edge/Chrome PC
-        // SVG no manifesto não é renderizado corretamente como ícone instalado no PC
+        // ===== ÍCONE MATERIAL YOU 2026 — Variante A: Gradient Flare =====
         function gerarIconePNG(size, callback) {
             var c = document.createElement('canvas');
             c.width = size; c.height = size;
             var ctx = c.getContext('2d');
-            var r = size * 0.18; // raio dos cantos
+            var r = size * 0.225; // raio dos cantos Material You (22.5%)
 
-            // Fundo laranja com bordas arredondadas
-            ctx.beginPath();
-            ctx.moveTo(r, 0);
-            ctx.lineTo(size - r, 0);
-            ctx.quadraticCurveTo(size, 0, size, r);
-            ctx.lineTo(size, size - r);
-            ctx.quadraticCurveTo(size, size, size - r, size);
-            ctx.lineTo(r, size);
-            ctx.quadraticCurveTo(0, size, 0, size - r);
-            ctx.lineTo(0, r);
-            ctx.quadraticCurveTo(0, 0, r, 0);
-            ctx.closePath();
-            ctx.fillStyle = '#FF6B00';
-            ctx.fill();
+            // ── Helper: clip arredondado ──
+            function clipRounded() {
+                ctx.beginPath();
+                ctx.moveTo(r, 0);
+                ctx.lineTo(size - r, 0);
+                ctx.quadraticCurveTo(size, 0, size, r);
+                ctx.lineTo(size, size - r);
+                ctx.quadraticCurveTo(size, size, size - r, size);
+                ctx.lineTo(r, size);
+                ctx.quadraticCurveTo(0, size, 0, size - r);
+                ctx.lineTo(0, r);
+                ctx.quadraticCurveTo(0, 0, r, 0);
+                ctx.closePath();
+            }
 
-            // Óculos — lente esquerda
-            var lx = size * 0.34, ly = size * 0.52, lr = size * 0.16, lw = size * 0.10;
+            // ── 1. Fundo degradê laranja ──
+            ctx.save();
+            clipRounded();
+            ctx.clip();
+            var bgGrad = ctx.createLinearGradient(0, 0, size, size);
+            bgGrad.addColorStop(0,   '#FF8C42');
+            bgGrad.addColorStop(0.5, '#FF6B00');
+            bgGrad.addColorStop(1,   '#CC4400');
+            ctx.fillStyle = bgGrad;
+            ctx.fillRect(0, 0, size, size);
+
+            // ── 2. Glow radial (lens flare) ──
+            var glow = ctx.createRadialGradient(size*0.35, size*0.30, 0, size*0.35, size*0.30, size*0.55);
+            glow.addColorStop(0, 'rgba(255,220,150,0.55)');
+            glow.addColorStop(1, 'rgba(255,100,0,0)');
+            ctx.fillStyle = glow;
+            ctx.fillRect(0, 0, size, size);
+            ctx.restore();
+
+            // ── 3. Óculos com clip ──
+            ctx.save();
+            clipRounded();
+            ctx.clip();
+
+            var lw  = size * 0.073;
+            var ly  = size * 0.521;
+            var lr  = size * 0.177;
+            var lx  = size * 0.344;
+            var rx2 = size * 0.656;
+
+            ctx.lineCap  = 'round';
+            ctx.lineJoin = 'round';
+            ctx.strokeStyle = 'white';
+            ctx.globalAlpha = 0.97;
+
+            // Sombra suave
+            ctx.shadowColor   = 'rgba(160,50,0,0.35)';
+            ctx.shadowBlur    = size * 0.04;
+            ctx.shadowOffsetY = size * 0.02;
+
+            // Lente esquerda
+            ctx.lineWidth = lw;
             ctx.beginPath();
             ctx.arc(lx, ly, lr, 0, Math.PI * 2);
-            ctx.strokeStyle = 'white';
-            ctx.lineWidth = lw;
             ctx.stroke();
 
-            // Óculos — lente direita
-            var rx2 = size * 0.66;
+            // Lente direita
             ctx.beginPath();
             ctx.arc(rx2, ly, lr, 0, Math.PI * 2);
-            ctx.strokeStyle = 'white';
-            ctx.lineWidth = lw;
             ctx.stroke();
 
-            // Hastes
-            ctx.lineCap = 'round';
-            ctx.lineWidth = size * 0.07;
+            ctx.shadowColor = 'transparent';
+            ctx.shadowBlur  = 0;
+            ctx.shadowOffsetY = 0;
+
+            // Ponte
+            ctx.lineWidth = size * 0.063;
             ctx.beginPath();
-            ctx.moveTo(size * 0.18, size * 0.45);
-            ctx.lineTo(size * 0.14, size * 0.40);
-            ctx.stroke();
-            ctx.beginPath();
-            ctx.moveTo(size * 0.82, size * 0.45);
-            ctx.lineTo(size * 0.86, size * 0.40);
+            ctx.moveTo(size * 0.479, ly);
+            ctx.quadraticCurveTo(size * 0.5, size * 0.490, size * 0.521, ly);
             ctx.stroke();
 
+            // Haste esquerda
+            ctx.beginPath();
+            ctx.moveTo(size * 0.167, size * 0.458);
+            ctx.lineTo(size * 0.115, size * 0.396);
+            ctx.stroke();
+
+            // Haste direita
+            ctx.beginPath();
+            ctx.moveTo(size * 0.833, size * 0.458);
+            ctx.lineTo(size * 0.885, size * 0.396);
+            ctx.stroke();
+
+            // Reflexo lente esq
+            ctx.fillStyle = 'white';
+            ctx.globalAlpha = 0.22;
+            ctx.beginPath();
+            ctx.arc(lx - size*0.052, ly - size*0.063, size*0.047, 0, Math.PI*2);
+            ctx.fill();
+            ctx.globalAlpha = 0.38;
+            ctx.beginPath();
+            ctx.arc(lx - size*0.073, ly - size*0.083, size*0.021, 0, Math.PI*2);
+            ctx.fill();
+
+            // Reflexo lente dir
+            ctx.globalAlpha = 0.22;
+            ctx.beginPath();
+            ctx.arc(rx2 - size*0.052, ly - size*0.063, size*0.047, 0, Math.PI*2);
+            ctx.fill();
+            ctx.globalAlpha = 0.38;
+            ctx.beginPath();
+            ctx.arc(rx2 - size*0.073, ly - size*0.083, size*0.021, 0, Math.PI*2);
+            ctx.fill();
+
+            // Logotipo
+            if (size >= 192) {
+                ctx.globalAlpha = 0.78;
+                ctx.font = 'bold ' + Math.round(size * 0.094) + 'px "Google Sans","Segoe UI",sans-serif';
+                ctx.fillStyle = 'white';
+                ctx.textAlign = 'center';
+                ctx.fillText('MEGAVISION', size * 0.5, size * 0.802);
+            }
+
+            ctx.restore();
+            ctx.globalAlpha = 1;
             callback(c.toDataURL('image/png'));
         }
 
@@ -101,9 +178,9 @@
         });
     })();
     </script>
-    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='18' fill='%23FF6B00'/%3E%3Ccircle cx='34' cy='52' r='16' fill='none' stroke='white' stroke-width='10'/%3E%3Ccircle cx='66' cy='52' r='16' fill='none' stroke='white' stroke-width='10'/%3E%3Cline x1='18' y1='45' x2='14' y2='40' stroke='white' stroke-width='7' stroke-linecap='round'/%3E%3Cline x1='82' y1='45' x2='86' y2='40' stroke='white' stroke-width='7' stroke-linecap='round'/%3E%3C/svg%3E">
-    <link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='18' fill='%23FF6B00'/%3E%3Ccircle cx='34' cy='52' r='16' fill='none' stroke='white' stroke-width='10'/%3E%3Ccircle cx='66' cy='52' r='16' fill='none' stroke='white' stroke-width='10'/%3E%3Cline x1='18' y1='45' x2='14' y2='40' stroke='white' stroke-width='7' stroke-linecap='round'/%3E%3Cline x1='82' y1='45' x2='86' y2='40' stroke='white' stroke-width='7' stroke-linecap='round'/%3E%3C/svg%3E">
-    <link rel="shortcut icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='18' fill='%23FF6B00'/%3E%3Ccircle cx='34' cy='52' r='16' fill='none' stroke='white' stroke-width='10'/%3E%3Ccircle cx='66' cy='52' r='16' fill='none' stroke='white' stroke-width='10'/%3E%3Cline x1='18' y1='45' x2='14' y2='40' stroke='white' stroke-width='7' stroke-linecap='round'/%3E%3Cline x1='82' y1='45' x2='86' y2='40' stroke='white' stroke-width='7' stroke-linecap='round'/%3E%3C/svg%3E">
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 96 96'%3E%3Cdefs%3E%3ClinearGradient id='bg' x1='0%25' y1='0%25' x2='100%25' y2='100%25'%3E%3Cstop offset='0%25' stop-color='%23FF8C42'/%3E%3Cstop offset='50%25' stop-color='%23FF6B00'/%3E%3Cstop offset='100%25' stop-color='%23CC4400'/%3E%3C/linearGradient%3E%3CradialGradient id='gl' cx='35%25' cy='30%25' r='55%25'%3E%3Cstop offset='0%25' stop-color='rgba(255,220,150,0.55)'/%3E%3Cstop offset='100%25' stop-color='rgba(255,100,0,0)'/%3E%3C/radialGradient%3E%3C/defs%3E%3Crect width='96' height='96' rx='21.6' fill='url(%23bg)'/%3E%3Crect width='96' height='96' rx='21.6' fill='url(%23gl)'/%3E%3Ccircle cx='33' cy='50' r='17' fill='none' stroke='white' stroke-width='7' stroke-linecap='round'/%3E%3Ccircle cx='63' cy='50' r='17' fill='none' stroke='white' stroke-width='7' stroke-linecap='round'/%3E%3Cpath d='M46 50 Q48 47 50 50' fill='none' stroke='white' stroke-width='6' stroke-linecap='round'/%3E%3Cline x1='16' y1='44' x2='11' y2='38' stroke='white' stroke-width='6' stroke-linecap='round'/%3E%3Cline x1='80' y1='44' x2='85' y2='38' stroke='white' stroke-width='6' stroke-linecap='round'/%3E%3Ccircle cx='28' cy='44' r='4.5' fill='white' opacity='0.22'/%3E%3Ccircle cx='26' cy='42' r='2' fill='white' opacity='0.38'/%3E%3Ccircle cx='58' cy='44' r='4.5' fill='white' opacity='0.22'/%3E%3Ccircle cx='56' cy='42' r='2' fill='white' opacity='0.38'/%3E%3C/svg%3E">
+    <link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 96 96'%3E%3Cdefs%3E%3ClinearGradient id='bg' x1='0%25' y1='0%25' x2='100%25' y2='100%25'%3E%3Cstop offset='0%25' stop-color='%23FF8C42'/%3E%3Cstop offset='50%25' stop-color='%23FF6B00'/%3E%3Cstop offset='100%25' stop-color='%23CC4400'/%3E%3C/linearGradient%3E%3CradialGradient id='gl' cx='35%25' cy='30%25' r='55%25'%3E%3Cstop offset='0%25' stop-color='rgba(255,220,150,0.55)'/%3E%3Cstop offset='100%25' stop-color='rgba(255,100,0,0)'/%3E%3C/radialGradient%3E%3C/defs%3E%3Crect width='96' height='96' rx='21.6' fill='url(%23bg)'/%3E%3Crect width='96' height='96' rx='21.6' fill='url(%23gl)'/%3E%3Ccircle cx='33' cy='50' r='17' fill='none' stroke='white' stroke-width='7' stroke-linecap='round'/%3E%3Ccircle cx='63' cy='50' r='17' fill='none' stroke='white' stroke-width='7' stroke-linecap='round'/%3E%3Cpath d='M46 50 Q48 47 50 50' fill='none' stroke='white' stroke-width='6' stroke-linecap='round'/%3E%3Cline x1='16' y1='44' x2='11' y2='38' stroke='white' stroke-width='6' stroke-linecap='round'/%3E%3Cline x1='80' y1='44' x2='85' y2='38' stroke='white' stroke-width='6' stroke-linecap='round'/%3E%3Ccircle cx='28' cy='44' r='4.5' fill='white' opacity='0.22'/%3E%3Ccircle cx='26' cy='42' r='2' fill='white' opacity='0.38'/%3E%3Ccircle cx='58' cy='44' r='4.5' fill='white' opacity='0.22'/%3E%3Ccircle cx='56' cy='42' r='2' fill='white' opacity='0.38'/%3E%3C/svg%3E">
+    <link rel="shortcut icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 96 96'%3E%3Cdefs%3E%3ClinearGradient id='bg' x1='0%25' y1='0%25' x2='100%25' y2='100%25'%3E%3Cstop offset='0%25' stop-color='%23FF8C42'/%3E%3Cstop offset='50%25' stop-color='%23FF6B00'/%3E%3Cstop offset='100%25' stop-color='%23CC4400'/%3E%3C/linearGradient%3E%3CradialGradient id='gl' cx='35%25' cy='30%25' r='55%25'%3E%3Cstop offset='0%25' stop-color='rgba(255,220,150,0.55)'/%3E%3Cstop offset='100%25' stop-color='rgba(255,100,0,0)'/%3E%3C/radialGradient%3E%3C/defs%3E%3Crect width='96' height='96' rx='21.6' fill='url(%23bg)'/%3E%3Crect width='96' height='96' rx='21.6' fill='url(%23gl)'/%3E%3Ccircle cx='33' cy='50' r='17' fill='none' stroke='white' stroke-width='7' stroke-linecap='round'/%3E%3Ccircle cx='63' cy='50' r='17' fill='none' stroke='white' stroke-width='7' stroke-linecap='round'/%3E%3Cpath d='M46 50 Q48 47 50 50' fill='none' stroke='white' stroke-width='6' stroke-linecap='round'/%3E%3Cline x1='16' y1='44' x2='11' y2='38' stroke='white' stroke-width='6' stroke-linecap='round'/%3E%3Cline x1='80' y1='44' x2='85' y2='38' stroke='white' stroke-width='6' stroke-linecap='round'/%3E%3Ccircle cx='28' cy='44' r='4.5' fill='white' opacity='0.22'/%3E%3Ccircle cx='26' cy='42' r='2' fill='white' opacity='0.38'/%3E%3Ccircle cx='58' cy='44' r='4.5' fill='white' opacity='0.22'/%3E%3Ccircle cx='56' cy='42' r='2' fill='white' opacity='0.38'/%3E%3C/svg%3E">
     <!-- ===== /PWA META TAGS ===== -->
 
     <!-- ===== RxDB v17 LOCAL-FIRST — IndexedDB + OPFS + Cloud Sync ===== -->
@@ -7636,6 +7713,24 @@ tr:hover td { background: rgba(255,107,0,0.03) !important; }
                                     <div id="rxdbTombstoneCount" class="rxdb-stat-val" style="font-size:0.85rem;">—</div>
                                     <div class="rxdb-stat-sub">deleções protegidas</div>
                                 </div>
+                                <!-- Card: Backup localStorage -->
+                                <div class="rxdb-stat-card" id="rxdbLsBackupCard" style="grid-column:span 2;border-color:#f59e0b33;">
+                                    <div class="rxdb-stat-lbl" style="display:flex;align-items:center;gap:5px;">
+                                        <i class="fas fa-shield-alt" style="color:#f59e0b;"></i> Backup localStorage
+                                    </div>
+                                    <div id="rxdbLsBackupStatus" class="rxdb-stat-val" style="font-size:0.78rem;color:#f59e0b;">verificando…</div>
+                                    <div id="rxdbLsBackupSub" class="rxdb-stat-sub">Fallback automático se IDB for limpo</div>
+                                    <div style="margin-top:6px;display:flex;gap:6px;flex-wrap:wrap;">
+                                        <button class="btn btn-sm" style="font-size:0.68rem;padding:3px 8px;background:#f59e0b22;color:#f59e0b;border:1px solid #f59e0b44;"
+                                            onclick="(function(){ try { LocalStorageBackup.save(); RxDBPanel._updateLsBackupCard(); Toast.show('💾 Backup localStorage atualizado!','success',2000); } catch(e){} })()">
+                                            <i class="fas fa-save"></i> Salvar agora
+                                        </button>
+                                        <button class="btn btn-sm" style="font-size:0.68rem;padding:3px 8px;background:#dc354522;color:#f87171;border:1px solid #dc354544;"
+                                            onclick="if(confirm('Apagar backup localStorage desta loja?')){ LocalStorageBackup.clear(); RxDBPanel._updateLsBackupCard(); Toast.show('🗑️ Backup localStorage apagado','info',2000); }">
+                                            <i class="fas fa-trash"></i> Limpar
+                                        </button>
+                                    </div>
+                                </div>
                             </div>
 
                             <!-- Barra de armazenamento com alertas de cor -->
@@ -8779,6 +8874,131 @@ tr:hover td { background: rgba(255,107,0,0.03) !important; }
             observe()    { return { unsubscribe: () => {} }; }
         };
 
+        // ══════════════════════════════════════════════════════════════════════
+        //  LocalStorageBackup — camada de redundância local (fallback do IDB)
+        //  Salva snapshot compacto do state em localStorage após cada saveData().
+        //  Se o IndexedDB for limpo pelo navegador, os dados são restaurados
+        //  automaticamente no próximo boot — sem precisar de Google Drive.
+        // ══════════════════════════════════════════════════════════════════════
+        const LocalStorageBackup = {
+            _PREFIX: 'optic_ls_bak_',
+            _DEBOUNCE_MS: 2000,
+            _timer: null,
+
+            _key(storeId) {
+                return this._PREFIX + (storeId || window._currentStore || 'barueri');
+            },
+
+            // ── Salva snapshot compacto (imagens base64 excluídas para economizar quota) ──
+            save(storeId) {
+                const sid = storeId || window._currentStore || 'barueri';
+                const TABLES = ['clients','products','sales','expenses',
+                                'prescriptions','suppliers','services',
+                                'crmContatos','crmTarefas','crmNps'];
+                try {
+                    const snap = { _ts: new Date().toISOString(), _store: sid, _v: 2 };
+                    TABLES.forEach(k => {
+                        if (Array.isArray(state[k])) {
+                            // Remove blobs base64 grandes para não estourar quota de ~5-10MB
+                            snap[k] = state[k].map(item => {
+                                if (!item || typeof item !== 'object') return item;
+                                const c = { ...item };
+                                if (typeof c.image === 'string' && c.image.startsWith('data:')) delete c.image;
+                                if (typeof c.photo === 'string' && c.photo.startsWith('data:'))  delete c.photo;
+                                return c;
+                            });
+                        } else { snap[k] = []; }
+                    });
+                    // Config sem logo (logo pode ser vários MB)
+                    const company = { ...(state.company || {}) };
+                    if (typeof company.logo === 'string' && company.logo.startsWith('data:')) delete company.logo;
+                    snap.company       = company;
+                    snap.config        = state.config        || {};
+                    snap.lastOsCounter = state.lastOsCounter || {};
+
+                    const json = JSON.stringify(snap);
+                    localStorage.setItem(this._key(sid), json);
+                    localStorage.setItem(this._key(sid) + '_ts', snap._ts);
+                    console.log('[LSBackup] ✅ Backup salvo —', sid, '~' + Math.round(json.length / 1024) + ' KB');
+                    return true;
+                } catch(e) {
+                    if (e.name === 'QuotaExceededError') {
+                        // Quota cheia: salva versão mínima com só metadados
+                        try {
+                            const mini = {
+                                _ts: new Date().toISOString(), _mini: true, _store: sid,
+                                clients_count:       (state.clients       || []).length,
+                                products_count:      (state.products      || []).length,
+                                sales_count:         (state.sales         || []).length,
+                                expenses_count:      (state.expenses      || []).length,
+                                prescriptions_count: (state.prescriptions || []).length
+                            };
+                            localStorage.setItem(this._key(sid) + '_meta', JSON.stringify(mini));
+                        } catch(_e2) {}
+                        console.warn('[LSBackup] Quota cheia — salvo apenas metadados');
+                    } else {
+                        console.warn('[LSBackup] Erro ao salvar:', e.message);
+                    }
+                    return false;
+                }
+            },
+
+            // ── Salva com debounce para não salvar a cada keystroke ───────────
+            scheduleSave(storeId) {
+                clearTimeout(this._timer);
+                this._timer = setTimeout(() => {
+                    this.save(storeId || window._currentStore || 'barueri');
+                }, this._DEBOUNCE_MS);
+            },
+
+            // ── Carrega snapshot do localStorage ─────────────────────────────
+            load(storeId) {
+                try {
+                    const sid = storeId || window._currentStore || 'barueri';
+                    const raw = localStorage.getItem(this._key(sid));
+                    if (!raw) return null;
+                    const snap = JSON.parse(raw);
+                    if (!snap || snap._mini) return null;
+                    return snap;
+                } catch(e) {
+                    console.warn('[LSBackup] Erro ao carregar:', e.message);
+                    return null;
+                }
+            },
+
+            // ── Data do último backup ─────────────────────────────────────────
+            getSavedAt(storeId) {
+                try {
+                    return localStorage.getItem(this._key(storeId || window._currentStore || 'barueri') + '_ts') || null;
+                } catch(_e) { return null; }
+            },
+
+            // ── Conta quantos registros estão no backup ───────────────────────
+            getStats(storeId) {
+                const snap = this.load(storeId);
+                if (!snap) return null;
+                const TABLES = ['clients','products','sales','expenses','prescriptions','suppliers','services'];
+                const counts = {};
+                let total = 0;
+                TABLES.forEach(k => { counts[k] = (snap[k] || []).length; total += counts[k]; });
+                return { counts, total, ts: snap._ts };
+            },
+
+            // ── Apaga backup (ex: ao fazer wipe de loja) ─────────────────────
+            clear(storeId) {
+                try {
+                    const sid = storeId || window._currentStore || 'barueri';
+                    localStorage.removeItem(this._key(sid));
+                    localStorage.removeItem(this._key(sid) + '_ts');
+                    localStorage.removeItem(this._key(sid) + '_meta');
+                } catch(_e) {}
+            }
+        };
+        window.LocalStorageBackup = LocalStorageBackup;
+        // ══════════════════════════════════════════════════════════════════════
+        //  /LocalStorageBackup
+        // ══════════════════════════════════════════════════════════════════════
+
         // ── Mapa de coleções ──────────────────────────────────────────────────
         const _COL_MAP = {
             clients: 'clients', products: 'products', sales: 'sales',
@@ -8853,6 +9073,21 @@ tr:hover td { background: rgba(255,107,0,0.03) !important; }
 
                 await this.sync('boot');
                 console.log('[RxDB v17] ✅ Boot completo — Local-First para loja:', storeId);
+
+                // Notifica se dados foram restaurados do backup localStorage
+                if (window._lsBackupRestored) {
+                    window._lsBackupRestored = false;
+                    const ts = window._lsBackupTs ? new Date(window._lsBackupTs).toLocaleString('pt-BR') : '';
+                    setTimeout(() => {
+                        try {
+                            Toast.show(
+                                '📦 Dados restaurados do backup local' + (ts ? ' (' + ts + ')' : '') +
+                                '. O IndexedDB foi re-populado automaticamente.',
+                                'info', 6000
+                            );
+                        } catch(_e) {}
+                    }, 1500);
+                }
                 // ✅ ORDEM CORRETA DE CARREGAMENTO:
                 // 1. IndexedDB local → dados exibidos IMEDIATAMENTE (já feito pelo sync('boot') acima)
                 // 2. Cloud pull → apenas DEPOIS de 2s, em background, para NÃO atrasar o boot
@@ -8898,6 +9133,32 @@ tr:hover td { background: rgba(255,107,0,0.03) !important; }
                     console.log('[RxDB v17] Dados carregados do IndexedDB para loja:', storeId);
                 } catch(e) {
                     console.error('[RxDB v17] _fetchAllData erro:', e.message);
+                }
+
+                // ── Fallback: se IDB está vazio, restaura do backup localStorage ──
+                // Cobre: modo privado, limpeza de dados, iOS Safari, novo dispositivo sem Drive
+                const MAIN_TABLES = ['clients','products','sales','expenses','prescriptions','suppliers','services'];
+                const hasAnyIDBData = MAIN_TABLES.some(k => (state[k] || []).length > 0);
+                if (!hasAnyIDBData) {
+                    const backup = window.LocalStorageBackup && LocalStorageBackup.load(storeId);
+                    if (backup) {
+                        console.warn('[LocalFirst] ⚠️ IDB vazio — restaurando do backup localStorage (', backup._ts, ')');
+                        MAIN_TABLES.forEach(k => {
+                            if (Array.isArray(backup[k]) && backup[k].length > 0) state[k] = backup[k];
+                        });
+                        if (backup.company && typeof backup.company === 'object')
+                            Object.assign(state.company || (state.company = {}), backup.company);
+                        if (backup.config && typeof backup.config === 'object')
+                            Object.assign(state.config || (state.config = {}), backup.config);
+                        if (backup.lastOsCounter && typeof backup.lastOsCounter === 'object')
+                            state.lastOsCounter = { ...(state.lastOsCounter || {}), ...backup.lastOsCounter };
+                        // Re-escreve no IDB para recuperar persistência nativa
+                        setTimeout(() => {
+                            try { LocalFirst.rewriteAll(true).catch(() => {}); } catch(_e) {}
+                        }, 800);
+                        window._lsBackupRestored = true;
+                        window._lsBackupTs = backup._ts;
+                    }
                 }
             },
 
@@ -8997,6 +9258,8 @@ tr:hover td { background: rgba(255,107,0,0.03) !important; }
                 } catch(e) { console.error('[RxDB v17] pushConfig:', e.message); }
                 // Atualiza painel
                 try { this._updatePanel?.(); } catch(e) {}
+                // Backup localStorage (config/company/lastOsCounter)
+                if (window.LocalStorageBackup) LocalStorageBackup.scheduleSave();
             },
 
             // ── rewriteAll ────────────────────────────────────────────────────
@@ -9076,7 +9339,9 @@ tr:hover td { background: rgba(255,107,0,0.03) !important; }
             // ── wipeStore ─────────────────────────────────────────────────────
             async wipeStore(storeId) {
                 await sbDeleteStore(storeId || window._currentStore || 'barueri');
-                Toast.show('🗑️ Dados da loja apagados do IndexedDB', 'info');
+                // Limpa backup localStorage junto ao wipe do IDB
+                if (window.LocalStorageBackup) LocalStorageBackup.clear(storeId || window._currentStore || 'barueri');
+                Toast.show('🗑️ Dados da loja apagados do IndexedDB e backup local', 'info');
             }
         };
         window.LocalFirst = LocalFirst;
@@ -9260,6 +9525,38 @@ tr:hover td { background: rgba(255,107,0,0.03) !important; }
                 }
             },
 
+            // ── Atualiza card de backup localStorage ─────────────────────────
+            _updateLsBackupCard() {
+                const statusEl = document.getElementById('rxdbLsBackupStatus');
+                const subEl    = document.getElementById('rxdbLsBackupSub');
+                const card     = document.getElementById('rxdbLsBackupCard');
+                if (!statusEl) return;
+                try {
+                    if (!window.LocalStorageBackup) {
+                        statusEl.textContent = '— N/D';
+                        statusEl.style.color = '#8b949e';
+                        return;
+                    }
+                    const stats = LocalStorageBackup.getStats();
+                    const ts    = LocalStorageBackup.getSavedAt();
+                    if (stats && stats.total > 0) {
+                        const tsStr = ts ? new Date(ts).toLocaleString('pt-BR', {day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'}) : '—';
+                        statusEl.textContent = '✅ ' + stats.total + ' registros';
+                        statusEl.style.color = '#3ecf8e';
+                        if (subEl) subEl.textContent = 'Último backup: ' + tsStr;
+                        if (card) card.style.borderColor = '#3ecf8e44';
+                    } else {
+                        statusEl.textContent = '⚠️ Vazio';
+                        statusEl.style.color = '#f59e0b';
+                        if (subEl) subEl.textContent = 'Salve dados para criar o backup';
+                        if (card) card.style.borderColor = '#f59e0b44';
+                    }
+                } catch(e) {
+                    statusEl.textContent = 'Erro';
+                    statusEl.style.color = '#f87171';
+                }
+            },
+
             // ── Quota e alertas ───────────────────────────────────────────────
             async _updateQuota() {
                 if (!navigator.storage?.estimate) return;
@@ -9351,6 +9648,9 @@ tr:hover td { background: rgba(255,107,0,0.03) !important; }
 
                 // 4. Persistência
                 await this._updatePersistUI();
+
+                // 5b. Backup localStorage
+                try { this._updateLsBackupCard(); } catch(_e) {}
 
                 // 5. OPFS status + snapshots
                 const opfsEl  = document.getElementById('rxdbOpfsStatus');
@@ -9791,6 +10091,8 @@ tr:hover td { background: rgba(255,107,0,0.03) !important; }
                 // FIX LOOP: rewriteAll(true) = persiste no IDB (incluindo logo/company)
                 // SEM toasts e SEM cloud push-back, quebrando o ciclo pull→push→pull
                 await LocalFirst.rewriteAll(true);
+                // Atualiza backup localStorage após pull do Drive (dados mais recentes)
+                try { if (window.LocalStorageBackup) LocalStorageBackup.save(); } catch(_e) {}
                 // Re-renderiza toda a UI
                 try { Dashboard.update(); }             catch(e) {}
                 try { Config.load?.(); }                catch(e) {}
@@ -13293,6 +13595,10 @@ tbody tr td{border:1.5px solid #000;padding:2mm;text-align:center;font-weight:70
                     console.warn('[saveData] Erro ao salvar no IndexedDB:', e.message);
                 } finally {
                     LocalFirst._realtimePaused = false;
+                }
+                // ── Backup redundante no localStorage (fallback se IDB for limpo) ──
+                if (window.LocalStorageBackup) {
+                    LocalStorageBackup.scheduleSave(storeId);
                 }
                 if (!silent) {} // silencia toast
             },
