@@ -7713,6 +7713,24 @@ tr:hover td { background: rgba(255,107,0,0.03) !important; }
                                     <div id="rxdbTombstoneCount" class="rxdb-stat-val" style="font-size:0.85rem;">—</div>
                                     <div class="rxdb-stat-sub">deleções protegidas</div>
                                 </div>
+                                <!-- Card: Backup localStorage -->
+                                <div class="rxdb-stat-card" id="rxdbLsBackupCard" style="grid-column:span 2;border-color:#f59e0b33;">
+                                    <div class="rxdb-stat-lbl" style="display:flex;align-items:center;gap:5px;">
+                                        <i class="fas fa-shield-alt" style="color:#f59e0b;"></i> Backup localStorage
+                                    </div>
+                                    <div id="rxdbLsBackupStatus" class="rxdb-stat-val" style="font-size:0.78rem;color:#f59e0b;">verificando…</div>
+                                    <div id="rxdbLsBackupSub" class="rxdb-stat-sub">Fallback automático se IDB for limpo</div>
+                                    <div style="margin-top:6px;display:flex;gap:6px;flex-wrap:wrap;">
+                                        <button class="btn btn-sm" style="font-size:0.68rem;padding:3px 8px;background:#f59e0b22;color:#f59e0b;border:1px solid #f59e0b44;"
+                                            onclick="(function(){ try { LocalStorageBackup.save(); RxDBPanel._updateLsBackupCard(); Toast.show('💾 Backup localStorage atualizado!','success',2000); } catch(e){} })()">
+                                            <i class="fas fa-save"></i> Salvar agora
+                                        </button>
+                                        <button class="btn btn-sm" style="font-size:0.68rem;padding:3px 8px;background:#dc354522;color:#f87171;border:1px solid #dc354544;"
+                                            onclick="if(confirm('Apagar backup localStorage desta loja?')){ LocalStorageBackup.clear(); RxDBPanel._updateLsBackupCard(); Toast.show('🗑️ Backup localStorage apagado','info',2000); }">
+                                            <i class="fas fa-trash"></i> Limpar
+                                        </button>
+                                    </div>
+                                </div>
                             </div>
 
                             <!-- Barra de armazenamento com alertas de cor -->
@@ -8856,6 +8874,131 @@ tr:hover td { background: rgba(255,107,0,0.03) !important; }
             observe()    { return { unsubscribe: () => {} }; }
         };
 
+        // ══════════════════════════════════════════════════════════════════════
+        //  LocalStorageBackup — camada de redundância local (fallback do IDB)
+        //  Salva snapshot compacto do state em localStorage após cada saveData().
+        //  Se o IndexedDB for limpo pelo navegador, os dados são restaurados
+        //  automaticamente no próximo boot — sem precisar de Google Drive.
+        // ══════════════════════════════════════════════════════════════════════
+        const LocalStorageBackup = {
+            _PREFIX: 'optic_ls_bak_',
+            _DEBOUNCE_MS: 2000,
+            _timer: null,
+
+            _key(storeId) {
+                return this._PREFIX + (storeId || window._currentStore || 'barueri');
+            },
+
+            // ── Salva snapshot compacto (imagens base64 excluídas para economizar quota) ──
+            save(storeId) {
+                const sid = storeId || window._currentStore || 'barueri';
+                const TABLES = ['clients','products','sales','expenses',
+                                'prescriptions','suppliers','services',
+                                'crmContatos','crmTarefas','crmNps'];
+                try {
+                    const snap = { _ts: new Date().toISOString(), _store: sid, _v: 2 };
+                    TABLES.forEach(k => {
+                        if (Array.isArray(state[k])) {
+                            // Remove blobs base64 grandes para não estourar quota de ~5-10MB
+                            snap[k] = state[k].map(item => {
+                                if (!item || typeof item !== 'object') return item;
+                                const c = { ...item };
+                                if (typeof c.image === 'string' && c.image.startsWith('data:')) delete c.image;
+                                if (typeof c.photo === 'string' && c.photo.startsWith('data:'))  delete c.photo;
+                                return c;
+                            });
+                        } else { snap[k] = []; }
+                    });
+                    // Config sem logo (logo pode ser vários MB)
+                    const company = { ...(state.company || {}) };
+                    if (typeof company.logo === 'string' && company.logo.startsWith('data:')) delete company.logo;
+                    snap.company       = company;
+                    snap.config        = state.config        || {};
+                    snap.lastOsCounter = state.lastOsCounter || {};
+
+                    const json = JSON.stringify(snap);
+                    localStorage.setItem(this._key(sid), json);
+                    localStorage.setItem(this._key(sid) + '_ts', snap._ts);
+                    console.log('[LSBackup] ✅ Backup salvo —', sid, '~' + Math.round(json.length / 1024) + ' KB');
+                    return true;
+                } catch(e) {
+                    if (e.name === 'QuotaExceededError') {
+                        // Quota cheia: salva versão mínima com só metadados
+                        try {
+                            const mini = {
+                                _ts: new Date().toISOString(), _mini: true, _store: sid,
+                                clients_count:       (state.clients       || []).length,
+                                products_count:      (state.products      || []).length,
+                                sales_count:         (state.sales         || []).length,
+                                expenses_count:      (state.expenses      || []).length,
+                                prescriptions_count: (state.prescriptions || []).length
+                            };
+                            localStorage.setItem(this._key(sid) + '_meta', JSON.stringify(mini));
+                        } catch(_e2) {}
+                        console.warn('[LSBackup] Quota cheia — salvo apenas metadados');
+                    } else {
+                        console.warn('[LSBackup] Erro ao salvar:', e.message);
+                    }
+                    return false;
+                }
+            },
+
+            // ── Salva com debounce para não salvar a cada keystroke ───────────
+            scheduleSave(storeId) {
+                clearTimeout(this._timer);
+                this._timer = setTimeout(() => {
+                    this.save(storeId || window._currentStore || 'barueri');
+                }, this._DEBOUNCE_MS);
+            },
+
+            // ── Carrega snapshot do localStorage ─────────────────────────────
+            load(storeId) {
+                try {
+                    const sid = storeId || window._currentStore || 'barueri';
+                    const raw = localStorage.getItem(this._key(sid));
+                    if (!raw) return null;
+                    const snap = JSON.parse(raw);
+                    if (!snap || snap._mini) return null;
+                    return snap;
+                } catch(e) {
+                    console.warn('[LSBackup] Erro ao carregar:', e.message);
+                    return null;
+                }
+            },
+
+            // ── Data do último backup ─────────────────────────────────────────
+            getSavedAt(storeId) {
+                try {
+                    return localStorage.getItem(this._key(storeId || window._currentStore || 'barueri') + '_ts') || null;
+                } catch(_e) { return null; }
+            },
+
+            // ── Conta quantos registros estão no backup ───────────────────────
+            getStats(storeId) {
+                const snap = this.load(storeId);
+                if (!snap) return null;
+                const TABLES = ['clients','products','sales','expenses','prescriptions','suppliers','services'];
+                const counts = {};
+                let total = 0;
+                TABLES.forEach(k => { counts[k] = (snap[k] || []).length; total += counts[k]; });
+                return { counts, total, ts: snap._ts };
+            },
+
+            // ── Apaga backup (ex: ao fazer wipe de loja) ─────────────────────
+            clear(storeId) {
+                try {
+                    const sid = storeId || window._currentStore || 'barueri';
+                    localStorage.removeItem(this._key(sid));
+                    localStorage.removeItem(this._key(sid) + '_ts');
+                    localStorage.removeItem(this._key(sid) + '_meta');
+                } catch(_e) {}
+            }
+        };
+        window.LocalStorageBackup = LocalStorageBackup;
+        // ══════════════════════════════════════════════════════════════════════
+        //  /LocalStorageBackup
+        // ══════════════════════════════════════════════════════════════════════
+
         // ── Mapa de coleções ──────────────────────────────────────────────────
         const _COL_MAP = {
             clients: 'clients', products: 'products', sales: 'sales',
@@ -8930,6 +9073,21 @@ tr:hover td { background: rgba(255,107,0,0.03) !important; }
 
                 await this.sync('boot');
                 console.log('[RxDB v17] ✅ Boot completo — Local-First para loja:', storeId);
+
+                // Notifica se dados foram restaurados do backup localStorage
+                if (window._lsBackupRestored) {
+                    window._lsBackupRestored = false;
+                    const ts = window._lsBackupTs ? new Date(window._lsBackupTs).toLocaleString('pt-BR') : '';
+                    setTimeout(() => {
+                        try {
+                            Toast.show(
+                                '📦 Dados restaurados do backup local' + (ts ? ' (' + ts + ')' : '') +
+                                '. O IndexedDB foi re-populado automaticamente.',
+                                'info', 6000
+                            );
+                        } catch(_e) {}
+                    }, 1500);
+                }
                 // ✅ ORDEM CORRETA DE CARREGAMENTO:
                 // 1. IndexedDB local → dados exibidos IMEDIATAMENTE (já feito pelo sync('boot') acima)
                 // 2. Cloud pull → apenas DEPOIS de 2s, em background, para NÃO atrasar o boot
@@ -8975,6 +9133,32 @@ tr:hover td { background: rgba(255,107,0,0.03) !important; }
                     console.log('[RxDB v17] Dados carregados do IndexedDB para loja:', storeId);
                 } catch(e) {
                     console.error('[RxDB v17] _fetchAllData erro:', e.message);
+                }
+
+                // ── Fallback: se IDB está vazio, restaura do backup localStorage ──
+                // Cobre: modo privado, limpeza de dados, iOS Safari, novo dispositivo sem Drive
+                const MAIN_TABLES = ['clients','products','sales','expenses','prescriptions','suppliers','services'];
+                const hasAnyIDBData = MAIN_TABLES.some(k => (state[k] || []).length > 0);
+                if (!hasAnyIDBData) {
+                    const backup = window.LocalStorageBackup && LocalStorageBackup.load(storeId);
+                    if (backup) {
+                        console.warn('[LocalFirst] ⚠️ IDB vazio — restaurando do backup localStorage (', backup._ts, ')');
+                        MAIN_TABLES.forEach(k => {
+                            if (Array.isArray(backup[k]) && backup[k].length > 0) state[k] = backup[k];
+                        });
+                        if (backup.company && typeof backup.company === 'object')
+                            Object.assign(state.company || (state.company = {}), backup.company);
+                        if (backup.config && typeof backup.config === 'object')
+                            Object.assign(state.config || (state.config = {}), backup.config);
+                        if (backup.lastOsCounter && typeof backup.lastOsCounter === 'object')
+                            state.lastOsCounter = { ...(state.lastOsCounter || {}), ...backup.lastOsCounter };
+                        // Re-escreve no IDB para recuperar persistência nativa
+                        setTimeout(() => {
+                            try { LocalFirst.rewriteAll(true).catch(() => {}); } catch(_e) {}
+                        }, 800);
+                        window._lsBackupRestored = true;
+                        window._lsBackupTs = backup._ts;
+                    }
                 }
             },
 
@@ -9074,6 +9258,8 @@ tr:hover td { background: rgba(255,107,0,0.03) !important; }
                 } catch(e) { console.error('[RxDB v17] pushConfig:', e.message); }
                 // Atualiza painel
                 try { this._updatePanel?.(); } catch(e) {}
+                // Backup localStorage (config/company/lastOsCounter)
+                if (window.LocalStorageBackup) LocalStorageBackup.scheduleSave();
             },
 
             // ── rewriteAll ────────────────────────────────────────────────────
@@ -9153,7 +9339,9 @@ tr:hover td { background: rgba(255,107,0,0.03) !important; }
             // ── wipeStore ─────────────────────────────────────────────────────
             async wipeStore(storeId) {
                 await sbDeleteStore(storeId || window._currentStore || 'barueri');
-                Toast.show('🗑️ Dados da loja apagados do IndexedDB', 'info');
+                // Limpa backup localStorage junto ao wipe do IDB
+                if (window.LocalStorageBackup) LocalStorageBackup.clear(storeId || window._currentStore || 'barueri');
+                Toast.show('🗑️ Dados da loja apagados do IndexedDB e backup local', 'info');
             }
         };
         window.LocalFirst = LocalFirst;
@@ -9337,6 +9525,38 @@ tr:hover td { background: rgba(255,107,0,0.03) !important; }
                 }
             },
 
+            // ── Atualiza card de backup localStorage ─────────────────────────
+            _updateLsBackupCard() {
+                const statusEl = document.getElementById('rxdbLsBackupStatus');
+                const subEl    = document.getElementById('rxdbLsBackupSub');
+                const card     = document.getElementById('rxdbLsBackupCard');
+                if (!statusEl) return;
+                try {
+                    if (!window.LocalStorageBackup) {
+                        statusEl.textContent = '— N/D';
+                        statusEl.style.color = '#8b949e';
+                        return;
+                    }
+                    const stats = LocalStorageBackup.getStats();
+                    const ts    = LocalStorageBackup.getSavedAt();
+                    if (stats && stats.total > 0) {
+                        const tsStr = ts ? new Date(ts).toLocaleString('pt-BR', {day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'}) : '—';
+                        statusEl.textContent = '✅ ' + stats.total + ' registros';
+                        statusEl.style.color = '#3ecf8e';
+                        if (subEl) subEl.textContent = 'Último backup: ' + tsStr;
+                        if (card) card.style.borderColor = '#3ecf8e44';
+                    } else {
+                        statusEl.textContent = '⚠️ Vazio';
+                        statusEl.style.color = '#f59e0b';
+                        if (subEl) subEl.textContent = 'Salve dados para criar o backup';
+                        if (card) card.style.borderColor = '#f59e0b44';
+                    }
+                } catch(e) {
+                    statusEl.textContent = 'Erro';
+                    statusEl.style.color = '#f87171';
+                }
+            },
+
             // ── Quota e alertas ───────────────────────────────────────────────
             async _updateQuota() {
                 if (!navigator.storage?.estimate) return;
@@ -9428,6 +9648,9 @@ tr:hover td { background: rgba(255,107,0,0.03) !important; }
 
                 // 4. Persistência
                 await this._updatePersistUI();
+
+                // 5b. Backup localStorage
+                try { this._updateLsBackupCard(); } catch(_e) {}
 
                 // 5. OPFS status + snapshots
                 const opfsEl  = document.getElementById('rxdbOpfsStatus');
@@ -9868,6 +10091,8 @@ tr:hover td { background: rgba(255,107,0,0.03) !important; }
                 // FIX LOOP: rewriteAll(true) = persiste no IDB (incluindo logo/company)
                 // SEM toasts e SEM cloud push-back, quebrando o ciclo pull→push→pull
                 await LocalFirst.rewriteAll(true);
+                // Atualiza backup localStorage após pull do Drive (dados mais recentes)
+                try { if (window.LocalStorageBackup) LocalStorageBackup.save(); } catch(_e) {}
                 // Re-renderiza toda a UI
                 try { Dashboard.update(); }             catch(e) {}
                 try { Config.load?.(); }                catch(e) {}
@@ -13370,6 +13595,10 @@ tbody tr td{border:1.5px solid #000;padding:2mm;text-align:center;font-weight:70
                     console.warn('[saveData] Erro ao salvar no IndexedDB:', e.message);
                 } finally {
                     LocalFirst._realtimePaused = false;
+                }
+                // ── Backup redundante no localStorage (fallback se IDB for limpo) ──
+                if (window.LocalStorageBackup) {
+                    LocalStorageBackup.scheduleSave(storeId);
                 }
                 if (!silent) {} // silencia toast
             },
