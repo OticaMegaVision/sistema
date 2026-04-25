@@ -18,11 +18,14 @@
     <script>
     (function() {
         // ===== ÍCONE MATERIAL YOU 2026 — Variante A: Gradient Flare =====
-        function gerarIconePNG(size, callback) {
+        function gerarIconePNG(size, callback, maskable) {
             var c = document.createElement('canvas');
             c.width = size; c.height = size;
             var ctx = c.getContext('2d');
             var r = size * 0.225; // raio dos cantos Material You (22.5%)
+            // Para ícones maskable, escala o conteúdo para 80% (safe zone Android)
+            var safeScale = maskable ? 0.78 : 1.0;
+            var safeOffset = maskable ? size * (1 - safeScale) / 2 : 0;
 
             // ── Helper: clip arredondado ──
             function clipRounded() {
@@ -63,11 +66,15 @@
             clipRounded();
             ctx.clip();
 
-            var lw  = size * 0.073;
-            var ly  = size * 0.521;
-            var lr  = size * 0.177;
-            var lx  = size * 0.344;
-            var rx2 = size * 0.656;
+            // Aplica safe zone para maskable: todos os elementos ficam dentro de 80% central
+            var s = size * safeScale; // tamanho efetivo do ícone
+            var so = safeOffset;      // offset para centralizar
+
+            var lw  = s * 0.073;
+            var ly  = so + s * 0.521;
+            var lr  = s * 0.177;
+            var lx  = so + s * 0.344;
+            var rx2 = so + s * 0.656;
 
             ctx.lineCap  = 'round';
             ctx.lineJoin = 'round';
@@ -95,52 +102,52 @@
             ctx.shadowOffsetY = 0;
 
             // Ponte
-            ctx.lineWidth = size * 0.063;
+            ctx.lineWidth = s * 0.063;
             ctx.beginPath();
-            ctx.moveTo(size * 0.479, ly);
-            ctx.quadraticCurveTo(size * 0.5, size * 0.490, size * 0.521, ly);
+            ctx.moveTo(so + s * 0.479, ly);
+            ctx.quadraticCurveTo(so + s * 0.5, so + s * 0.490, so + s * 0.521, ly);
             ctx.stroke();
 
             // Haste esquerda
             ctx.beginPath();
-            ctx.moveTo(size * 0.167, size * 0.458);
-            ctx.lineTo(size * 0.115, size * 0.396);
+            ctx.moveTo(so + s * 0.167, so + s * 0.458);
+            ctx.lineTo(so + s * 0.115, so + s * 0.396);
             ctx.stroke();
 
             // Haste direita
             ctx.beginPath();
-            ctx.moveTo(size * 0.833, size * 0.458);
-            ctx.lineTo(size * 0.885, size * 0.396);
+            ctx.moveTo(so + s * 0.833, so + s * 0.458);
+            ctx.lineTo(so + s * 0.885, so + s * 0.396);
             ctx.stroke();
 
             // Reflexo lente esq
             ctx.fillStyle = 'white';
             ctx.globalAlpha = 0.22;
             ctx.beginPath();
-            ctx.arc(lx - size*0.052, ly - size*0.063, size*0.047, 0, Math.PI*2);
+            ctx.arc(lx - s*0.052, ly - s*0.063, s*0.047, 0, Math.PI*2);
             ctx.fill();
             ctx.globalAlpha = 0.38;
             ctx.beginPath();
-            ctx.arc(lx - size*0.073, ly - size*0.083, size*0.021, 0, Math.PI*2);
+            ctx.arc(lx - s*0.073, ly - s*0.083, s*0.021, 0, Math.PI*2);
             ctx.fill();
 
             // Reflexo lente dir
             ctx.globalAlpha = 0.22;
             ctx.beginPath();
-            ctx.arc(rx2 - size*0.052, ly - size*0.063, size*0.047, 0, Math.PI*2);
+            ctx.arc(rx2 - s*0.052, ly - s*0.063, s*0.047, 0, Math.PI*2);
             ctx.fill();
             ctx.globalAlpha = 0.38;
             ctx.beginPath();
-            ctx.arc(rx2 - size*0.073, ly - size*0.083, size*0.021, 0, Math.PI*2);
+            ctx.arc(rx2 - s*0.073, ly - s*0.083, s*0.021, 0, Math.PI*2);
             ctx.fill();
 
             // Logotipo
             if (size >= 192) {
                 ctx.globalAlpha = 0.78;
-                ctx.font = 'bold ' + Math.round(size * 0.094) + 'px "Google Sans","Segoe UI",sans-serif';
+                ctx.font = 'bold ' + Math.round(s * 0.094) + 'px "Google Sans","Segoe UI",sans-serif';
                 ctx.fillStyle = 'white';
                 ctx.textAlign = 'center';
-                ctx.fillText('MEGAVISION', size * 0.5, size * 0.802);
+                ctx.fillText('MEGAVISION', so + s * 0.5, so + s * 0.802);
             }
 
             ctx.restore();
@@ -150,30 +157,36 @@
 
         gerarIconePNG(512, function(png512) {
             gerarIconePNG(192, function(png192) {
-                var manifest = {
-                    name: "ÓticaMegaVision Pro",
-                    short_name: "ÓticaMegaVision",
-                    description: "Sistema Profissional de Gestão para Óticas",
-                    start_url: location.href.replace(/\/[^\/]*$/, '/'),
-                    scope: location.href.replace(/\/[^\/]*$/, '/'),
-                    display: "standalone",
-                    background_color: "#ffffff",
-                    theme_color: "#ff6b00",
-                    orientation: "portrait-primary",
-                    icons: [
-                        { src: png192, sizes: "192x192", type: "image/png", purpose: "any maskable" },
-                        { src: png512, sizes: "512x512", type: "image/png", purpose: "any maskable" }
-                    ]
-                };
-                var blob = new Blob([JSON.stringify(manifest)], { type: 'application/manifest+json' });
-                var existing = document.querySelector('link[rel="manifest"]');
-                if (existing) existing.href = URL.createObjectURL(blob);
-                else {
-                    var ml = document.createElement('link');
-                    ml.rel = 'manifest';
-                    ml.href = URL.createObjectURL(blob);
-                    document.head.appendChild(ml);
-                }
+                gerarIconePNG(512, function(png512m) {
+                    gerarIconePNG(192, function(png192m) {
+                        var manifest = {
+                            name: "ÓticaMegaVision Pro",
+                            short_name: "ÓticaMegaVision",
+                            description: "Sistema Profissional de Gestão para Óticas",
+                            start_url: location.href.replace(/\/[^\/]*$/, '/'),
+                            scope: location.href.replace(/\/[^\/]*$/, '/'),
+                            display: "standalone",
+                            background_color: "#ff6b00",
+                            theme_color: "#ff6b00",
+                            orientation: "portrait-primary",
+                            icons: [
+                                { src: png192,  sizes: "192x192", type: "image/png", purpose: "any" },
+                                { src: png512,  sizes: "512x512", type: "image/png", purpose: "any" },
+                                { src: png192m, sizes: "192x192", type: "image/png", purpose: "maskable" },
+                                { src: png512m, sizes: "512x512", type: "image/png", purpose: "maskable" }
+                            ]
+                        };
+                        var blob = new Blob([JSON.stringify(manifest)], { type: 'application/manifest+json' });
+                        var existing = document.querySelector('link[rel="manifest"]');
+                        if (existing) existing.href = URL.createObjectURL(blob);
+                        else {
+                            var ml = document.createElement('link');
+                            ml.rel = 'manifest';
+                            ml.href = URL.createObjectURL(blob);
+                            document.head.appendChild(ml);
+                        }
+                    }, true);
+                }, true);
             });
         });
     })();
