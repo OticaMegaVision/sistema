@@ -8895,7 +8895,8 @@ tr:hover td { background: rgba(255,107,0,0.03) !important; }
         const LocalStorageBackup = {
             _PREFIX: 'optic_ls_bak_',
             _DEBOUNCE_MS: 2000,
-            _timer: null,
+            // FIX BUG#3: um timer por loja em vez de um único timer compartilhado
+            _timers: {},
 
             _key(storeId) {
                 return this._PREFIX + (storeId || window._currentStore || 'barueri');
@@ -8904,6 +8905,16 @@ tr:hover td { background: rgba(255,107,0,0.03) !important; }
             // ── Salva snapshot compacto (imagens base64 excluídas para economizar quota) ──
             save(storeId) {
                 const sid = storeId || window._currentStore || 'barueri';
+                // FIX BUG#2: guarda contra contaminação cruzada de lojas.
+                // state sempre representa a loja ATUALMENTE CARREGADA (window._currentStore).
+                // Se storeId != _currentStore, o state contém dados da outra loja —
+                // salvar agora sobrescreveria o backup de 'sid' com dados errados.
+                if (sid !== (window._currentStore || 'barueri')) {
+                    console.warn('[LSBackup] ⚠️ Salvamento bloqueado: storeId="' + sid +
+                        '" difere da loja ativa="' + window._currentStore +
+                        '". Dados não serão gravados para evitar contaminação cruzada.');
+                    return false;
+                }
                 const TABLES = ['clients','products','sales','expenses',
                                 'prescriptions','suppliers','services',
                                 'crmContatos','crmTarefas','crmNps'];
@@ -8955,11 +8966,13 @@ tr:hover td { background: rgba(255,107,0,0.03) !important; }
                 }
             },
 
-            // ── Salva com debounce para não salvar a cada keystroke ───────────
+            // ── Salva com debounce POR LOJA para não cancelar saves de lojas diferentes ──
             scheduleSave(storeId) {
-                clearTimeout(this._timer);
-                this._timer = setTimeout(() => {
-                    this.save(storeId || window._currentStore || 'barueri');
+                // FIX BUG#3: captura storeId no momento do agendamento (não no disparo)
+                const sid = storeId || window._currentStore || 'barueri';
+                clearTimeout(this._timers[sid]);
+                this._timers[sid] = setTimeout(() => {
+                    this.save(sid); // usa 'sid' capturado, nunca window._currentStore
                 }, this._DEBOUNCE_MS);
             },
 
@@ -9271,7 +9284,8 @@ tr:hover td { background: rgba(255,107,0,0.03) !important; }
                 // Atualiza painel
                 try { this._updatePanel?.(); } catch(e) {}
                 // Backup localStorage (config/company/lastOsCounter)
-                if (window.LocalStorageBackup) LocalStorageBackup.scheduleSave();
+                // FIX BUG#1: passa storeId explícito para evitar salvar na loja errada
+                if (window.LocalStorageBackup) LocalStorageBackup.scheduleSave(storeId);
             },
 
             // ── rewriteAll ────────────────────────────────────────────────────
@@ -14138,29 +14152,47 @@ tbody tr td{border:1.5px solid #000;padding:2mm;text-align:center;font-weight:70
                 const btn  = document.getElementById('btnHideValues');
                 const icon = document.getElementById('hideValuesIcon');
                 const lbl  = document.getElementById('hideValuesLabel');
+                // FIX BUG#4: chave namespaceada por loja para não vazar entre lojas
+                const _hvKey = 'valoresOcultos_' + (window._currentStore || 'barueri');
                 if (hidden) {
                     btn?.classList.add('ativo');
                     if (icon) icon.className = 'fas fa-eye-slash';
                     if (lbl)  lbl.textContent = 'Mostrar';
-                    try { localStorage.setItem('valoresOcultos','1'); } catch(e){}
+                    try { localStorage.setItem(_hvKey,'1'); } catch(e){}
                 } else {
                     btn?.classList.remove('ativo');
                     if (icon) icon.className = 'fas fa-eye';
                     if (lbl)  lbl.textContent = 'Ocultar';
-                    try { localStorage.removeItem('valoresOcultos'); } catch(e){}
+                    try { localStorage.removeItem(_hvKey); } catch(e){}
                 }
             },
 
             _restoreHideValues() {
                 try {
-                    if (localStorage.getItem('valoresOcultos') === '1') {
+                    // FIX BUG#4: lê chave namespaceada por loja
+                    const _hvKey = 'valoresOcultos_' + (window._currentStore || 'barueri');
+                    // Compatibilidade retroativa: migra chave antiga para nova
+                    const legacyVal = localStorage.getItem('valoresOcultos');
+                    if (legacyVal === '1' && !localStorage.getItem(_hvKey)) {
+                        localStorage.setItem(_hvKey, '1');
+                    }
+                    // Remove sempre a chave legada para evitar contaminação futura
+                    try { localStorage.removeItem('valoresOcultos'); } catch(_e2) {}
+
+                    const isHidden = localStorage.getItem(_hvKey) === '1';
+                    const btn  = document.getElementById('btnHideValues');
+                    const icon = document.getElementById('hideValuesIcon');
+                    const lbl  = document.getElementById('hideValuesLabel');
+                    if (isHidden) {
                         document.body.classList.add('valores-ocultos');
-                        const btn  = document.getElementById('btnHideValues');
-                        const icon = document.getElementById('hideValuesIcon');
-                        const lbl  = document.getElementById('hideValuesLabel');
                         btn?.classList.add('ativo');
                         if (icon) icon.className = 'fas fa-eye-slash';
                         if (lbl)  lbl.textContent = 'Mostrar';
+                    } else {
+                        document.body.classList.remove('valores-ocultos');
+                        btn?.classList.remove('ativo');
+                        if (icon) icon.className = 'fas fa-eye';
+                        if (lbl)  lbl.textContent = 'Ocultar';
                     }
                 } catch(e) {}
             },
@@ -23259,6 +23291,18 @@ const StoreManager = {
         const loja = this._lojas[lojaId];
         this.closeModal();
 
+        // 0. FIX MULTI-LOJA: força o backup imediato da loja ANTERIOR antes de trocar.
+        // Cancela qualquer scheduleSave pendente e salva agora (síncrono) enquanto
+        // window._currentStore e state ainda apontam para a loja anterior.
+        const lojaAnterior = window._currentStore || 'barueri';
+        try {
+            if (window.LocalStorageBackup) {
+                clearTimeout(LocalStorageBackup._timers[lojaAnterior]);
+                LocalStorageBackup._timers[lojaAnterior] = null;
+                LocalStorageBackup.save(lojaAnterior); // salva agora, estado ainda correto
+            }
+        } catch(_e) {}
+
         // 1. Para Realtime da loja anterior imediatamente
         try {
             // LocalFirst listeners managed automatically
@@ -23334,6 +23378,8 @@ const StoreManager = {
                 App.updateCompanyDisplay();
                 try { Config.load(); } catch(e) {}
                 Utils.updatePixKey();
+                // FIX BUG#4: restaura preferência de ocultar valores para a nova loja
+                try { Dashboard._restoreHideValues?.(); } catch(e) {}
                 try { Clients.renderTable?.(); }   catch(e) {}
                 try { Products.renderTable?.(); }  catch(e) {}
                 try { Sales.renderHistory?.(); }   catch(e) {}
