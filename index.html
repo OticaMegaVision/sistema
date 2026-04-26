@@ -4819,7 +4819,7 @@ tr:hover td { background: rgba(255,107,0,0.03) !important; }
 </div>
 <!-- ===== /TELA DE LOGIN ===== -->
 
-    <div class="app-container">
+    <div class="app-container" id="appContainer" style="visibility:hidden;">
         <!-- Sidebar -->
         <aside class="sidebar no-print" id="sidebar">
             <canvas id="sidebarIllusionCanvas" aria-hidden="true"></canvas>
@@ -23101,6 +23101,8 @@ const AuthSystem = {
             this.hideLoginScreen();
             this._updateUserBadge();
             this._restrictStoreSelector();
+            // Revela o app agora que o login foi confirmado
+            try { document.getElementById('appContainer').style.visibility = ''; } catch(e) {}
 
             // ── Inicializa o app após login bem-sucedido ──
             try {
@@ -23185,10 +23187,12 @@ const AuthSystem = {
                     if (docData && docData.company) Object.assign(state.company, docData.company);
                 } catch(e) {}
             }
-            // Pequeno delay para garantir que state.company está populado antes do render
-            setTimeout(() => { try { this.showLoginScreen(); } catch(e) {} }, 50);
+            // Pequeno delay removido: login mostrado imediatamente, sem flash do sistema
+            try { this.showLoginScreen(); } catch(e) {}
             return false;
         }
+        // Sessão válida — revela o app antes de retornar
+        try { document.getElementById('appContainer').style.visibility = ''; } catch(e) {}
         window._authUser = session;
         this._updateUserBadge();
         this._restrictStoreSelector();
