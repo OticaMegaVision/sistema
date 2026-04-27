@@ -4773,7 +4773,7 @@ tr:hover td { background: rgba(255,107,0,0.03) !important; }
 <div id="loginScreen" style="display:none;position:fixed;inset:0;z-index:99999;background:transparent;align-items:center;justify-content:center;flex-direction:column;">
   <div style="background:#fff;border-radius:20px;padding:2.5rem 2rem;width:360px;max-width:95vw;box-shadow:0 25px 80px rgba(0,0,0,0.5);text-align:center;">
     <div id="loginLogoWrap" style="width:90px;height:90px;background:linear-gradient(135deg,#ff6b00,#e55a00);border-radius:50%;display:flex;align-items:center;justify-content:center;margin:0 auto 1.25rem;box-shadow:0 8px 28px rgba(255,107,0,0.45);overflow:hidden;transition:background .3s;">
-      <img id="loginLogoImg" alt="Logo da empresa" style="display:none;width:100%;height:100%;object-fit:contain;border-radius:50%;padding:4px;">
+      <img id="loginLogoImg" alt="Logo da empresa" style="display:none;width:100%;height:100%;object-fit:cover;border-radius:50%;padding:4px;">
       <i id="loginFallbackIcon" class="fas fa-eye" style="font-size:2rem;color:#fff;"></i>
     </div>
     <h2 id="loginCompanyName" style="font-size:1.4rem;font-weight:800;color:#212529;margin-bottom:0.25rem;">ÓticaMegaVision Pro</h2>
@@ -8932,9 +8932,21 @@ tr:hover td { background: rgba(255,107,0,0.03) !important; }
                             });
                         } else { snap[k] = []; }
                     });
-                    // Config sem logo (logo pode ser vários MB)
+                    // FIX BUG#2: o logo base64 é armazenado em chave SEPARADA para não
+                    // estourar a quota do snapshot principal (~5-10 MB), mas ainda assim
+                    // persistir entre sessões e ser restaurado quando o IDB está vazio
+                    // (novo dispositivo, modo privado, iOS Safari).
                     const company = { ...(state.company || {}) };
-                    if (typeof company.logo === 'string' && company.logo.startsWith('data:')) delete company.logo;
+                    const logoData = (typeof company.logo === 'string' && company.logo.startsWith('data:'))
+                        ? company.logo : null;
+                    if (logoData) {
+                        try { localStorage.setItem(this._key(sid) + '_logo', logoData); }
+                        catch(_le) { /* quota excedida para o logo — segue sem ele */ }
+                        delete company.logo; // remove do snapshot principal
+                    } else {
+                        // Logo removido: limpa a chave separada para não restaurar logo antigo
+                        try { localStorage.removeItem(this._key(sid) + '_logo'); } catch(_le) {}
+                    }
                     snap.company       = company;
                     snap.config        = state.config        || {};
                     snap.lastOsCounter = state.lastOsCounter || {};
@@ -8984,6 +8996,13 @@ tr:hover td { background: rgba(255,107,0,0.03) !important; }
                     if (!raw) return null;
                     const snap = JSON.parse(raw);
                     if (!snap || snap._mini) return null;
+                    // FIX BUG#2: restaura logo da chave separada (salvo por save() acima)
+                    if (snap.company && !snap.company.logo) {
+                        try {
+                            const savedLogo = localStorage.getItem(this._key(sid) + '_logo');
+                            if (savedLogo) snap.company.logo = savedLogo;
+                        } catch(_le) {}
+                    }
                     return snap;
                 } catch(e) {
                     console.warn('[LSBackup] Erro ao carregar:', e.message);
@@ -13769,6 +13788,17 @@ tbody tr td{border:1.5px solid #000;padding:2mm;text-align:center;font-weight:70
                         state.company.logo = e.target.result;
                         this.updateCompanyDisplay();
                         this.saveData();
+                        // FIX BUG#1: sincroniza logo com a nuvem (Supabase/Drive/OneDrive)
+                        // App.updateLogo não chamava upsertConfig, logo o logo nunca era
+                        // enviado para outros dispositivos após upload via sidebar.
+                        SupaSync.upsertConfig().catch(() => {});
+                        // FIX BUG#4: atualiza preview de configurações para refletir o novo logo
+                        try {
+                            const prev = document.getElementById('configLogoPreview');
+                            const ph   = document.getElementById('configLogoPlaceholder');
+                            if (prev) { prev.src = e.target.result; prev.style.display = 'block'; }
+                            if (ph)   ph.style.display = 'none';
+                        } catch(_e) {}
                         Toast.show('Logo atualizada com sucesso!');
                     };
                     reader.readAsDataURL(file);
@@ -17650,6 +17680,13 @@ tbody tr td{border:1.5px solid #000;padding:2mm;text-align:center;font-weight:70
                     const ph   = document.getElementById('configLogoPlaceholder');
                     if (prev) { prev.src = state.company.logo; prev.style.display = 'block'; }
                     if (ph)   ph.style.display = 'none';
+                } else {
+                    // FIX BUG#3: reseta o preview quando não há logo — evita logo "fantasma"
+                    // após sync que removeu o logo em outro dispositivo/aba
+                    const prev = document.getElementById('configLogoPreview');
+                    const ph   = document.getElementById('configLogoPlaceholder');
+                    if (prev) { prev.src = ''; prev.style.display = 'none'; }
+                    if (ph)   ph.style.display = '';
                 }
                 
                 document.getElementById('configCreditTax').value = state.company.creditTax || 2.5;
