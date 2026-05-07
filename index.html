@@ -11428,7 +11428,7 @@ tr:hover td { background: rgba(255,107,0,0.03) !important; }
                             contas[idx2].formaPagamento = forma || '—';
                             if (obs) contas[idx2].obs = obs;
                             overlay.remove();
-                            this.saveAll(contas).then(() => { this.renderAll().catch(()=>{}); Dashboard.update().catch(()=>{}); }).catch(()=>{});
+                            ContasManager.saveAll(contas).then(() => { ContasManager.renderAll().catch(()=>{}); Dashboard.update().catch(()=>{}); }).catch(()=>{});
                             Toast.show(`💰 Pagamento parcial de R$ ${paidVal.toFixed(2).replace('.',',')} registrado. Saldo restante: R$ ${saldo.toFixed(2).replace('.',',')}`, 'warning', 5000);
                         } else {
                             contas[idx2].pago           = true;
@@ -11437,9 +11437,9 @@ tr:hover td { background: rgba(255,107,0,0.03) !important; }
                             contas[idx2].formaPagamento = forma || '—';
                             if (obs) contas[idx2].obs = obs;
                             overlay.remove();
-                            this.saveAll(contas).then(() => { this.renderAll().catch(()=>{}); Dashboard.update().catch(()=>{}); }).catch(()=>{});
+                            ContasManager.saveAll(contas).then(() => { ContasManager.renderAll().catch(()=>{}); Dashboard.update().catch(()=>{}); }).catch(()=>{});
                             Toast.show('Baixa registrada! ✅', 'success');
-                            this.gerarComprovante(id);
+                            ContasManager.gerarComprovante(id);
                         }
                     }
                 };
