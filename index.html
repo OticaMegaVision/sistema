@@ -7782,11 +7782,12 @@ tr:hover td { background: rgba(255,107,0,0.03) !important; }
                                         <option value="0">00:00 — Meia-noite</option>
                                         <option value="1">01:00</option>
                                         <option value="2">02:00</option>
-                                        <option value="3" selected>03:00 — Recomendado</option>
+                                        <option value="3">03:00</option>
                                         <option value="4">04:00</option>
                                         <option value="5">05:00</option>
                                         <option value="6">06:00 — Manhã cedo</option>
                                         <option value="12">12:00 — Meio-dia</option>
+                                        <option value="17">17:00 — Final da tarde</option>
                                         <option value="18">18:00 — Final do dia</option>
                                         <option value="20">20:00 — Noite</option>
                                         <option value="22">22:00 — Antes de dormir</option>
@@ -9399,6 +9400,9 @@ tr:hover td { background: rgba(255,107,0,0.03) !important; }
                         if (cfg.config        && typeof cfg.config        === 'object') Object.assign(state.config        || (state.config        = {}), cfg.config);
                         if (cfg.company       && typeof cfg.company       === 'object') Object.assign(state.company       || (state.company       = {}), cfg.company);
                         if (cfg.lastOsCounter && typeof cfg.lastOsCounter === 'object') state.lastOsCounter = { ...(state.lastOsCounter || {}), ...cfg.lastOsCounter };
+                        // FIX: restaura mensagens de WhatsApp personalizadas (antes eram
+                        // salvas em memória mas nunca persistidas — voltavam ao padrão)
+                        if (cfg.wppMensagens  && typeof cfg.wppMensagens  === 'object') Object.assign(state.wppMensagens  || (state.wppMensagens  = {}), cfg.wppMensagens);
                     }
                     // Tenta também o doc 'empresa' para compatibilidade com switchTo
                     const emp = await sbGetDoc(storeId, 'config', 'empresa');
@@ -9407,6 +9411,7 @@ tr:hover td { background: rgba(255,107,0,0.03) !important; }
                         if (emp.notificacoes)  Object.assign(state.notificacoes  || (state.notificacoes  = {}), emp.notificacoes);
                         if (emp.backupConfig)  Object.assign(state.backupConfig  || (state.backupConfig  = {}), emp.backupConfig);
                         if (emp.lastOsCounter) state.lastOsCounter = { ...(state.lastOsCounter || {}), ...emp.lastOsCounter };
+                        if (emp.wppMensagens)  Object.assign(state.wppMensagens  || (state.wppMensagens  = {}), emp.wppMensagens);
                     }
                     console.log('[RxDB v17] Dados carregados do IndexedDB para loja:', storeId);
                 } catch(e) {
@@ -9517,6 +9522,7 @@ tr:hover td { background: rgba(255,107,0,0.03) !important; }
                     config:         state.config || {},
                     company:        state.company || {},
                     lastOsCounter:  state.lastOsCounter || {},
+                    wppMensagens:   state.wppMensagens || {},
                     storeId,
                     _updatedAt:     now
                 };
@@ -9529,6 +9535,7 @@ tr:hover td { background: rgba(255,107,0,0.03) !important; }
                         notificacoes:   state.notificacoes || {},
                         backupConfig:   state.backupConfig || {},
                         lastOsCounter:  state.lastOsCounter || {},
+                        wppMensagens:   state.wppMensagens || {},
                         _updatedAt:     now
                     });
                     // FIX LOOP: só agenda cloud push se não estiver em modo silencioso
@@ -12473,8 +12480,8 @@ tr:hover td { background: rgba(255,107,0,0.03) !important; }
                 { username: 'admin', fullName: 'Administrador', profile: 'admin', status: 'active', lastAccess: 'Nunca' }
             ],
             backupConfig: {
-                autoEnabled: false,
-                hour: 3,
+                autoEnabled: true,
+                hour: 17,
                 keepDays: 7,
                 lastAutoBackup: null,
                 nextAutoBackup: null
@@ -17479,22 +17486,22 @@ tbody tr td{border:1.5px solid #000;padding:2mm;text-align:center;font-weight:70
                 bubble.innerHTML = safe;
             },
 
-            salvarAtual() {
+            async salvarAtual() {
                 const ta  = document.getElementById('wppTextarea');
                 const key = this._current;
                 if (!ta) return;
                 if (!state.wppMensagens) state.wppMensagens = {};
                 state.wppMensagens[key] = ta.value;
-                App.saveData(true);
+                await App.saveData(true);
                 Toast.show('✅ Mensagem "' + WPP_META[key].title + '" salva!', 'success');
             },
 
-            salvarTodos() {
+            async salvarTodos() {
                 if (!state.wppMensagens) state.wppMensagens = {};
                 // Salva a mensagem atualmente aberta no editor antes de salvar tudo
                 const ta  = document.getElementById('wppTextarea');
                 if (ta) state.wppMensagens[this._current] = ta.value;
-                App.saveData(true);
+                await App.saveData(true);
                 Toast.show('✅ Todas as mensagens salvas!', 'success');
             },
 
@@ -22153,6 +22160,17 @@ ${container.innerHTML}
             _dailyTimer: null,
 
             init: function() {
+                // ✅ MIGRAÇÃO ÚNICA: ativa backup automático diário às 17h para quem
+                // já usava o sistema antes dessa mudança. Roda só uma vez (flag
+                // _migrated17h) — depois disso respeita o que o usuário configurar.
+                if (!state.backupConfig._migrated17h) {
+                    state.backupConfig.autoEnabled = true;
+                    state.backupConfig.hour = 17;
+                    state.backupConfig._migrated17h = true;
+                    try { App.saveData(true); } catch(e) {}
+                    console.log('[BackupManager] ✅ Migração aplicada: backup automático diário ativado às 17h');
+                }
+
                 // ── Verifica/agenda backup diário ao iniciar ──
                 this._agendarBackupDiario();
 
