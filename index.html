@@ -10133,18 +10133,65 @@ tr:hover td { background: rgba(255,107,0,0.03) !important; }
             function _isNearExpiry(tok) { return  tok && Date.now() >= (tok.expires_at - 600000); } // < 10 min restantes
             function _randomStr(n) { return Array.from(crypto.getRandomValues(new Uint8Array(n))).map(b => b.toString(16).padStart(2,'0')).join('').slice(0,n); }
 
+            // ── PKCE: gera code_verifier + code_challenge (fluxo sem client_secret) ──
+            function _b64url(bytes) {
+                return btoa(String.fromCharCode(...bytes)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+            }
+            async function _pkcePair() {
+                const verifier = _b64url(crypto.getRandomValues(new Uint8Array(32)));
+                const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(verifier));
+                const challenge = _b64url(new Uint8Array(digest));
+                return { verifier, challenge };
+            }
+
             // ── Auto-refresh silencioso do token Google Drive ─────────────────
             let _autoRefreshing     = false;
             let _autoRefreshPopup   = null;
             let _autoRefreshTimeout = null;
 
+            // Renovação via refresh_token — sem popup, sem depender de sessão do navegador
+            async function _refreshGDriveToken() {
+                if (!_gdriveToken || !_gdriveToken.refresh_token) return false;
+                try {
+                    const body = new URLSearchParams({
+                        client_id:     _gdriveToken.client_id,
+                        refresh_token: _gdriveToken.refresh_token,
+                        grant_type:    'refresh_token'
+                    });
+                    const resp = await fetch('https://oauth2.googleapis.com/token', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                        body
+                    });
+                    const data = await resp.json();
+                    if (!data.access_token) throw new Error('sem access_token na resposta');
+                    _gdriveToken.access_token = data.access_token;
+                    _gdriveToken.expires_at   = Date.now() + (data.expires_in || 3600) * 1000;
+                    if (data.refresh_token) _gdriveToken.refresh_token = data.refresh_token;
+                    _saveTokens();
+                    _updateUI();
+                    document.getElementById('cs_reconnect_banner')?.remove();
+                    console.log('[CloudSync] ✅ Token Google Drive renovado via refresh_token — sem popup');
+                    _showSyncIndicator('🔄 Token renovado');
+                    return true;
+                } catch (e) {
+                    console.warn('[CloudSync] Falha ao renovar via refresh_token:', e.message);
+                    return false;
+                }
+            }
+
             function _autoRefreshGDriveToken() {
                 if (_autoRefreshing) return;
                 if (!_gdriveToken) return;
+                // ✅ NOVO: se já temos refresh_token (fluxo PKCE), usa ele — sem popup
+                if (_gdriveToken.refresh_token) {
+                    _refreshGDriveToken().then(ok => { if (!ok) _showReconnectBanner(); });
+                    return;
+                }
                 const clientId = _gdriveToken.client_id || localStorage.getItem('cs_gdrive_client_id') || '';
                 if (!clientId) return;
                 _autoRefreshing = true;
-                console.log('[CloudSync] 🔄 Auto-renovando token Google Drive (prompt=none)...');
+                console.log('[CloudSync] 🔄 Auto-renovando token Google Drive (prompt=none) — token antigo sem refresh_token, reconecte para migrar...');
                 const state_val = _randomStr(16);
                 sessionStorage.setItem('gdrive_autorefresh_state', state_val);
                 const params = new URLSearchParams({
@@ -10412,50 +10459,111 @@ tr:hover td { background: rgba(255,107,0,0.03) !important; }
             //  GOOGLE DRIVE
             // ════════════════════════════════════════════════════════════════
 
+            // ✅ NOVO: fluxo Authorization Code + PKCE via popup — sem client_secret,
+            // gera refresh_token real (login permanente até revogação manual).
+            let _gdriveConnectPopup = null;
+            let _gdriveConnectPoll  = null;
+
             async function connectGDrive() {
                 const clientId = (document.getElementById('gdriveClientId')?.value?.trim()) || GDRIVE_DEFAULT_CLIENT;
                 if (!clientId) { Toast.show('⚠️ Informe o Client ID do Google Cloud Console para conectar.', 'warning', 5000); return; }
-                // FIX: salva o Client ID para reconexão automática após expirar
                 try { localStorage.setItem('cs_gdrive_client_id', clientId); } catch(e) {}
+
+                const { verifier, challenge } = await _pkcePair();
                 const state_val = _randomStr(16);
-                sessionStorage.setItem('gdrive_state',  state_val);
+                sessionStorage.setItem('gdrive_state', state_val);
                 sessionStorage.setItem('gdrive_client', clientId);
+                sessionStorage.setItem('gdrive_pkce_verifier', verifier);
+
                 const params = new URLSearchParams({
-                    client_id:     clientId,
-                    redirect_uri:  location.origin + location.pathname,
-                    response_type: 'token',
-                    scope:         'https://www.googleapis.com/auth/drive.appdata https://www.googleapis.com/auth/drive.file',
-                    state:         state_val,
-                    prompt:        'consent'
+                    client_id:              clientId,
+                    redirect_uri:           location.origin + location.pathname,
+                    response_type:          'code',
+                    scope:                  'https://www.googleapis.com/auth/drive.appdata https://www.googleapis.com/auth/drive.file',
+                    state:                  state_val,
+                    code_challenge:         challenge,
+                    code_challenge_method:  'S256',
+                    access_type:            'offline',
+                    prompt:                 'consent'
                 });
-                window.location.href = 'https://accounts.google.com/o/oauth2/v2/auth?' + params;
+                const authUrl = 'https://accounts.google.com/o/oauth2/v2/auth?' + params;
+
+                const w = 500, h = 640;
+                const left = (screen.width  - w) / 2;
+                const top  = (screen.height - h) / 2;
+                _gdriveConnectPopup = window.open(authUrl, 'gdrive_connect', `width=${w},height=${h},left=${left},top=${top},toolbar=no,menubar=no`);
+                if (!_gdriveConnectPopup) {
+                    Toast.show('⚠️ O navegador bloqueou o popup. Permita popups para este site e tente novamente.', 'warning', 6000);
+                    return;
+                }
+                clearInterval(_gdriveConnectPoll);
+                _gdriveConnectPoll = setInterval(() => {
+                    try {
+                        if (_gdriveConnectPopup.closed) { clearInterval(_gdriveConnectPoll); return; }
+                        const popupUrl = new URL(_gdriveConnectPopup.location.href);
+                        if (popupUrl.origin === location.origin && popupUrl.searchParams.get('code')) {
+                            clearInterval(_gdriveConnectPoll);
+                            const code = popupUrl.searchParams.get('code');
+                            const state = popupUrl.searchParams.get('state');
+                            _gdriveConnectPopup.close();
+                            _handleGDriveCodeCallback(new URLSearchParams({ code, state }));
+                        }
+                    } catch (e) {
+                        // cross-origin enquanto o popup está em accounts.google.com — esperado, ignora
+                    }
+                }, 400);
             }
 
-            function _handleGDriveImplicitCallback(hashParams) {
-                const accessToken = hashParams.get('access_token');
-                const state_val   = hashParams.get('state');
-                const expiresIn   = parseInt(hashParams.get('expires_in') || '3600', 10);
-                if (!accessToken) return false;
+            async function _handleGDriveCodeCallback(queryParams) {
+                const code      = queryParams.get('code');
+                const state_val = queryParams.get('state');
+                if (!code) return false;
                 if (sessionStorage.getItem('gdrive_state') !== state_val) {
                     Toast.show('⚠️ Falha de segurança no callback Google (state inválido).', 'danger');
                     return false;
                 }
-                _gdriveToken = {
-                    access_token: accessToken,
-                    expires_at:   Date.now() + expiresIn * 1000,
-                    client_id:    sessionStorage.getItem('gdrive_client') || ''
-                };
-                _activeProvider = 'gdrive';
-                _saveTokens();
-                sessionStorage.removeItem('gdrive_state');
-                sessionStorage.removeItem('gdrive_client');
-                _updateUI();
-                history.replaceState({}, '', location.pathname);
-                Toast.show('✅ Google Drive conectado! Sincronizando...', 'success', 3000);
-                // Ao conectar: pull imediato + inicia polling
-                setTimeout(() => { gdrivePull(true).catch(()=>{}); }, 800);
-                _startPolling();
-                return true;
+                const clientId = sessionStorage.getItem('gdrive_client') || '';
+                const verifier = sessionStorage.getItem('gdrive_pkce_verifier') || '';
+                try {
+                    const body = new URLSearchParams({
+                        client_id:     clientId,
+                        code:          code,
+                        code_verifier: verifier,
+                        grant_type:    'authorization_code',
+                        redirect_uri:  location.origin + location.pathname
+                    });
+                    const resp = await fetch('https://oauth2.googleapis.com/token', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                        body
+                    });
+                    const data = await resp.json();
+                    if (!data.access_token) {
+                        console.warn('[CloudSync] Falha na troca do code:', data);
+                        Toast.show('⚠️ Falha ao obter token do Google.', 'danger');
+                        return false;
+                    }
+                    _gdriveToken = {
+                        access_token:  data.access_token,
+                        refresh_token: data.refresh_token || null,
+                        expires_at:    Date.now() + (data.expires_in || 3600) * 1000,
+                        client_id:     clientId
+                    };
+                    _activeProvider = 'gdrive';
+                    _saveTokens();
+                    sessionStorage.removeItem('gdrive_state');
+                    sessionStorage.removeItem('gdrive_client');
+                    sessionStorage.removeItem('gdrive_pkce_verifier');
+                    _updateUI();
+                    Toast.show('✅ Google Drive conectado permanentemente! Sincronizando...', 'success', 3000);
+                    setTimeout(() => { gdrivePull(true).catch(()=>{}); }, 800);
+                    _startPolling();
+                    return true;
+                } catch (e) {
+                    console.warn('[CloudSync] Erro na troca do code:', e.message);
+                    Toast.show('⚠️ Falha ao conectar com o Google Drive.', 'danger');
+                    return false;
+                }
             }
 
             // ── Obtém ou cria o fileId no Drive (por loja) ──────────────────
@@ -10942,10 +11050,11 @@ tr:hover td { background: rgba(255,107,0,0.03) !important; }
                     return;
                 }
                 // ── Fluxo normal de login ──────────────────────────────────────
-                if      (sessionStorage.getItem('gdrive_state') === stateVal) _handleGDriveImplicitCallback(hashParams);
-                else if (sessionStorage.getItem('od_state')     === stateVal) _handleOneDriveImplicitCallback(hashParams);
-                else if (sessionStorage.getItem('gdrive_state'))              _handleGDriveImplicitCallback(hashParams);
-                else if (sessionStorage.getItem('od_state'))                  _handleOneDriveImplicitCallback(hashParams);
+                // Nota: Google Drive não passa mais por aqui — o novo fluxo (Authorization
+                // Code + PKCE) é detectado pela própria janela que abriu o popup, via
+                // polling de location.href, e chama _handleGDriveCodeCallback diretamente.
+                if      (sessionStorage.getItem('od_state') === stateVal) _handleOneDriveImplicitCallback(hashParams);
+                else if (sessionStorage.getItem('od_state'))              _handleOneDriveImplicitCallback(hashParams);
             }
 
             // ── Sync ao focar na aba (pull inteligente) ───────────────────────
