@@ -10547,7 +10547,8 @@ tr:hover td { background: rgba(255,107,0,0.03) !important; }
                     const data = await resp.json();
                     if (!data.access_token) {
                         console.warn('[CloudSync] Falha na troca do code:', data);
-                        Toast.show('⚠️ Falha ao obter token do Google.', 'danger');
+                        const motivo = data.error_description || data.error || 'erro desconhecido';
+                        Toast.show('⚠️ Falha ao obter token do Google: ' + motivo, 'danger', 8000);
                         return false;
                     }
                     _gdriveToken = {
@@ -12918,6 +12919,9 @@ tr:hover td { background: rgba(255,107,0,0.03) !important; }
                 // ==================== MOTOR DE PDF — ALTA QUALIDADE ====================
         // Configurações globais de qualidade
         function _showPDFLoading(msg) {
+            // ✅ FIX: contador de profundidade — evita que uma geração de PDF
+            // concorrente esconda o overlay de outra ainda em andamento
+            window._pdfLoadingDepth = (window._pdfLoadingDepth || 0) + 1;
             let ov = document.getElementById('_pdfLoadingOverlay');
             if (!ov) {
                 ov = document.createElement('div');
@@ -12938,8 +12942,39 @@ tr:hover td { background: rgba(255,107,0,0.03) !important; }
             ov.style.display = 'flex';
         }
         function _hidePDFLoading() {
+            window._pdfLoadingDepth = Math.max(0, (window._pdfLoadingDepth || 1) - 1);
+            if (window._pdfLoadingDepth > 0) return; // ainda tem outra geração em andamento
             const ov = document.getElementById('_pdfLoadingOverlay');
             if (ov) ov.style.display = 'none';
+        }
+
+        // ✅ FIX POPUP-BLOCKER: a maioria dos navegadores (especialmente Safari/iOS)
+        // só permite window.open() de forma síncrona, dentro do mesmo gesto de clique
+        // do usuário. Como a geração do PDF passa por vários "await" (carregamento
+        // das bibliotecas na 1ª vez, delay de renderização, captura via html2canvas —
+        // que pode levar 1 a vários segundos), quando o código finalmente chama
+        // window.open() o navegador já não reconhece mais aquilo como parte do clique
+        // original e BLOQUEIA o popup silenciosamente. É essa a causa mais provável do
+        // "bugada" ao gerar PDF — funciona quando é rápido, falha quando demora mais.
+        //
+        // Fix: reserva uma aba em branco de forma SÍNCRONA, no exato momento do clique
+        // (antes de qualquer await), e só troca o conteúdo dela pro PDF quando ele
+        // ficar pronto — em vez de abrir uma aba nova só no final.
+        function _reservarAbaPDF() {
+            try { return window.open('', '_blank'); } catch(e) { return null; }
+        }
+        function _abrirPdfNaAba(preTab, blobUrl) {
+            if (preTab && !preTab.closed) {
+                try {
+                    preTab.location.href = blobUrl;
+                    Toast.show('PDF aberto para visualização! ✅', 'success');
+                    return preTab;
+                } catch(e) { /* cai no fallback abaixo */ }
+            }
+            const tab = window.open(blobUrl, '_blank');
+            if (!tab) Toast.show('Permita popups para visualizar o PDF', 'warning');
+            else Toast.show('PDF aberto para visualização! ✅', 'success');
+            return tab;
         }
 
         const PDF_CONFIG = {
@@ -13148,9 +13183,7 @@ tr:hover td { background: rgba(255,107,0,0.03) !important; }
 
                 // Sempre abre para visualização — nunca baixa automaticamente
                 const blobUrl = pdf.output('bloburl');
-                const tab = window.open(blobUrl, '_blank');
-                if (!tab) Toast.show('Permita popups para visualizar o PDF', 'warning');
-                else Toast.show('PDF aberto para visualização! ✅', 'success');
+                _abrirPdfNaAba(opcoes.tab, blobUrl);
             } catch (err) {
                 console.error('[PDF] Erro:', err);
                 Toast.show('Erro ao gerar PDF: ' + err.message, 'error');
@@ -13163,7 +13196,7 @@ tr:hover td { background: rgba(255,107,0,0.03) !important; }
         // ═══════════════════════════════════════════════════════════════════
         // gerarPDFTamanhoReal — comprovante, cupom, tamanho personalizado
         // ═══════════════════════════════════════════════════════════════════
-        async function gerarPDFTamanhoReal(elemento, nomeArquivo, larguraMM = 80) {
+        async function gerarPDFTamanhoReal(elemento, nomeArquivo, larguraMM = 80, opcoes = {}) {
             if (!window.jspdf || !window.html2canvas) {
                 await new Promise(resolve => window._ensurePDF(resolve));
             }
@@ -13196,9 +13229,7 @@ tr:hover td { background: rgba(255,107,0,0.03) !important; }
                 pdf.addImage(data, format, 0, 0, larguraMM, alturaMM, '', 'FAST');
                 // Sempre visualiza — nunca baixa
                 const blobUrl = pdf.output('bloburl');
-                const tab = window.open(blobUrl, '_blank');
-                if (!tab) Toast.show('Permita popups para visualizar o PDF', 'warning');
-                else Toast.show('PDF aberto para visualização! ✅', 'success');
+                _abrirPdfNaAba(opcoes.tab, blobUrl);
             } catch (err) {
                 console.error('[PDF] Erro:', err);
                 Toast.show('Erro ao gerar PDF: ' + err.message, 'error');
@@ -13211,7 +13242,7 @@ tr:hover td { background: rgba(255,107,0,0.03) !important; }
         // ═══════════════════════════════════════════════════════════════════
         // gerarPDFPorVias — OS, cada via em página separada
         // ═══════════════════════════════════════════════════════════════════
-        async function gerarPDFPorVias(vias, nomeArquivo) {
+        async function gerarPDFPorVias(vias, nomeArquivo, opcoes = {}) {
             if (!window.jspdf || !window.html2canvas) {
                 await new Promise(resolve => window._ensurePDF(resolve));
             }
@@ -13253,9 +13284,7 @@ tr:hover td { background: rgba(255,107,0,0.03) !important; }
 
                 // Sempre visualiza — nunca baixa
                 const blobUrl = pdf.output('bloburl');
-                const tab = window.open(blobUrl, '_blank');
-                if (!tab) Toast.show('Permita popups para visualizar o PDF', 'warning');
-                else Toast.show('PDF aberto para visualização! ✅', 'success');
+                _abrirPdfNaAba(opcoes.tab, blobUrl);
             } catch (err) {
                 console.error('[PDF] Erro:', err);
                 Toast.show('Erro ao gerar PDF: ' + err.message, 'error');
@@ -20300,6 +20329,9 @@ ${container.innerHTML}
             },
 
             async gerarPDF_OS(tipo) {
+                // ✅ FIX: reserva a aba ANTES de qualquer await, ainda dentro do
+                // gesto de clique original — evita bloqueio de popup do navegador
+                const _pdfTab = _reservarAbaPDF();
                 // CORREÇÃO: usa _pdfSale (definido por _setPdfTarget) quando disponível,
                 // senão usa state.currentSale (para PDF da venda sendo editada no formulário).
                 // Isso evita que state.currentSale seja substituído pelo registro antigo.
@@ -20310,7 +20342,7 @@ ${container.innerHTML}
                 const company = state.company;
                 const squareLogo = await getSquareLogo(company.logo, 200);
 
-                if (!sale) { Toast.show('Nenhuma OS selecionada.', 'error'); return; }
+                if (!sale) { try { _pdfTab?.close(); } catch(e) {} Toast.show('Nenhuma OS selecionada.', 'error'); return; }
                 // Limpa o alvo temporário após uso para evitar contaminação futura
                 state._pdfSale = null;
 
@@ -20546,14 +20578,14 @@ ${container.innerHTML}
                     wrapper.className = 'os-pdf-wrapper uma-folha';
                     wrapper.style.cssText = 'width:210mm;height:297mm;overflow:hidden;display:flex;flex-direction:column;background:#fff;';
                     wrapper.innerHTML = buildVia('1ª VIA — LOJA', true, true, '297mm');
-                    gerarPDF(wrapper, `OS_${sale.number}_via_loja`, { pageWidth:210, pageHeight:297, forceHeight:true, preview:true });
+                    gerarPDF(wrapper, `OS_${sale.number}_via_loja`, { pageWidth:210, pageHeight:297, forceHeight:true, preview:true, tab:_pdfTab });
 
                 } else if (tipo === 'via2') {
                     const wrapper = document.createElement('div');
                     wrapper.className = 'os-pdf-wrapper uma-folha';
                     wrapper.style.cssText = 'width:210mm;height:297mm;overflow:hidden;display:flex;flex-direction:column;background:#fff;';
                     wrapper.innerHTML = buildVia('2ª VIA — CLIENTE', false, true, '297mm');
-                    gerarPDF(wrapper, `OS_${sale.number}_via_cliente`, { pageWidth:210, pageHeight:297, forceHeight:true, preview:true });
+                    gerarPDF(wrapper, `OS_${sale.number}_via_cliente`, { pageWidth:210, pageHeight:297, forceHeight:true, preview:true, tab:_pdfTab });
 
                 } else {
                     // Ambas — A4 297mm (144mm+9mm corte+144mm)
@@ -20562,11 +20594,12 @@ ${container.innerHTML}
                     const corteHtml = `<div class="os-corte"><div class="os-corte-linha"></div>✂️ &nbsp; RECORTE AQUI — 2ª VIA DO CLIENTE &nbsp; ✂️<div class="os-corte-linha"></div></div>`;
                     wrapper.innerHTML = buildVia('1ª VIA — LOJA', true, true, '144mm') + corteHtml + buildVia('2ª VIA — CLIENTE', false, true, '144mm');
                     wrapper.style.cssText = 'width:210mm;height:297mm;overflow:hidden;display:flex;flex-direction:column;background:#fff;';
-                    gerarPDF(wrapper, `OS_${sale.number}_ambas`, { pageWidth:210, pageHeight:297, forceHeight:true, preview:true });
+                    gerarPDF(wrapper, `OS_${sale.number}_ambas`, { pageWidth:210, pageHeight:297, forceHeight:true, preview:true, tab:_pdfTab });
                 }
             },
 
             async gerarPDF_Promissoria() {
+                const _pdfTab = _reservarAbaPDF();
                 const client = state.clients.find(c => c.id === state.currentSale.clientId);
                 const sale = state.currentSale;
                 const details = state.currentSale.paymentDetails;
@@ -20783,10 +20816,11 @@ ${container.innerHTML}
                 const elemento = document.createElement('div');
                 elemento.innerHTML = html;
                 elemento.className = 'promissoria-pdf';
-                gerarPDF(elemento, `PROMISSORIA_${sale.number}`);
+                gerarPDF(elemento, `PROMISSORIA_${sale.number}`, { tab:_pdfTab });
             },
 
             async gerarPDF_Carne() {
+                const _pdfTab = _reservarAbaPDF();
                 // CORREÇÃO: usa _pdfSale quando disponível (chamado via _setPdfTarget),
                 // senão usa state.currentSale (formulário ativo)
                 const sale    = state._pdfSale || state.currentSale;
@@ -20798,6 +20832,7 @@ ${container.innerHTML}
                 state._pdfSale = null;
 
                 if (!details || !details.parcels || details.parcels.length === 0) {
+                    try { _pdfTab?.close(); } catch(e) {}
                     Toast.show('Calcule as parcelas antes de gerar o carnê', 'warning');
                     return;
                 }
@@ -20966,9 +21001,10 @@ ${container.innerHTML}
                     .join('\n');
                 el.prepend(style);
 
-                gerarPDF(el, `CARNE_${sale.number}`, { preview: true });
+                gerarPDF(el, `CARNE_${sale.number}`, { preview: true, tab:_pdfTab });
             },
             async gerarPDF_Comprovante(parcelaIndex) {
+                const _pdfTab = _reservarAbaPDF();
                 const client  = state.clients.find(c => c.id === state.currentSale.clientId);
                 const sale    = state.currentSale;
                 const details = state.currentSale.paymentDetails;
@@ -20976,12 +21012,13 @@ ${container.innerHTML}
                 const squareLogo = await getSquareLogo(company.logo, 200);
 
                 if (!details) {
+                    try { _pdfTab?.close(); } catch(e) {}
                     Toast.show('Calcule as parcelas primeiro', 'warning');
                     return;
                 }
 
                 const parcela = details.parcels[parcelaIndex];
-                if (!parcela) return;
+                if (!parcela) { try { _pdfTab?.close(); } catch(e) {} return; }
 
                 const fd = d => d ? new Date(d + 'T12:00:00').toLocaleDateString('pt-BR') : '—';
                 const isLate   = parcela.daysLate > 0;
@@ -21113,7 +21150,7 @@ ${container.innerHTML}
                 el.prepend(style);
 
                 // PDF no tamanho real: largura 80mm, altura = conteúdo real
-                gerarPDFTamanhoReal(el, `COMPROVANTE_OS${sale.number}_P${parcela.number}`, 80);
+                gerarPDFTamanhoReal(el, `COMPROVANTE_OS${sale.number}_P${parcela.number}`, 80, { tab:_pdfTab });
             },
 
             // ── WhatsApp: enviar status do pedido para o cliente ──
@@ -21931,7 +21968,7 @@ ${container.innerHTML}
                                 style="background:#333;color:#fff;border:none;padding:10px 12px;border-radius:8px;cursor:pointer;font-weight:700;font-size:12px;display:flex;align-items:center;justify-content:center;gap:6px;grid-column:1/-1;">
                                 <i class="fas fa-file-pdf"></i> ✂️ Ambas as Vias (A4 — 210×297mm)
                             </button>
-                            <button onclick="Sales._setPdfTarget('${sale.id}');Modal.close('viewModal');setTimeout(()=>Sales.gerarPDF_Carne(),80);"
+                            <button onclick="Sales._setPdfTarget('${sale.id}');Modal.close('viewModal');Sales.gerarPDF_Carne();"
                                 style="background:#6610f2;color:#fff;border:none;padding:10px 12px;border-radius:8px;cursor:pointer;font-weight:700;font-size:12px;display:flex;align-items:center;justify-content:center;gap:6px;grid-column:1/-1;">
                                 <i class="fas fa-receipt"></i> Gerar Carnê PDF
                             </button>
