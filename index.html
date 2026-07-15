@@ -214,25 +214,36 @@
     <script>
     (function() {
         var _loaded = {};
-        window._lazyLoad = function(url, cb) {
+        window._lazyLoad = function(url, cb, onerror) {
             if (_loaded[url]) { if (cb) cb(); return; }
             var s = document.createElement('script');
             s.src = url;
+            // ✅ FIX BUG PDF: onerror agora sempre notifica o chamador (via callback de erro)
+            // em vez de só logar no console. Antes, uma falha de carregamento (ex: CDN
+            // bloqueado, sem internet) deixava a fila de callbacks (_pdfQueue) presa para
+            // sempre, e o botão de PDF ficava girando o loading infinitamente sem erro.
             s.onload = function() { _loaded[url] = true; if (cb) cb(); };
-            s.onerror = function() { console.warn('[LazyLoad] Falha ao carregar:', url); };
+            s.onerror = function() {
+                console.warn('[LazyLoad] Falha ao carregar:', url);
+                try { s.remove(); } catch(_e) {}
+                if (onerror) onerror(url); else if (cb) cb();
+            };
             document.head.appendChild(s);
         };
         // Pré-define globais para evitar erros antes do carregamento
         var _pdfQueue = [], _xlsxQueue = [];
         window._ensurePDF = function(cb) {
-            if (window.jspdf && window.html2canvas) { cb(); return; }
+            if (window.jspdf && window.html2canvas) { cb(true); return; }
             _pdfQueue.push(cb);
             if (_pdfQueue.length > 1) return; // já carregando
+            var _falhou = false;
+            var _onErr = function() { _falhou = true; };
             window._lazyLoad('https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js', function() {
                 window._lazyLoad('https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js', function() {
-                    var q = _pdfQueue.splice(0); q.forEach(function(fn){ try{fn();}catch(e){} });
-                });
-            });
+                    var ok = !_falhou && !!(window.jspdf && window.html2canvas);
+                    var q = _pdfQueue.splice(0); q.forEach(function(fn){ try{fn(ok);}catch(e){} });
+                }, _onErr);
+            }, _onErr);
         };
         window._ensureXLSX = function(cb) {
             if (window.XLSX) { cb(); return; }
@@ -7782,11 +7793,12 @@ tr:hover td { background: rgba(255,107,0,0.03) !important; }
                                         <option value="0">00:00 — Meia-noite</option>
                                         <option value="1">01:00</option>
                                         <option value="2">02:00</option>
-                                        <option value="3" selected>03:00 — Recomendado</option>
+                                        <option value="3">03:00</option>
                                         <option value="4">04:00</option>
                                         <option value="5">05:00</option>
                                         <option value="6">06:00 — Manhã cedo</option>
                                         <option value="12">12:00 — Meio-dia</option>
+                                        <option value="17" selected>17:00 — Final da tarde</option>
                                         <option value="18">18:00 — Final do dia</option>
                                         <option value="20">20:00 — Noite</option>
                                         <option value="22">22:00 — Antes de dormir</option>
@@ -9184,6 +9196,8 @@ tr:hover td { background: rgba(255,107,0,0.03) !important; }
                     snap.company       = company;
                     snap.config        = state.config        || {};
                     snap.lastOsCounter = state.lastOsCounter || {};
+                    // ✅ FIX BUG WHATSAPP: inclui mensagens personalizadas no snapshot local
+                    snap.wppMensagens  = state.wppMensagens  || {};
 
                     const json = JSON.stringify(snap);
                     localStorage.setItem(this._key(sid), json);
@@ -9399,6 +9413,8 @@ tr:hover td { background: rgba(255,107,0,0.03) !important; }
                         if (cfg.config        && typeof cfg.config        === 'object') Object.assign(state.config        || (state.config        = {}), cfg.config);
                         if (cfg.company       && typeof cfg.company       === 'object') Object.assign(state.company       || (state.company       = {}), cfg.company);
                         if (cfg.lastOsCounter && typeof cfg.lastOsCounter === 'object') state.lastOsCounter = { ...(state.lastOsCounter || {}), ...cfg.lastOsCounter };
+                        // ✅ FIX BUG WHATSAPP: restaura mensagens personalizadas salvas
+                        if (cfg.wppMensagens  && typeof cfg.wppMensagens  === 'object') Object.assign(state.wppMensagens  || (state.wppMensagens  = {}), cfg.wppMensagens);
                     }
                     // Tenta também o doc 'empresa' para compatibilidade com switchTo
                     const emp = await sbGetDoc(storeId, 'config', 'empresa');
@@ -9407,6 +9423,8 @@ tr:hover td { background: rgba(255,107,0,0.03) !important; }
                         if (emp.notificacoes)  Object.assign(state.notificacoes  || (state.notificacoes  = {}), emp.notificacoes);
                         if (emp.backupConfig)  Object.assign(state.backupConfig  || (state.backupConfig  = {}), emp.backupConfig);
                         if (emp.lastOsCounter) state.lastOsCounter = { ...(state.lastOsCounter || {}), ...emp.lastOsCounter };
+                        // ✅ FIX BUG WHATSAPP: restaura também a partir do doc 'empresa'
+                        if (emp.wppMensagens)  Object.assign(state.wppMensagens  || (state.wppMensagens  = {}), emp.wppMensagens);
                     }
                     console.log('[RxDB v17] Dados carregados do IndexedDB para loja:', storeId);
                 } catch(e) {
@@ -9430,6 +9448,9 @@ tr:hover td { background: rgba(255,107,0,0.03) !important; }
                             Object.assign(state.config || (state.config = {}), backup.config);
                         if (backup.lastOsCounter && typeof backup.lastOsCounter === 'object')
                             state.lastOsCounter = { ...(state.lastOsCounter || {}), ...backup.lastOsCounter };
+                        // ✅ FIX BUG WHATSAPP: restaura mensagens também no fallback local
+                        if (backup.wppMensagens && typeof backup.wppMensagens === 'object')
+                            Object.assign(state.wppMensagens || (state.wppMensagens = {}), backup.wppMensagens);
                         // Re-escreve no IDB para recuperar persistência nativa
                         setTimeout(() => {
                             try { LocalFirst.rewriteAll(true).catch(() => {}); } catch(_e) {}
@@ -9517,6 +9538,9 @@ tr:hover td { background: rgba(255,107,0,0.03) !important; }
                     config:         state.config || {},
                     company:        state.company || {},
                     lastOsCounter:  state.lastOsCounter || {},
+                    // ✅ FIX BUG WHATSAPP: wppMensagens não era persistido em lugar nenhum,
+                    // então mensagens editadas eram perdidas ao sair/recarregar o sistema.
+                    wppMensagens:   state.wppMensagens || {},
                     storeId,
                     _updatedAt:     now
                 };
@@ -9529,6 +9553,8 @@ tr:hover td { background: rgba(255,107,0,0.03) !important; }
                         notificacoes:   state.notificacoes || {},
                         backupConfig:   state.backupConfig || {},
                         lastOsCounter:  state.lastOsCounter || {},
+                        // ✅ FIX BUG WHATSAPP: garante persistência também no doc 'empresa'
+                        wppMensagens:   state.wppMensagens || {},
                         _updatedAt:     now
                     });
                     // FIX LOOP: só agenda cloud push se não estiver em modo silencioso
@@ -12364,8 +12390,9 @@ tr:hover td { background: rgba(255,107,0,0.03) !important; }
                 { username: 'admin', fullName: 'Administrador', profile: 'admin', status: 'active', lastAccess: 'Nunca' }
             ],
             backupConfig: {
-                autoEnabled: false,
-                hour: 3,
+                // ✅ Backup automático diário ativado por padrão, às 17h, conforme solicitado.
+                autoEnabled: true,
+                hour: 17,
                 keepDays: 7,
                 lastAutoBackup: null,
                 nextAutoBackup: null
@@ -12968,8 +12995,23 @@ tr:hover td { background: rgba(255,107,0,0.03) !important; }
         // gerarPDF — A4, com paginação automática, máxima qualidade
         // ═══════════════════════════════════════════════════════════════════
         async function gerarPDF(elemento, nomeArquivo, opcoes = {}) {
+            // ✅ FIX BUG PDF (popup blocker): abre a aba em branco AGORA, ainda dentro
+            // do gesto de clique do usuário, e navega ela depois (via .location) quando
+            // o PDF estiver pronto. Como o restante da geração é assíncrono (await),
+            // abrir a aba só no final quase sempre era bloqueado pelo navegador —
+            // o usuário achava que "deu bug" mesmo quando o PDF foi gerado com sucesso.
+            const _pdfTab = window.open('', '_blank');
+            if (_pdfTab) {
+                try { _pdfTab.document.write('<title>Gerando PDF…</title><body style="font-family:Arial,sans-serif;display:flex;align-items:center;justify-content:center;height:100vh;margin:0;color:#666">Gerando PDF, aguarde…</body>'); } catch(_e) {}
+            }
             if (!window.jspdf || !window.html2canvas) {
-                await new Promise(resolve => window._ensurePDF(resolve));
+                const ok = await new Promise(resolve => window._ensurePDF(resolve));
+                if (!ok) {
+                    _hidePDFLoading();
+                    if (_pdfTab && !_pdfTab.closed) _pdfTab.close();
+                    Toast.show('Não foi possível carregar o gerador de PDF. Verifique sua conexão com a internet e tente novamente.', 'error', 6000);
+                    return;
+                }
             }
             const { jsPDF } = window.jspdf;
             const { PX_PER_MM, SCALE, RENDER_DELAY } = PDF_CONFIG;
@@ -13030,13 +13072,21 @@ tr:hover td { background: rgba(255,107,0,0.03) !important; }
                     }
                 }
 
-                // Sempre abre para visualização — nunca baixa automaticamente
+                // Sempre abre para visualização — nunca baixa automaticamente.
+                // ✅ FIX BUG PDF: navega a aba já aberta no início (evita bloqueio de pop-up);
+                // se por algum motivo ela não existir/foi fechada, tenta abrir uma nova.
                 const blobUrl = pdf.output('bloburl');
-                const tab = window.open(blobUrl, '_blank');
-                if (!tab) Toast.show('Permita popups para visualizar o PDF', 'warning');
-                else Toast.show('PDF aberto para visualização! ✅', 'success');
+                if (_pdfTab && !_pdfTab.closed) {
+                    _pdfTab.location.href = blobUrl;
+                    Toast.show('PDF aberto para visualização! ✅', 'success');
+                } else {
+                    const tab = window.open(blobUrl, '_blank');
+                    if (!tab) Toast.show('Permita popups para visualizar o PDF', 'warning');
+                    else Toast.show('PDF aberto para visualização! ✅', 'success');
+                }
             } catch (err) {
                 console.error('[PDF] Erro:', err);
+                if (_pdfTab && !_pdfTab.closed) _pdfTab.close();
                 Toast.show('Erro ao gerar PDF: ' + err.message, 'error');
             } finally {
                 _hidePDFLoading();
@@ -13048,8 +13098,20 @@ tr:hover td { background: rgba(255,107,0,0.03) !important; }
         // gerarPDFTamanhoReal — comprovante, cupom, tamanho personalizado
         // ═══════════════════════════════════════════════════════════════════
         async function gerarPDFTamanhoReal(elemento, nomeArquivo, larguraMM = 80) {
+            // ✅ FIX BUG PDF (popup blocker): mesma estratégia de gerarPDF() —
+            // abre a aba já dentro do gesto de clique do usuário.
+            const _pdfTab = window.open('', '_blank');
+            if (_pdfTab) {
+                try { _pdfTab.document.write('<title>Gerando PDF…</title><body style="font-family:Arial,sans-serif;display:flex;align-items:center;justify-content:center;height:100vh;margin:0;color:#666">Gerando PDF, aguarde…</body>'); } catch(_e) {}
+            }
             if (!window.jspdf || !window.html2canvas) {
-                await new Promise(resolve => window._ensurePDF(resolve));
+                const ok = await new Promise(resolve => window._ensurePDF(resolve));
+                if (!ok) {
+                    _hidePDFLoading();
+                    if (_pdfTab && !_pdfTab.closed) _pdfTab.close();
+                    Toast.show('Não foi possível carregar o gerador de PDF. Verifique sua conexão com a internet e tente novamente.', 'error', 6000);
+                    return;
+                }
             }
             const { jsPDF } = window.jspdf;
             const { PX_PER_MM, RENDER_DELAY } = PDF_CONFIG;
@@ -13080,11 +13142,17 @@ tr:hover td { background: rgba(255,107,0,0.03) !important; }
                 pdf.addImage(data, format, 0, 0, larguraMM, alturaMM, '', 'FAST');
                 // Sempre visualiza — nunca baixa
                 const blobUrl = pdf.output('bloburl');
-                const tab = window.open(blobUrl, '_blank');
-                if (!tab) Toast.show('Permita popups para visualizar o PDF', 'warning');
-                else Toast.show('PDF aberto para visualização! ✅', 'success');
+                if (_pdfTab && !_pdfTab.closed) {
+                    _pdfTab.location.href = blobUrl;
+                    Toast.show('PDF aberto para visualização! ✅', 'success');
+                } else {
+                    const tab = window.open(blobUrl, '_blank');
+                    if (!tab) Toast.show('Permita popups para visualizar o PDF', 'warning');
+                    else Toast.show('PDF aberto para visualização! ✅', 'success');
+                }
             } catch (err) {
                 console.error('[PDF] Erro:', err);
+                if (_pdfTab && !_pdfTab.closed) _pdfTab.close();
                 Toast.show('Erro ao gerar PDF: ' + err.message, 'error');
             } finally {
                 _hidePDFLoading();
@@ -13096,8 +13164,20 @@ tr:hover td { background: rgba(255,107,0,0.03) !important; }
         // gerarPDFPorVias — OS, cada via em página separada
         // ═══════════════════════════════════════════════════════════════════
         async function gerarPDFPorVias(vias, nomeArquivo) {
+            // ✅ FIX BUG PDF (popup blocker): mesma estratégia — abre a aba já
+            // dentro do gesto de clique do usuário.
+            const _pdfTab = window.open('', '_blank');
+            if (_pdfTab) {
+                try { _pdfTab.document.write('<title>Gerando PDF…</title><body style="font-family:Arial,sans-serif;display:flex;align-items:center;justify-content:center;height:100vh;margin:0;color:#666">Gerando PDF, aguarde…</body>'); } catch(_e) {}
+            }
             if (!window.jspdf || !window.html2canvas) {
-                await new Promise(resolve => window._ensurePDF(resolve));
+                const ok = await new Promise(resolve => window._ensurePDF(resolve));
+                if (!ok) {
+                    _hidePDFLoading();
+                    if (_pdfTab && !_pdfTab.closed) _pdfTab.close();
+                    Toast.show('Não foi possível carregar o gerador de PDF. Verifique sua conexão com a internet e tente novamente.', 'error', 6000);
+                    return;
+                }
             }
             const { jsPDF } = window.jspdf;
             const { RENDER_DELAY } = PDF_CONFIG;
@@ -13137,12 +13217,20 @@ tr:hover td { background: rgba(255,107,0,0.03) !important; }
 
                 // Sempre visualiza — nunca baixa
                 const blobUrl = pdf.output('bloburl');
-                const tab = window.open(blobUrl, '_blank');
-                if (!tab) Toast.show('Permita popups para visualizar o PDF', 'warning');
-                else Toast.show('PDF aberto para visualização! ✅', 'success');
+                if (_pdfTab && !_pdfTab.closed) {
+                    _pdfTab.location.href = blobUrl;
+                    Toast.show('PDF aberto para visualização! ✅', 'success');
+                } else {
+                    const tab = window.open(blobUrl, '_blank');
+                    if (!tab) Toast.show('Permita popups para visualizar o PDF', 'warning');
+                    else Toast.show('PDF aberto para visualização! ✅', 'success');
+                }
             } catch (err) {
                 console.error('[PDF] Erro:', err);
+                if (_pdfTab && !_pdfTab.closed) _pdfTab.close();
                 Toast.show('Erro ao gerar PDF: ' + err.message, 'error');
+            } finally {
+                _hidePDFLoading();
             }
         }
 
