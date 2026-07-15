@@ -8089,6 +8089,13 @@ tr:hover td { background: rgba(255,107,0,0.03) !important; }
                                             value="">
                                         <div style="color:#6b7280;font-size:0.68rem;margin-top:2px;">Opcional — use apenas se quiser seu próprio app Google. <a href="https://console.cloud.google.com" target="_blank" style="color:#60a5fa;">console.cloud.google.com</a></div>
                                     </div>
+                                    <div style="margin-top:0.5rem;">
+                                        <label style="color:#9ca3af;font-size:0.72rem;font-weight:600;">Client Secret (obrigatório para Client ID tipo "Aplicativo Web")</label>
+                                        <input id="gdriveClientSecret" type="password" placeholder="GOCSPX-xxxxxxxxxxxxxxxxxxxx"
+                                            style="width:100%;background:#0f172a;color:#93c5fd;border:1px solid #1e3a5f;border-radius:6px;padding:7px 10px;font-size:0.8rem;font-family:monospace;margin-top:3px;"
+                                            value="">
+                                        <div style="color:#6b7280;font-size:0.68rem;margin-top:2px;">Necessário porque o Client ID é do tipo "Aplicativo Web". Fica salvo apenas neste dispositivo.</div>
+                                    </div>
                                 </div>
                                 <div id="gdriveConnected" style="display:none;">
                                     <div style="display:flex;align-items:center;gap:0.5rem;margin-bottom:0.75rem;color:#4ade80;font-weight:700;font-size:0.85rem;">
@@ -10160,11 +10167,13 @@ tr:hover td { background: rgba(255,107,0,0.03) !important; }
             async function _refreshGDriveToken() {
                 if (!_gdriveToken || !_gdriveToken.refresh_token) return false;
                 try {
-                    const body = new URLSearchParams({
+                    const refreshParams = {
                         client_id:     _gdriveToken.client_id,
                         refresh_token: _gdriveToken.refresh_token,
                         grant_type:    'refresh_token'
-                    });
+                    };
+                    if (_gdriveToken.client_secret) refreshParams.client_secret = _gdriveToken.client_secret;
+                    const body = new URLSearchParams(refreshParams);
                     const resp = await fetch('https://oauth2.googleapis.com/token', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
@@ -10474,12 +10483,17 @@ tr:hover td { background: rgba(255,107,0,0.03) !important; }
             async function connectGDrive() {
                 const clientId = (document.getElementById('gdriveClientId')?.value?.trim()) || GDRIVE_DEFAULT_CLIENT;
                 if (!clientId) { Toast.show('⚠️ Informe o Client ID do Google Cloud Console para conectar.', 'warning', 5000); return; }
-                try { localStorage.setItem('cs_gdrive_client_id', clientId); } catch(e) {}
+                const clientSecret = (document.getElementById('gdriveClientSecret')?.value?.trim()) || '';
+                try {
+                    localStorage.setItem('cs_gdrive_client_id', clientId);
+                    if (clientSecret) localStorage.setItem('cs_gdrive_client_secret', clientSecret);
+                } catch(e) {}
 
                 const { verifier, challenge } = await _pkcePair();
                 const state_val = _randomStr(16);
                 sessionStorage.setItem('gdrive_state', state_val);
                 sessionStorage.setItem('gdrive_client', clientId);
+                sessionStorage.setItem('gdrive_client_secret', clientSecret);
                 sessionStorage.setItem('gdrive_pkce_verifier', verifier);
 
                 const params = new URLSearchParams({
@@ -10529,16 +10543,19 @@ tr:hover td { background: rgba(255,107,0,0.03) !important; }
                     Toast.show('⚠️ Falha de segurança no callback Google (state inválido).', 'danger');
                     return false;
                 }
-                const clientId = sessionStorage.getItem('gdrive_client') || '';
-                const verifier = sessionStorage.getItem('gdrive_pkce_verifier') || '';
+                const clientId     = sessionStorage.getItem('gdrive_client') || '';
+                const clientSecret = sessionStorage.getItem('gdrive_client_secret') || '';
+                const verifier     = sessionStorage.getItem('gdrive_pkce_verifier') || '';
                 try {
-                    const body = new URLSearchParams({
+                    const bodyParams = {
                         client_id:     clientId,
                         code:          code,
                         code_verifier: verifier,
                         grant_type:    'authorization_code',
                         redirect_uri:  location.origin + location.pathname
-                    });
+                    };
+                    if (clientSecret) bodyParams.client_secret = clientSecret;
+                    const body = new URLSearchParams(bodyParams);
                     const resp = await fetch('https://oauth2.googleapis.com/token', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
@@ -10555,12 +10572,14 @@ tr:hover td { background: rgba(255,107,0,0.03) !important; }
                         access_token:  data.access_token,
                         refresh_token: data.refresh_token || null,
                         expires_at:    Date.now() + (data.expires_in || 3600) * 1000,
-                        client_id:     clientId
+                        client_id:     clientId,
+                        client_secret: clientSecret || null
                     };
                     _activeProvider = 'gdrive';
                     _saveTokens();
                     sessionStorage.removeItem('gdrive_state');
                     sessionStorage.removeItem('gdrive_client');
+                    sessionStorage.removeItem('gdrive_client_secret');
                     sessionStorage.removeItem('gdrive_pkce_verifier');
                     _updateUI();
                     Toast.show('✅ Google Drive conectado permanentemente! Sincronizando...', 'success', 3000);
@@ -11158,6 +11177,9 @@ tr:hover td { background: rgba(255,107,0,0.03) !important; }
                     const savedId = localStorage.getItem('cs_gdrive_client_id') || '';
                     const inp = document.getElementById('gdriveClientId');
                     if (inp && savedId && !inp.value) inp.value = savedId;
+                    const savedSecret = localStorage.getItem('cs_gdrive_client_secret') || '';
+                    const inpSecret = document.getElementById('gdriveClientSecret');
+                    if (inpSecret && savedSecret && !inpSecret.value) inpSecret.value = savedSecret;
                 }, 800);
                 setTimeout(() => {
                     _updateUI();
