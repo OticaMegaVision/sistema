@@ -7782,12 +7782,11 @@ tr:hover td { background: rgba(255,107,0,0.03) !important; }
                                         <option value="0">00:00 — Meia-noite</option>
                                         <option value="1">01:00</option>
                                         <option value="2">02:00</option>
-                                        <option value="3">03:00</option>
+                                        <option value="3" selected>03:00 — Recomendado</option>
                                         <option value="4">04:00</option>
                                         <option value="5">05:00</option>
                                         <option value="6">06:00 — Manhã cedo</option>
                                         <option value="12">12:00 — Meio-dia</option>
-                                        <option value="17">17:00 — Final da tarde</option>
                                         <option value="18">18:00 — Final do dia</option>
                                         <option value="20">20:00 — Noite</option>
                                         <option value="22">22:00 — Antes de dormir</option>
@@ -8088,13 +8087,6 @@ tr:hover td { background: rgba(255,107,0,0.03) !important; }
                                             style="width:100%;background:#0f172a;color:#93c5fd;border:1px solid #1e3a5f;border-radius:6px;padding:7px 10px;font-size:0.8rem;font-family:monospace;margin-top:3px;"
                                             value="">
                                         <div style="color:#6b7280;font-size:0.68rem;margin-top:2px;">Opcional — use apenas se quiser seu próprio app Google. <a href="https://console.cloud.google.com" target="_blank" style="color:#60a5fa;">console.cloud.google.com</a></div>
-                                    </div>
-                                    <div style="margin-top:0.5rem;">
-                                        <label style="color:#9ca3af;font-size:0.72rem;font-weight:600;">Client Secret (obrigatório para Client ID tipo "Aplicativo Web")</label>
-                                        <input id="gdriveClientSecret" type="password" placeholder="GOCSPX-xxxxxxxxxxxxxxxxxxxx"
-                                            style="width:100%;background:#0f172a;color:#93c5fd;border:1px solid #1e3a5f;border-radius:6px;padding:7px 10px;font-size:0.8rem;font-family:monospace;margin-top:3px;"
-                                            value="">
-                                        <div style="color:#6b7280;font-size:0.68rem;margin-top:2px;">Necessário porque o Client ID é do tipo "Aplicativo Web". Fica salvo apenas neste dispositivo.</div>
                                     </div>
                                 </div>
                                 <div id="gdriveConnected" style="display:none;">
@@ -9407,9 +9399,6 @@ tr:hover td { background: rgba(255,107,0,0.03) !important; }
                         if (cfg.config        && typeof cfg.config        === 'object') Object.assign(state.config        || (state.config        = {}), cfg.config);
                         if (cfg.company       && typeof cfg.company       === 'object') Object.assign(state.company       || (state.company       = {}), cfg.company);
                         if (cfg.lastOsCounter && typeof cfg.lastOsCounter === 'object') state.lastOsCounter = { ...(state.lastOsCounter || {}), ...cfg.lastOsCounter };
-                        // FIX: restaura mensagens de WhatsApp personalizadas (antes eram
-                        // salvas em memória mas nunca persistidas — voltavam ao padrão)
-                        if (cfg.wppMensagens  && typeof cfg.wppMensagens  === 'object') Object.assign(state.wppMensagens  || (state.wppMensagens  = {}), cfg.wppMensagens);
                     }
                     // Tenta também o doc 'empresa' para compatibilidade com switchTo
                     const emp = await sbGetDoc(storeId, 'config', 'empresa');
@@ -9418,7 +9407,6 @@ tr:hover td { background: rgba(255,107,0,0.03) !important; }
                         if (emp.notificacoes)  Object.assign(state.notificacoes  || (state.notificacoes  = {}), emp.notificacoes);
                         if (emp.backupConfig)  Object.assign(state.backupConfig  || (state.backupConfig  = {}), emp.backupConfig);
                         if (emp.lastOsCounter) state.lastOsCounter = { ...(state.lastOsCounter || {}), ...emp.lastOsCounter };
-                        if (emp.wppMensagens)  Object.assign(state.wppMensagens  || (state.wppMensagens  = {}), emp.wppMensagens);
                     }
                     console.log('[RxDB v17] Dados carregados do IndexedDB para loja:', storeId);
                 } catch(e) {
@@ -9529,7 +9517,6 @@ tr:hover td { background: rgba(255,107,0,0.03) !important; }
                     config:         state.config || {},
                     company:        state.company || {},
                     lastOsCounter:  state.lastOsCounter || {},
-                    wppMensagens:   state.wppMensagens || {},
                     storeId,
                     _updatedAt:     now
                 };
@@ -9542,7 +9529,6 @@ tr:hover td { background: rgba(255,107,0,0.03) !important; }
                         notificacoes:   state.notificacoes || {},
                         backupConfig:   state.backupConfig || {},
                         lastOsCounter:  state.lastOsCounter || {},
-                        wppMensagens:   state.wppMensagens || {},
                         _updatedAt:     now
                     });
                     // FIX LOOP: só agenda cloud push se não estiver em modo silencioso
@@ -10147,67 +10133,18 @@ tr:hover td { background: rgba(255,107,0,0.03) !important; }
             function _isNearExpiry(tok) { return  tok && Date.now() >= (tok.expires_at - 600000); } // < 10 min restantes
             function _randomStr(n) { return Array.from(crypto.getRandomValues(new Uint8Array(n))).map(b => b.toString(16).padStart(2,'0')).join('').slice(0,n); }
 
-            // ── PKCE: gera code_verifier + code_challenge (fluxo sem client_secret) ──
-            function _b64url(bytes) {
-                return btoa(String.fromCharCode(...bytes)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
-            }
-            async function _pkcePair() {
-                const verifier = _b64url(crypto.getRandomValues(new Uint8Array(32)));
-                const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(verifier));
-                const challenge = _b64url(new Uint8Array(digest));
-                return { verifier, challenge };
-            }
-
             // ── Auto-refresh silencioso do token Google Drive ─────────────────
             let _autoRefreshing     = false;
             let _autoRefreshPopup   = null;
             let _autoRefreshTimeout = null;
 
-            // Renovação via refresh_token — sem popup, sem depender de sessão do navegador
-            async function _refreshGDriveToken() {
-                if (!_gdriveToken || !_gdriveToken.refresh_token) return false;
-                try {
-                    const refreshParams = {
-                        client_id:     _gdriveToken.client_id,
-                        refresh_token: _gdriveToken.refresh_token,
-                        grant_type:    'refresh_token'
-                    };
-                    if (_gdriveToken.client_secret) refreshParams.client_secret = _gdriveToken.client_secret;
-                    const body = new URLSearchParams(refreshParams);
-                    const resp = await fetch('https://oauth2.googleapis.com/token', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-                        body
-                    });
-                    const data = await resp.json();
-                    if (!data.access_token) throw new Error('sem access_token na resposta');
-                    _gdriveToken.access_token = data.access_token;
-                    _gdriveToken.expires_at   = Date.now() + (data.expires_in || 3600) * 1000;
-                    if (data.refresh_token) _gdriveToken.refresh_token = data.refresh_token;
-                    _saveTokens();
-                    _updateUI();
-                    document.getElementById('cs_reconnect_banner')?.remove();
-                    console.log('[CloudSync] ✅ Token Google Drive renovado via refresh_token — sem popup');
-                    _showSyncIndicator('🔄 Token renovado');
-                    return true;
-                } catch (e) {
-                    console.warn('[CloudSync] Falha ao renovar via refresh_token:', e.message);
-                    return false;
-                }
-            }
-
             function _autoRefreshGDriveToken() {
                 if (_autoRefreshing) return;
                 if (!_gdriveToken) return;
-                // ✅ NOVO: se já temos refresh_token (fluxo PKCE), usa ele — sem popup
-                if (_gdriveToken.refresh_token) {
-                    _refreshGDriveToken().then(ok => { if (!ok) _showReconnectBanner(); });
-                    return;
-                }
                 const clientId = _gdriveToken.client_id || localStorage.getItem('cs_gdrive_client_id') || '';
                 if (!clientId) return;
                 _autoRefreshing = true;
-                console.log('[CloudSync] 🔄 Auto-renovando token Google Drive (prompt=none) — token antigo sem refresh_token, reconecte para migrar...');
+                console.log('[CloudSync] 🔄 Auto-renovando token Google Drive (prompt=none)...');
                 const state_val = _randomStr(16);
                 sessionStorage.setItem('gdrive_autorefresh_state', state_val);
                 const params = new URLSearchParams({
@@ -10475,122 +10412,50 @@ tr:hover td { background: rgba(255,107,0,0.03) !important; }
             //  GOOGLE DRIVE
             // ════════════════════════════════════════════════════════════════
 
-            // ✅ NOVO: fluxo Authorization Code + PKCE via popup — sem client_secret,
-            // gera refresh_token real (login permanente até revogação manual).
-            let _gdriveConnectPopup = null;
-            let _gdriveConnectPoll  = null;
-
             async function connectGDrive() {
                 const clientId = (document.getElementById('gdriveClientId')?.value?.trim()) || GDRIVE_DEFAULT_CLIENT;
                 if (!clientId) { Toast.show('⚠️ Informe o Client ID do Google Cloud Console para conectar.', 'warning', 5000); return; }
-                const clientSecret = (document.getElementById('gdriveClientSecret')?.value?.trim()) || '';
-                try {
-                    localStorage.setItem('cs_gdrive_client_id', clientId);
-                    if (clientSecret) localStorage.setItem('cs_gdrive_client_secret', clientSecret);
-                } catch(e) {}
-
-                const { verifier, challenge } = await _pkcePair();
+                // FIX: salva o Client ID para reconexão automática após expirar
+                try { localStorage.setItem('cs_gdrive_client_id', clientId); } catch(e) {}
                 const state_val = _randomStr(16);
-                sessionStorage.setItem('gdrive_state', state_val);
+                sessionStorage.setItem('gdrive_state',  state_val);
                 sessionStorage.setItem('gdrive_client', clientId);
-                sessionStorage.setItem('gdrive_client_secret', clientSecret);
-                sessionStorage.setItem('gdrive_pkce_verifier', verifier);
-
                 const params = new URLSearchParams({
-                    client_id:              clientId,
-                    redirect_uri:           location.origin + location.pathname,
-                    response_type:          'code',
-                    scope:                  'https://www.googleapis.com/auth/drive.appdata https://www.googleapis.com/auth/drive.file',
-                    state:                  state_val,
-                    code_challenge:         challenge,
-                    code_challenge_method:  'S256',
-                    access_type:            'offline',
-                    prompt:                 'consent'
+                    client_id:     clientId,
+                    redirect_uri:  location.origin + location.pathname,
+                    response_type: 'token',
+                    scope:         'https://www.googleapis.com/auth/drive.appdata https://www.googleapis.com/auth/drive.file',
+                    state:         state_val,
+                    prompt:        'consent'
                 });
-                const authUrl = 'https://accounts.google.com/o/oauth2/v2/auth?' + params;
-
-                const w = 500, h = 640;
-                const left = (screen.width  - w) / 2;
-                const top  = (screen.height - h) / 2;
-                _gdriveConnectPopup = window.open(authUrl, 'gdrive_connect', `width=${w},height=${h},left=${left},top=${top},toolbar=no,menubar=no`);
-                if (!_gdriveConnectPopup) {
-                    Toast.show('⚠️ O navegador bloqueou o popup. Permita popups para este site e tente novamente.', 'warning', 6000);
-                    return;
-                }
-                clearInterval(_gdriveConnectPoll);
-                _gdriveConnectPoll = setInterval(() => {
-                    try {
-                        if (_gdriveConnectPopup.closed) { clearInterval(_gdriveConnectPoll); return; }
-                        const popupUrl = new URL(_gdriveConnectPopup.location.href);
-                        if (popupUrl.origin === location.origin && popupUrl.searchParams.get('code')) {
-                            clearInterval(_gdriveConnectPoll);
-                            const code = popupUrl.searchParams.get('code');
-                            const state = popupUrl.searchParams.get('state');
-                            _gdriveConnectPopup.close();
-                            _handleGDriveCodeCallback(new URLSearchParams({ code, state }));
-                        }
-                    } catch (e) {
-                        // cross-origin enquanto o popup está em accounts.google.com — esperado, ignora
-                    }
-                }, 400);
+                window.location.href = 'https://accounts.google.com/o/oauth2/v2/auth?' + params;
             }
 
-            async function _handleGDriveCodeCallback(queryParams) {
-                const code      = queryParams.get('code');
-                const state_val = queryParams.get('state');
-                if (!code) return false;
+            function _handleGDriveImplicitCallback(hashParams) {
+                const accessToken = hashParams.get('access_token');
+                const state_val   = hashParams.get('state');
+                const expiresIn   = parseInt(hashParams.get('expires_in') || '3600', 10);
+                if (!accessToken) return false;
                 if (sessionStorage.getItem('gdrive_state') !== state_val) {
                     Toast.show('⚠️ Falha de segurança no callback Google (state inválido).', 'danger');
                     return false;
                 }
-                const clientId     = sessionStorage.getItem('gdrive_client') || '';
-                const clientSecret = sessionStorage.getItem('gdrive_client_secret') || '';
-                const verifier     = sessionStorage.getItem('gdrive_pkce_verifier') || '';
-                try {
-                    const bodyParams = {
-                        client_id:     clientId,
-                        code:          code,
-                        code_verifier: verifier,
-                        grant_type:    'authorization_code',
-                        redirect_uri:  location.origin + location.pathname
-                    };
-                    if (clientSecret) bodyParams.client_secret = clientSecret;
-                    const body = new URLSearchParams(bodyParams);
-                    const resp = await fetch('https://oauth2.googleapis.com/token', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-                        body
-                    });
-                    const data = await resp.json();
-                    if (!data.access_token) {
-                        console.warn('[CloudSync] Falha na troca do code:', data);
-                        const motivo = data.error_description || data.error || 'erro desconhecido';
-                        Toast.show('⚠️ Falha ao obter token do Google: ' + motivo, 'danger', 8000);
-                        return false;
-                    }
-                    _gdriveToken = {
-                        access_token:  data.access_token,
-                        refresh_token: data.refresh_token || null,
-                        expires_at:    Date.now() + (data.expires_in || 3600) * 1000,
-                        client_id:     clientId,
-                        client_secret: clientSecret || null
-                    };
-                    _activeProvider = 'gdrive';
-                    _saveTokens();
-                    sessionStorage.removeItem('gdrive_state');
-                    sessionStorage.removeItem('gdrive_client');
-                    sessionStorage.removeItem('gdrive_client_secret');
-                    sessionStorage.removeItem('gdrive_pkce_verifier');
-                    _updateUI();
-                    Toast.show('✅ Google Drive conectado permanentemente! Sincronizando...', 'success', 3000);
-                    setTimeout(() => { gdrivePull(true).catch(()=>{}); }, 800);
-                    _startPolling();
-                    return true;
-                } catch (e) {
-                    console.warn('[CloudSync] Erro na troca do code:', e.message);
-                    Toast.show('⚠️ Falha ao conectar com o Google Drive.', 'danger');
-                    return false;
-                }
+                _gdriveToken = {
+                    access_token: accessToken,
+                    expires_at:   Date.now() + expiresIn * 1000,
+                    client_id:    sessionStorage.getItem('gdrive_client') || ''
+                };
+                _activeProvider = 'gdrive';
+                _saveTokens();
+                sessionStorage.removeItem('gdrive_state');
+                sessionStorage.removeItem('gdrive_client');
+                _updateUI();
+                history.replaceState({}, '', location.pathname);
+                Toast.show('✅ Google Drive conectado! Sincronizando...', 'success', 3000);
+                // Ao conectar: pull imediato + inicia polling
+                setTimeout(() => { gdrivePull(true).catch(()=>{}); }, 800);
+                _startPolling();
+                return true;
             }
 
             // ── Obtém ou cria o fileId no Drive (por loja) ──────────────────
@@ -11077,11 +10942,10 @@ tr:hover td { background: rgba(255,107,0,0.03) !important; }
                     return;
                 }
                 // ── Fluxo normal de login ──────────────────────────────────────
-                // Nota: Google Drive não passa mais por aqui — o novo fluxo (Authorization
-                // Code + PKCE) é detectado pela própria janela que abriu o popup, via
-                // polling de location.href, e chama _handleGDriveCodeCallback diretamente.
-                if      (sessionStorage.getItem('od_state') === stateVal) _handleOneDriveImplicitCallback(hashParams);
-                else if (sessionStorage.getItem('od_state'))              _handleOneDriveImplicitCallback(hashParams);
+                if      (sessionStorage.getItem('gdrive_state') === stateVal) _handleGDriveImplicitCallback(hashParams);
+                else if (sessionStorage.getItem('od_state')     === stateVal) _handleOneDriveImplicitCallback(hashParams);
+                else if (sessionStorage.getItem('gdrive_state'))              _handleGDriveImplicitCallback(hashParams);
+                else if (sessionStorage.getItem('od_state'))                  _handleOneDriveImplicitCallback(hashParams);
             }
 
             // ── Sync ao focar na aba (pull inteligente) ───────────────────────
@@ -11177,9 +11041,6 @@ tr:hover td { background: rgba(255,107,0,0.03) !important; }
                     const savedId = localStorage.getItem('cs_gdrive_client_id') || '';
                     const inp = document.getElementById('gdriveClientId');
                     if (inp && savedId && !inp.value) inp.value = savedId;
-                    const savedSecret = localStorage.getItem('cs_gdrive_client_secret') || '';
-                    const inpSecret = document.getElementById('gdriveClientSecret');
-                    if (inpSecret && savedSecret && !inpSecret.value) inpSecret.value = savedSecret;
                 }, 800);
                 setTimeout(() => {
                     _updateUI();
@@ -12503,8 +12364,8 @@ tr:hover td { background: rgba(255,107,0,0.03) !important; }
                 { username: 'admin', fullName: 'Administrador', profile: 'admin', status: 'active', lastAccess: 'Nunca' }
             ],
             backupConfig: {
-                autoEnabled: true,
-                hour: 17,
+                autoEnabled: false,
+                hour: 3,
                 keepDays: 7,
                 lastAutoBackup: null,
                 nextAutoBackup: null
@@ -12941,9 +12802,6 @@ tr:hover td { background: rgba(255,107,0,0.03) !important; }
                 // ==================== MOTOR DE PDF — ALTA QUALIDADE ====================
         // Configurações globais de qualidade
         function _showPDFLoading(msg) {
-            // ✅ FIX: contador de profundidade — evita que uma geração de PDF
-            // concorrente esconda o overlay de outra ainda em andamento
-            window._pdfLoadingDepth = (window._pdfLoadingDepth || 0) + 1;
             let ov = document.getElementById('_pdfLoadingOverlay');
             if (!ov) {
                 ov = document.createElement('div');
@@ -12964,39 +12822,8 @@ tr:hover td { background: rgba(255,107,0,0.03) !important; }
             ov.style.display = 'flex';
         }
         function _hidePDFLoading() {
-            window._pdfLoadingDepth = Math.max(0, (window._pdfLoadingDepth || 1) - 1);
-            if (window._pdfLoadingDepth > 0) return; // ainda tem outra geração em andamento
             const ov = document.getElementById('_pdfLoadingOverlay');
             if (ov) ov.style.display = 'none';
-        }
-
-        // ✅ FIX POPUP-BLOCKER: a maioria dos navegadores (especialmente Safari/iOS)
-        // só permite window.open() de forma síncrona, dentro do mesmo gesto de clique
-        // do usuário. Como a geração do PDF passa por vários "await" (carregamento
-        // das bibliotecas na 1ª vez, delay de renderização, captura via html2canvas —
-        // que pode levar 1 a vários segundos), quando o código finalmente chama
-        // window.open() o navegador já não reconhece mais aquilo como parte do clique
-        // original e BLOQUEIA o popup silenciosamente. É essa a causa mais provável do
-        // "bugada" ao gerar PDF — funciona quando é rápido, falha quando demora mais.
-        //
-        // Fix: reserva uma aba em branco de forma SÍNCRONA, no exato momento do clique
-        // (antes de qualquer await), e só troca o conteúdo dela pro PDF quando ele
-        // ficar pronto — em vez de abrir uma aba nova só no final.
-        function _reservarAbaPDF() {
-            try { return window.open('', '_blank'); } catch(e) { return null; }
-        }
-        function _abrirPdfNaAba(preTab, blobUrl) {
-            if (preTab && !preTab.closed) {
-                try {
-                    preTab.location.href = blobUrl;
-                    Toast.show('PDF aberto para visualização! ✅', 'success');
-                    return preTab;
-                } catch(e) { /* cai no fallback abaixo */ }
-            }
-            const tab = window.open(blobUrl, '_blank');
-            if (!tab) Toast.show('Permita popups para visualizar o PDF', 'warning');
-            else Toast.show('PDF aberto para visualização! ✅', 'success');
-            return tab;
         }
 
         const PDF_CONFIG = {
@@ -13205,7 +13032,9 @@ tr:hover td { background: rgba(255,107,0,0.03) !important; }
 
                 // Sempre abre para visualização — nunca baixa automaticamente
                 const blobUrl = pdf.output('bloburl');
-                _abrirPdfNaAba(opcoes.tab, blobUrl);
+                const tab = window.open(blobUrl, '_blank');
+                if (!tab) Toast.show('Permita popups para visualizar o PDF', 'warning');
+                else Toast.show('PDF aberto para visualização! ✅', 'success');
             } catch (err) {
                 console.error('[PDF] Erro:', err);
                 Toast.show('Erro ao gerar PDF: ' + err.message, 'error');
@@ -13218,7 +13047,7 @@ tr:hover td { background: rgba(255,107,0,0.03) !important; }
         // ═══════════════════════════════════════════════════════════════════
         // gerarPDFTamanhoReal — comprovante, cupom, tamanho personalizado
         // ═══════════════════════════════════════════════════════════════════
-        async function gerarPDFTamanhoReal(elemento, nomeArquivo, larguraMM = 80, opcoes = {}) {
+        async function gerarPDFTamanhoReal(elemento, nomeArquivo, larguraMM = 80) {
             if (!window.jspdf || !window.html2canvas) {
                 await new Promise(resolve => window._ensurePDF(resolve));
             }
@@ -13251,7 +13080,9 @@ tr:hover td { background: rgba(255,107,0,0.03) !important; }
                 pdf.addImage(data, format, 0, 0, larguraMM, alturaMM, '', 'FAST');
                 // Sempre visualiza — nunca baixa
                 const blobUrl = pdf.output('bloburl');
-                _abrirPdfNaAba(opcoes.tab, blobUrl);
+                const tab = window.open(blobUrl, '_blank');
+                if (!tab) Toast.show('Permita popups para visualizar o PDF', 'warning');
+                else Toast.show('PDF aberto para visualização! ✅', 'success');
             } catch (err) {
                 console.error('[PDF] Erro:', err);
                 Toast.show('Erro ao gerar PDF: ' + err.message, 'error');
@@ -13264,7 +13095,7 @@ tr:hover td { background: rgba(255,107,0,0.03) !important; }
         // ═══════════════════════════════════════════════════════════════════
         // gerarPDFPorVias — OS, cada via em página separada
         // ═══════════════════════════════════════════════════════════════════
-        async function gerarPDFPorVias(vias, nomeArquivo, opcoes = {}) {
+        async function gerarPDFPorVias(vias, nomeArquivo) {
             if (!window.jspdf || !window.html2canvas) {
                 await new Promise(resolve => window._ensurePDF(resolve));
             }
@@ -13306,7 +13137,9 @@ tr:hover td { background: rgba(255,107,0,0.03) !important; }
 
                 // Sempre visualiza — nunca baixa
                 const blobUrl = pdf.output('bloburl');
-                _abrirPdfNaAba(opcoes.tab, blobUrl);
+                const tab = window.open(blobUrl, '_blank');
+                if (!tab) Toast.show('Permita popups para visualizar o PDF', 'warning');
+                else Toast.show('PDF aberto para visualização! ✅', 'success');
             } catch (err) {
                 console.error('[PDF] Erro:', err);
                 Toast.show('Erro ao gerar PDF: ' + err.message, 'error');
@@ -17537,22 +17370,22 @@ tbody tr td{border:1.5px solid #000;padding:2mm;text-align:center;font-weight:70
                 bubble.innerHTML = safe;
             },
 
-            async salvarAtual() {
+            salvarAtual() {
                 const ta  = document.getElementById('wppTextarea');
                 const key = this._current;
                 if (!ta) return;
                 if (!state.wppMensagens) state.wppMensagens = {};
                 state.wppMensagens[key] = ta.value;
-                await App.saveData(true);
+                App.saveData(true);
                 Toast.show('✅ Mensagem "' + WPP_META[key].title + '" salva!', 'success');
             },
 
-            async salvarTodos() {
+            salvarTodos() {
                 if (!state.wppMensagens) state.wppMensagens = {};
                 // Salva a mensagem atualmente aberta no editor antes de salvar tudo
                 const ta  = document.getElementById('wppTextarea');
                 if (ta) state.wppMensagens[this._current] = ta.value;
-                await App.saveData(true);
+                App.saveData(true);
                 Toast.show('✅ Todas as mensagens salvas!', 'success');
             },
 
@@ -20351,9 +20184,6 @@ ${container.innerHTML}
             },
 
             async gerarPDF_OS(tipo) {
-                // ✅ FIX: reserva a aba ANTES de qualquer await, ainda dentro do
-                // gesto de clique original — evita bloqueio de popup do navegador
-                const _pdfTab = _reservarAbaPDF();
                 // CORREÇÃO: usa _pdfSale (definido por _setPdfTarget) quando disponível,
                 // senão usa state.currentSale (para PDF da venda sendo editada no formulário).
                 // Isso evita que state.currentSale seja substituído pelo registro antigo.
@@ -20364,7 +20194,7 @@ ${container.innerHTML}
                 const company = state.company;
                 const squareLogo = await getSquareLogo(company.logo, 200);
 
-                if (!sale) { try { _pdfTab?.close(); } catch(e) {} Toast.show('Nenhuma OS selecionada.', 'error'); return; }
+                if (!sale) { Toast.show('Nenhuma OS selecionada.', 'error'); return; }
                 // Limpa o alvo temporário após uso para evitar contaminação futura
                 state._pdfSale = null;
 
@@ -20600,14 +20430,14 @@ ${container.innerHTML}
                     wrapper.className = 'os-pdf-wrapper uma-folha';
                     wrapper.style.cssText = 'width:210mm;height:297mm;overflow:hidden;display:flex;flex-direction:column;background:#fff;';
                     wrapper.innerHTML = buildVia('1ª VIA — LOJA', true, true, '297mm');
-                    gerarPDF(wrapper, `OS_${sale.number}_via_loja`, { pageWidth:210, pageHeight:297, forceHeight:true, preview:true, tab:_pdfTab });
+                    gerarPDF(wrapper, `OS_${sale.number}_via_loja`, { pageWidth:210, pageHeight:297, forceHeight:true, preview:true });
 
                 } else if (tipo === 'via2') {
                     const wrapper = document.createElement('div');
                     wrapper.className = 'os-pdf-wrapper uma-folha';
                     wrapper.style.cssText = 'width:210mm;height:297mm;overflow:hidden;display:flex;flex-direction:column;background:#fff;';
                     wrapper.innerHTML = buildVia('2ª VIA — CLIENTE', false, true, '297mm');
-                    gerarPDF(wrapper, `OS_${sale.number}_via_cliente`, { pageWidth:210, pageHeight:297, forceHeight:true, preview:true, tab:_pdfTab });
+                    gerarPDF(wrapper, `OS_${sale.number}_via_cliente`, { pageWidth:210, pageHeight:297, forceHeight:true, preview:true });
 
                 } else {
                     // Ambas — A4 297mm (144mm+9mm corte+144mm)
@@ -20616,12 +20446,11 @@ ${container.innerHTML}
                     const corteHtml = `<div class="os-corte"><div class="os-corte-linha"></div>✂️ &nbsp; RECORTE AQUI — 2ª VIA DO CLIENTE &nbsp; ✂️<div class="os-corte-linha"></div></div>`;
                     wrapper.innerHTML = buildVia('1ª VIA — LOJA', true, true, '144mm') + corteHtml + buildVia('2ª VIA — CLIENTE', false, true, '144mm');
                     wrapper.style.cssText = 'width:210mm;height:297mm;overflow:hidden;display:flex;flex-direction:column;background:#fff;';
-                    gerarPDF(wrapper, `OS_${sale.number}_ambas`, { pageWidth:210, pageHeight:297, forceHeight:true, preview:true, tab:_pdfTab });
+                    gerarPDF(wrapper, `OS_${sale.number}_ambas`, { pageWidth:210, pageHeight:297, forceHeight:true, preview:true });
                 }
             },
 
             async gerarPDF_Promissoria() {
-                const _pdfTab = _reservarAbaPDF();
                 const client = state.clients.find(c => c.id === state.currentSale.clientId);
                 const sale = state.currentSale;
                 const details = state.currentSale.paymentDetails;
@@ -20838,11 +20667,10 @@ ${container.innerHTML}
                 const elemento = document.createElement('div');
                 elemento.innerHTML = html;
                 elemento.className = 'promissoria-pdf';
-                gerarPDF(elemento, `PROMISSORIA_${sale.number}`, { tab:_pdfTab });
+                gerarPDF(elemento, `PROMISSORIA_${sale.number}`);
             },
 
             async gerarPDF_Carne() {
-                const _pdfTab = _reservarAbaPDF();
                 // CORREÇÃO: usa _pdfSale quando disponível (chamado via _setPdfTarget),
                 // senão usa state.currentSale (formulário ativo)
                 const sale    = state._pdfSale || state.currentSale;
@@ -20854,7 +20682,6 @@ ${container.innerHTML}
                 state._pdfSale = null;
 
                 if (!details || !details.parcels || details.parcels.length === 0) {
-                    try { _pdfTab?.close(); } catch(e) {}
                     Toast.show('Calcule as parcelas antes de gerar o carnê', 'warning');
                     return;
                 }
@@ -21023,10 +20850,9 @@ ${container.innerHTML}
                     .join('\n');
                 el.prepend(style);
 
-                gerarPDF(el, `CARNE_${sale.number}`, { preview: true, tab:_pdfTab });
+                gerarPDF(el, `CARNE_${sale.number}`, { preview: true });
             },
             async gerarPDF_Comprovante(parcelaIndex) {
-                const _pdfTab = _reservarAbaPDF();
                 const client  = state.clients.find(c => c.id === state.currentSale.clientId);
                 const sale    = state.currentSale;
                 const details = state.currentSale.paymentDetails;
@@ -21034,13 +20860,12 @@ ${container.innerHTML}
                 const squareLogo = await getSquareLogo(company.logo, 200);
 
                 if (!details) {
-                    try { _pdfTab?.close(); } catch(e) {}
                     Toast.show('Calcule as parcelas primeiro', 'warning');
                     return;
                 }
 
                 const parcela = details.parcels[parcelaIndex];
-                if (!parcela) { try { _pdfTab?.close(); } catch(e) {} return; }
+                if (!parcela) return;
 
                 const fd = d => d ? new Date(d + 'T12:00:00').toLocaleDateString('pt-BR') : '—';
                 const isLate   = parcela.daysLate > 0;
@@ -21172,7 +20997,7 @@ ${container.innerHTML}
                 el.prepend(style);
 
                 // PDF no tamanho real: largura 80mm, altura = conteúdo real
-                gerarPDFTamanhoReal(el, `COMPROVANTE_OS${sale.number}_P${parcela.number}`, 80, { tab:_pdfTab });
+                gerarPDFTamanhoReal(el, `COMPROVANTE_OS${sale.number}_P${parcela.number}`, 80);
             },
 
             // ── WhatsApp: enviar status do pedido para o cliente ──
@@ -21990,7 +21815,7 @@ ${container.innerHTML}
                                 style="background:#333;color:#fff;border:none;padding:10px 12px;border-radius:8px;cursor:pointer;font-weight:700;font-size:12px;display:flex;align-items:center;justify-content:center;gap:6px;grid-column:1/-1;">
                                 <i class="fas fa-file-pdf"></i> ✂️ Ambas as Vias (A4 — 210×297mm)
                             </button>
-                            <button onclick="Sales._setPdfTarget('${sale.id}');Modal.close('viewModal');Sales.gerarPDF_Carne();"
+                            <button onclick="Sales._setPdfTarget('${sale.id}');Modal.close('viewModal');setTimeout(()=>Sales.gerarPDF_Carne(),80);"
                                 style="background:#6610f2;color:#fff;border:none;padding:10px 12px;border-radius:8px;cursor:pointer;font-weight:700;font-size:12px;display:flex;align-items:center;justify-content:center;gap:6px;grid-column:1/-1;">
                                 <i class="fas fa-receipt"></i> Gerar Carnê PDF
                             </button>
@@ -22219,17 +22044,6 @@ ${container.innerHTML}
             _dailyTimer: null,
 
             init: function() {
-                // ✅ MIGRAÇÃO ÚNICA: ativa backup automático diário às 17h para quem
-                // já usava o sistema antes dessa mudança. Roda só uma vez (flag
-                // _migrated17h) — depois disso respeita o que o usuário configurar.
-                if (!state.backupConfig._migrated17h) {
-                    state.backupConfig.autoEnabled = true;
-                    state.backupConfig.hour = 17;
-                    state.backupConfig._migrated17h = true;
-                    try { App.saveData(true); } catch(e) {}
-                    console.log('[BackupManager] ✅ Migração aplicada: backup automático diário ativado às 17h');
-                }
-
                 // ── Verifica/agenda backup diário ao iniciar ──
                 this._agendarBackupDiario();
 
