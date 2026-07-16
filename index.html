@@ -208,7 +208,7 @@
     <!-- ===== /RxDB v17 ===== -->
 
 
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
     <!-- Bibliotecas para PDF e Excel — carregadas de forma LAZY para não bloquear o primeiro render -->
     <!-- São injetadas dinamicamente apenas quando o usuário aciona exportação PDF/Excel -->
     <script>
@@ -280,6 +280,13 @@
             --border-radius: 8px;
             --box-shadow: 0 4px 6px rgba(0,0,0,0.1);
             --transition: all 0.2s ease;
+            /* ===== Escala de radius/sombra padronizada ===== */
+            --r-sm: 6px;
+            --r-md: 10px;
+            --r-lg: 14px;
+            --shadow-sm: 0 1px 3px rgba(16,24,40,0.06);
+            --shadow-md: 0 4px 14px rgba(16,24,40,0.08);
+            --shadow-lg: 0 8px 28px rgba(16,24,40,0.14);
         }
 
         .dark-mode {
@@ -371,7 +378,7 @@
         }
 
         .dark-mode .main-content {
-            background: #111111;
+            background: transparent;
         }
 
         .dark-mode .badge {
@@ -519,13 +526,17 @@
         }
 
         body {
-            background: #f4f5f7;
+            background-color: #eef0f3;
+            background-image: linear-gradient(165deg, #f4f5f8 0%, #e9ebef 100%);
+            background-attachment: fixed;
             color: var(--dark);
             transition: var(--transition);
             min-height: 100vh;
         }
         .dark-mode body {
-            background: #111111;
+            background-color: #0f1013;
+            background-image: linear-gradient(165deg, #16171b 0%, #0a0b0d 100%);
+            background-attachment: fixed;
         }
 
         /* ===== LAYOUT PRINCIPAL ===== */
@@ -553,7 +564,7 @@
         .sidebar::-webkit-scrollbar { display: none; width: 0; }
 
         .sidebar-header {
-            padding: 0.6rem 0.5rem 0.5rem;
+            padding: 0.45rem 0.5rem 0.4rem;
             border-bottom: 1px solid rgba(255,255,255,0.07);
             flex-shrink: 0;
         }
@@ -585,8 +596,8 @@
 
         /* ── Sidebar: logo circular ── */
         .logo-wrapper {
-            width: 72px;
-            height: 72px;
+            width: 56px;
+            height: 56px;
             border-radius: 50%;
             overflow: hidden;
             cursor: pointer;
@@ -610,8 +621,8 @@
             display: block !important;
         }
         .logo-placeholder {
-            width: 72px;
-            height: 72px;
+            width: 44px;
+            height: 44px;
             border-radius: 50%;
             cursor: pointer;
             transition: transform 0.2s;
@@ -621,7 +632,7 @@
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: 18px;
+            font-size: 14px;
             color: white;
             box-shadow: 0 2px 10px rgba(0,0,0,0.3);
         }
@@ -659,7 +670,7 @@
         .sidebar-menu::-webkit-scrollbar-track { background: transparent; }
 
         .sidebar-section-label {
-            padding: 0.25rem 0.4rem 0.1rem;
+            padding: 0.18rem 0.4rem 0.06rem;
             font-size: 0.5rem;
             font-weight: 700;
             color: rgba(255,255,255,0.25);
@@ -669,17 +680,17 @@
         }
 
         .menu-item {
-            padding: 0.3rem 0.4rem;
+            padding: 0.18rem 0.4rem;
             display: flex;
             flex-direction: column;
             align-items: center;
             justify-content: center;
-            gap: 2px;
+            gap: 1px;
             cursor: pointer;
             transition: all 0.18s;
-            border-radius: 8px;
+            border-radius: var(--r-sm);
             color: rgba(255,255,255,0.55);
-            font-size: 0.82rem;
+            font-size: 0.74rem;
             font-weight: 500;
             margin-bottom: 1px;
             position: relative;
@@ -727,7 +738,7 @@
 
 
         .sidebar-footer {
-            padding: 0.4rem 0.4rem;
+            padding: 0.3rem 0.4rem;
             border-top: 1px solid rgba(255,255,255,0.07);
             flex-shrink: 0;
         }
@@ -738,7 +749,7 @@
             background: rgba(255,255,255,0.06);
             border: 1px solid rgba(255,255,255,0.08);
             color: rgba(255,255,255,0.55);
-            border-radius: 8px;
+            border-radius: var(--r-sm);
             cursor: pointer;
             display: flex;
             flex-direction: column;
@@ -775,12 +786,7 @@
             z-index: 1;
         }
         #mainIllusionCanvas {
-            position: absolute;
-            inset: 0;
-            width: 100%;
-            height: 100%;
-            pointer-events: none;
-            z-index: 0;
+            display: none !important;
         }
         .main-content > *:not(#mainIllusionCanvas) {
             position: relative;
@@ -835,11 +841,39 @@
 
         .datetime-widget {
             background: white;
-            padding: 0.4rem 1rem;
+            padding: 0.4rem 1rem 0.4rem 0.5rem;
             border-radius: 10px;
             box-shadow: 0 1px 8px rgba(0,0,0,0.07);
             border: 1px solid rgba(0,0,0,0.05);
-            text-align: center;
+            text-align: left;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .clock-ring {
+            width: 34px;
+            height: 34px;
+            border-radius: 50%;
+            background: conic-gradient(var(--primary) 0deg 250deg, var(--light-gray) 250deg 360deg);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+        }
+        .clock-ring::before {
+            content: '';
+            position: absolute;
+        }
+        .clock-ring i {
+            width: 26px;
+            height: 26px;
+            border-radius: 50%;
+            background: white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.72rem;
+            color: var(--primary);
         }
 
         .time {
@@ -914,10 +948,10 @@
 
         .card {
             background: white;
-            border-radius: 14px;
-            box-shadow: 0 2px 12px rgba(0,0,0,0.07);
+            border-radius: var(--r-lg);
+            box-shadow: 0 2px 8px rgba(16,24,40,0.08), 0 8px 24px rgba(16,24,40,0.06);
             padding: 1.35rem 1.35rem 1.1rem;
-            border: 1px solid rgba(0,0,0,0.06);
+            border: 1px solid rgba(0,0,0,0.05);
             transition: transform 0.2s, box-shadow 0.2s;
             position: relative;
             overflow: hidden;
@@ -929,12 +963,12 @@
             top: 0; left: 0; right: 0;
             height: 3px;
             background: var(--card-accent, var(--primary));
-            border-radius: 14px 14px 0 0;
+            border-radius: var(--r-lg) var(--r-lg) 0 0;
         }
 
         .card:hover {
             transform: translateY(-2px);
-            box-shadow: 0 6px 24px rgba(0,0,0,0.12);
+            box-shadow: var(--shadow-md);
         }
 
         .card-header {
@@ -955,7 +989,7 @@
         .card-icon {
             width: 36px;
             height: 36px;
-            border-radius: 10px;
+            border-radius: var(--r-md);
             display: flex;
             align-items: center;
             justify-content: center;
@@ -3898,10 +3932,9 @@ td,th,.btn,.form-control,.badge,.toast,
 }
 
 body {
-    background: #f5f3ef !important;
-    background-image:
-        radial-gradient(ellipse at 10% 20%, rgba(255,107,0,0.04) 0%, transparent 50%),
-        radial-gradient(ellipse at 90% 80%, rgba(255,204,0,0.04) 0%, transparent 50%) !important;
+    background-color: #eef0f3 !important;
+    background-image: linear-gradient(165deg, #f4f5f8 0%, #e9ebef 100%) !important;
+    background-attachment: fixed !important;
 }
 
 /* ══════════════════════════════════════
@@ -3937,18 +3970,36 @@ body {
 }
 .menu-item {
     color: rgba(255,255,255,0.75) !important;
-    border-radius: 10px !important;
+    border-radius: 12px !important;
     transition: all 0.2s ease !important;
+    position: relative !important;
+}
+.menu-item i {
+    font-size: 0.8rem !important;
+    transition: transform 0.2s ease !important;
 }
 .menu-item:hover {
     background: rgba(255,255,255,0.18) !important;
     color: white !important;
-    transform: translateX(2px) !important;
+    transform: translateY(-1px) !important;
 }
+.menu-item:hover i { transform: scale(1.08) !important; }
 .menu-item.active {
     background: rgba(255,255,255,0.25) !important;
     color: white !important;
     border-left: 3px solid rgba(255,255,255,0.9) !important;
+    box-shadow: 0 4px 14px rgba(0,0,0,0.15) !important;
+}
+.menu-item.active::after {
+    content: '' !important;
+    position: absolute !important;
+    top: 6px !important;
+    right: 10px !important;
+    width: 6px !important;
+    height: 6px !important;
+    border-radius: 50% !important;
+    background: #fff !important;
+    box-shadow: 0 0 0 3px rgba(255,255,255,0.3) !important;
 }
 .menu-item.active i { color: #fff8e0 !important; }
 .menu-item:hover i  { color: white !important; }
@@ -3967,10 +4018,7 @@ body {
     color: white !important;
 }
 
-/* ── DARK MODE SIDEBAR ── */
-.dark-mode .sidebar {
-    background: linear-gradient(180deg, #cc4400 0%, #7a2800 100%) !important;
-}
+/* ── DARK MODE SIDEBAR: ver definição definitiva mais abaixo (preto/cinza) ── */
 
 /* ══════════════════════════════════════
    HEADER
@@ -4404,17 +4452,49 @@ tr:hover td { background: rgba(255,107,0,0.03) !important; }
 
 /* ── Fundo geral ── */
 .dark-mode body {
-    background: #0d0d0d !important;
+    background-color: #101114 !important;
+    background-image: linear-gradient(165deg, #16171b 0%, #0d0e11 100%) !important;
+    background-attachment: fixed !important;
     color: #e8e8e8 !important;
 }
 .dark-mode .main-content {
-    background: #0d0d0d !important;
+    background: transparent !important;
 }
 
-/* ── Sidebar dark: mantém laranja ── */
+/* ── Sidebar dark: preto/cinza, laranja só como acento ── */
 .dark-mode .sidebar {
-    background: linear-gradient(180deg, #cc4400 0%, #8a2d00 100%) !important;
+    background: linear-gradient(180deg, #1c1e24 0%, #0e0f12 100%) !important;
     box-shadow: 4px 0 24px rgba(0,0,0,0.6) !important;
+    border-right: 1px solid #232530 !important;
+}
+.dark-mode .logo-placeholder,
+.dark-mode #logoPlaceholder {
+    background: rgba(255,107,0,0.14) !important;
+    box-shadow: inset 0 0 0 1.5px rgba(255,107,0,0.3) !important;
+}
+.dark-mode .company-name { color: #fff !important; }
+.dark-mode .company-subtitle,
+.dark-mode .sidebar-section-label { color: #6b7280 !important; }
+.dark-mode .menu-item { color: #9aa1ac !important; }
+.dark-mode .menu-item:hover {
+    background: #232530 !important;
+    color: #fff !important;
+}
+.dark-mode .menu-item.active {
+    background: rgba(255,107,0,0.14) !important;
+    color: #fff !important;
+    border-left: 3px solid var(--primary) !important;
+    box-shadow: none !important;
+}
+.dark-mode .menu-item.active i { color: var(--primary) !important; }
+.dark-mode .menu-item.active::after {
+    background: var(--primary) !important;
+    box-shadow: 0 0 0 3px rgba(255,107,0,0.25) !important;
+}
+.dark-mode .theme-toggle {
+    background: #232530 !important;
+    border-color: #2e313b !important;
+    color: #c7cad1 !important;
 }
 
 /* ── Header ── */
@@ -4422,12 +4502,12 @@ tr:hover td { background: rgba(255,107,0,0.03) !important; }
     border-bottom-color: #2e2e32 !important;
 }
 .dark-mode .header-left h1 {
-    background: linear-gradient(135deg, #ff8040 0%, #ffcc00 100%) !important;
-    -webkit-background-clip: text !important;
-    -webkit-text-fill-color: transparent !important;
-    background-clip: text !important;
+    background: none !important;
+    -webkit-text-fill-color: unset !important;
+    color: #f0f0f0 !important;
 }
-.dark-mode #pageSubtitle { color: #666 !important; }
+.dark-mode #pageSubtitle { color: #6b7280 !important; }
+.dark-mode #pageGreeting { color: #6b7280 !important; }
 
 /* ── Widget data/hora ── */
 .dark-mode .datetime-widget {
@@ -4435,13 +4515,13 @@ tr:hover td { background: rgba(255,107,0,0.03) !important; }
     border-color: #2e2e32 !important;
     box-shadow: none !important;
 }
+.dark-mode .clock-ring-inner { background: #1c1c1e !important; }
 .dark-mode .time {
-    background: linear-gradient(135deg, #ff8040, #ffcc00) !important;
-    -webkit-background-clip: text !important;
-    -webkit-text-fill-color: transparent !important;
-    background-clip: text !important;
+    background: none !important;
+    -webkit-text-fill-color: unset !important;
+    color: #f0f0f0 !important;
 }
-.dark-mode .date { color: #666 !important; }
+.dark-mode .date { color: #6b7280 !important; }
 
 /* ── Cards do dashboard ── */
 .dark-mode .card {
@@ -4458,10 +4538,9 @@ tr:hover td { background: rgba(255,107,0,0.03) !important; }
 
 /* ── Section title ── */
 .dark-mode .section-title {
-    background: linear-gradient(135deg, #ff8040, #ffcc00) !important;
-    -webkit-background-clip: text !important;
-    -webkit-text-fill-color: transparent !important;
-    background-clip: text !important;
+    background: none !important;
+    -webkit-text-fill-color: unset !important;
+    color: #f0f0f0 !important;
     border-bottom-color: #2e2e32 !important;
 }
 
@@ -4780,6 +4859,21 @@ tr:hover td { background: rgba(255,107,0,0.03) !important; }
    REDESIGN 2026 — KPI Cards, Fin Panels, Conta Items
    ========================================================= */
 
+/* ── KPI sparkline (mini gráfico de tendência) ── */
+.kpi-spark {
+    height: 22px;
+    display: flex;
+    align-items: flex-end;
+    gap: 3px;
+    margin-top: 8px;
+}
+.kpi-spark div {
+    flex: 1;
+    border-radius: 2px 2px 0 0;
+    min-height: 3px;
+    transition: opacity .2s;
+}
+
 /* ── KPI trend badge ── */
 .kpi-trend-badge {
     display: inline-flex;
@@ -5089,6 +5183,7 @@ tr:hover td { background: rgba(255,107,0,0.03) !important; }
                 <div class="header-left">
                     <h1 id="pageTitle">Dashboard</h1>
                     <div id="pageSubtitle"></div>
+                    <div id="pageGreeting" style="font-size:0.82rem;color:var(--gray);margin-top:2px;font-weight:500;"></div>
                 </div>
                 <div class="header-right">
                     <!-- BADGE USUÁRIO LOGADO -->
@@ -5102,8 +5197,11 @@ tr:hover td { background: rgba(255,107,0,0.03) !important; }
                     </div>
                     <!-- /SELETOR DE LOJA -->
                     <div class="datetime-widget" aria-live="polite">
-                        <div class="time" id="currentTime"></div>
-                        <div class="date" id="currentDate"></div>
+                        <div class="clock-ring"><i class="fas fa-clock"></i></div>
+                        <div>
+                            <div class="time" id="currentTime"></div>
+                            <div class="date" id="currentDate"></div>
+                        </div>
                     </div>
                     <div class="backup-buttons">
                         <input type="file" id="importBackup" class="d-none" accept=".json" onchange="App.importBackup(event)" aria-hidden="true">
@@ -14108,6 +14206,19 @@ tbody tr td{border:1.5px solid #000;padding:2mm;text-align:center;font-weight:70
                 document.getElementById('currentDate').innerText = now.toLocaleDateString('pt-BR', { 
                     weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' 
                 });
+                const greetingEl = document.getElementById('pageGreeting');
+                const titleEl = document.getElementById('pageTitle');
+                if (greetingEl) {
+                    if (titleEl && titleEl.innerText.trim() === 'Dashboard') {
+                        const h = now.getHours();
+                        const saudacao = h < 12 ? 'Bom dia' : h < 18 ? 'Boa tarde' : 'Boa noite';
+                        const loja = (document.getElementById('storeCurrentLabel') || {}).innerText || '';
+                        greetingEl.innerText = `${saudacao}${loja ? ', ' + loja : ''} 👋`;
+                        greetingEl.style.display = '';
+                    } else {
+                        greetingEl.style.display = 'none';
+                    }
+                }
             },
 
             updateLogo(event) {
@@ -14851,6 +14962,23 @@ tbody tr td{border:1.5px solid #000;padding:2mm;text-align:center;font-weight:70
                 });
             },
 
+            _sparkline(items, dateKey, valueKey, color) {
+                const days = [];
+                for (let i = 6; i >= 0; i--) {
+                    const d = new Date();
+                    d.setDate(d.getDate() - i);
+                    days.push(d.toISOString().slice(0, 10));
+                }
+                const totals = days.map(day =>
+                    (items || []).filter(it => (it[dateKey] || '').slice(0, 10) === day)
+                                 .reduce((a, it) => a + (it[valueKey] || 0), 0)
+                );
+                const max = Math.max(...totals, 1);
+                return `<div class="kpi-spark">${totals.map((v, i) =>
+                    `<div style="height:${Math.max(6, Math.round(v / max * 100))}%;background:${color};opacity:${i === totals.length - 1 ? 1 : 0.25};"></div>`
+                ).join('')}</div>`;
+            },
+
             updateCards() {
                 const sales    = this._filteredSales();
                 const expenses = this._filteredExpenses();
@@ -14885,6 +15013,7 @@ tbody tr td{border:1.5px solid #000;padding:2mm;text-align:center;font-weight:70
                         <div class="card-value">${Utils.formatCurrency(totalSales)}</div>
                         <div id="dash-sub-vendas" style="font-size:0.76rem;color:var(--gray);">Ticket médio: <strong>${Utils.formatCurrency(ticketMedio)}</strong></div>
                         <div class="kpi-progress-wrap"><div class="kpi-progress-bar" style="width:72%;background:#ff6b00;"></div></div>
+                        ${this._sparkline(state.sales, 'date', 'total', '#ff6b00')}
                     </div>
                     <div class="card" style="--card-accent:#dc3545;">
                         <div class="card-header">
@@ -14897,6 +15026,7 @@ tbody tr td{border:1.5px solid #000;padding:2mm;text-align:center;font-weight:70
                         <div class="card-value">${Utils.formatCurrency(totalExpenses)}</div>
                         <div id="dash-sub-despesas" style="font-size:0.76rem;color:var(--gray);">${expenses.length} lançamento${expenses.length !== 1 ? 's' : ''} no período</div>
                         <div class="kpi-progress-wrap"><div class="kpi-progress-bar" style="width:${totalSales>0?Math.min(100,Math.round(totalExpenses/totalSales*100)):0}%;background:#dc3545;"></div></div>
+                        ${this._sparkline(state.expenses, 'date', 'value', '#dc3545')}
                     </div>
                     <div class="card" style="--card-accent:${profit >= 0 ? '#22c55e' : '#dc3545'};">
                         <div class="card-header">
@@ -14909,6 +15039,7 @@ tbody tr td{border:1.5px solid #000;padding:2mm;text-align:center;font-weight:70
                         <div class="card-value" style="color:${profit >= 0 ? '#22c55e' : '#dc3545'};">${Utils.formatCurrency(profit)}</div>
                         <div id="dash-sub-resultado" style="font-size:0.76rem;color:var(--gray);">${profit >= 0 ? 'Resultado positivo no período' : 'Resultado negativo no período'}</div>
                         <div class="kpi-progress-wrap"><div class="kpi-progress-bar" style="width:${totalSales>0?Math.min(100,Math.abs(Math.round(profit/totalSales*100))):0}%;background:${profit >= 0 ? '#22c55e' : '#dc3545'};"></div></div>
+                        ${this._sparkline(state.sales, 'date', 'total', profit >= 0 ? '#22c55e' : '#dc3545')}
                     </div>
                     <div class="card" style="--card-accent:#0ea5e9;">
                         <div class="card-header">
@@ -14921,6 +15052,7 @@ tbody tr td{border:1.5px solid #000;padding:2mm;text-align:center;font-weight:70
                         <div class="card-value" style="color:#0ea5e9;">${salesPendentes}</div>
                         <div id="dash-sub-os" style="font-size:0.76rem;color:var(--gray);">${salesEntregues} entregue${salesEntregues !== 1 ? 's' : ''} no período</div>
                         <div class="kpi-progress-wrap"><div class="kpi-progress-bar" style="width:${(salesPendentes+salesEntregues)>0?Math.round(salesEntregues/(salesPendentes+salesEntregues)*100):0}%;background:#0ea5e9;"></div></div>
+                        ${this._sparkline(state.sales, 'date', 'total', '#0ea5e9')}
                     </div>
                     <div class="card" style="--card-accent:#10b981;grid-column:span 2;">
                         <div class="card-header">
