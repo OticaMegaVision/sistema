@@ -17602,40 +17602,40 @@ tbody tr td{border:1.5px solid #000;padding:2mm;text-align:center;font-weight:70
                 bubble.innerHTML = safe;
             },
 
-            salvarAtual() {
+            async salvarAtual() {
                 const ta  = document.getElementById('wppTextarea');
                 const key = this._current;
                 if (!ta) return;
                 if (!state.wppMensagens) state.wppMensagens = {};
                 state.wppMensagens[key] = ta.value;
-                App.saveData(true);
+                await App.saveData(true);
                 Toast.show('✅ Mensagem "' + WPP_META[key].title + '" salva!', 'success');
             },
 
-            salvarTodos() {
+            async salvarTodos() {
                 if (!state.wppMensagens) state.wppMensagens = {};
                 // Salva a mensagem atualmente aberta no editor antes de salvar tudo
                 const ta  = document.getElementById('wppTextarea');
                 if (ta) state.wppMensagens[this._current] = ta.value;
-                App.saveData(true);
+                await App.saveData(true);
                 Toast.show('✅ Todas as mensagens salvas!', 'success');
             },
 
-            restaurarAtual() {
+            async restaurarAtual() {
                 const key = this._current;
                 if (!confirm('Restaurar a mensagem "' + WPP_META[key].title + '" para o texto padrão?')) return;
                 if (!state.wppMensagens) state.wppMensagens = {};
                 state.wppMensagens[key] = WPP_DEFAULTS[key];
                 document.getElementById('wppTextarea').value = WPP_DEFAULTS[key];
-                App.saveData(true);
+                await App.saveData(true);
                 this.onInput();
                 Toast.show('↩️ Mensagem restaurada para o padrão.', 'info');
             },
 
-            restaurarTodos() {
+            async restaurarTodos() {
                 if (!confirm('Restaurar TODAS as mensagens para o texto padrão? As suas personalizações serão perdidas.')) return;
                 state.wppMensagens = { ...WPP_DEFAULTS };
-                App.saveData(true);
+                await App.saveData(true);
                 // Recarregar a mensagem atual no editor
                 document.getElementById('wppTextarea').value = WPP_DEFAULTS[this._current];
                 this.onInput();
@@ -23656,7 +23656,29 @@ const AuthSystem = {
     },
 
     logout() {
-        Modal.showConfirm('Deseja sair do sistema?', () => {
+        Modal.showConfirm('Deseja sair do sistema?', async () => {
+            const storeId = window._currentStore || 'barueri';
+            // ✅ FIX BUG SAIR-SEM-SALVAR: antes o reload disparava na hora, cancelando
+            // o backup local (debounced) e o push pra nuvem ainda em andamento —
+            // por isso edições recentes (ex: mensagens do WhatsApp) se perdiam ao sair
+            // e entrar de novo. Agora força o flush síncrono do backup local...
+            try {
+                if (window.LocalStorageBackup) {
+                    clearTimeout(LocalStorageBackup._timers[storeId]);
+                    LocalStorageBackup._timers[storeId] = null;
+                    LocalStorageBackup.save(storeId);
+                }
+            } catch(_e) {}
+            // ...e aguarda a config (incluindo wppMensagens) ser persistida na nuvem,
+            // com um limite de tempo para não travar o logout se estiver offline.
+            try {
+                if (window.LocalFirst) {
+                    await Promise.race([
+                        LocalFirst.pushConfig(),
+                        new Promise(resolve => setTimeout(resolve, 2500))
+                    ]);
+                }
+            } catch(_e) {}
             this._clearSession();
             // Recarrega a página para garantir estado limpo
             window.location.reload();
