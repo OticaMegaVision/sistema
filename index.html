@@ -10185,6 +10185,9 @@ body.dark-mode,
             // ── Constantes ───────────────────────────────────────────────────
             const GDRIVE_DEFAULT_CLIENT   = '';
             const ONEDRIVE_DEFAULT_CLIENT = '';
+            // Edge Function (Supabase) que troca/renova o token do Google mantendo
+            // o client_secret seguro no servidor — nunca exposto no navegador.
+            const GDRIVE_OAUTH_FN = 'https://qhscxyistzlmxxnjrqao.supabase.co/functions/v1/gdrive-oauth';
             // ── FIX MULTI-LOJA: arquivo separado por loja ────────────────────
             // Cada loja tem seu próprio arquivo no Drive para evitar sobreposição
             // de dados entre Barueri e Caucaia do Alto.
@@ -10270,73 +10273,10 @@ body.dark-mode,
             function _randomStr(n) { return Array.from(crypto.getRandomValues(new Uint8Array(n))).map(b => b.toString(16).padStart(2,'0')).join('').slice(0,n); }
 
             // ── Auto-refresh silencioso do token Google Drive ─────────────────
-            let _autoRefreshing     = false;
-            let _autoRefreshPopup   = null;
-            let _autoRefreshTimeout = null;
-
-            function _autoRefreshGDriveToken() {
-                if (_autoRefreshing) return;
-                if (!_gdriveToken) return;
-                const clientId = _gdriveToken.client_id || localStorage.getItem('cs_gdrive_client_id') || '';
-                if (!clientId) return;
-                _autoRefreshing = true;
-                console.log('[CloudSync] 🔄 Auto-renovando token Google Drive (prompt=none)...');
-                const state_val = _randomStr(16);
-                sessionStorage.setItem('gdrive_autorefresh_state', state_val);
-                const params = new URLSearchParams({
-                    client_id:     clientId,
-                    redirect_uri:  location.origin + location.pathname,
-                    response_type: 'token',
-                    scope:         'https://www.googleapis.com/auth/drive.appdata https://www.googleapis.com/auth/drive.file',
-                    state:         state_val,
-                    prompt:        'none'
-                });
-                const popupUrl = 'https://accounts.google.com/o/oauth2/v2/auth?' + params;
-                try {
-                    _autoRefreshPopup = window.open(popupUrl, '_gdrive_silent_refresh', 'width=1,height=1,left=-9999,top=-9999,toolbar=no,scrollbars=no');
-                } catch(e) { _autoRefreshing = false; return; }
-                // Timeout de segurança: se não receber resposta em 20s mostra banner
-                clearTimeout(_autoRefreshTimeout);
-                _autoRefreshTimeout = setTimeout(() => {
-                    if (_autoRefreshing) {
-                        _autoRefreshing = false;
-                        sessionStorage.removeItem('gdrive_autorefresh_state');
-                        try { _autoRefreshPopup?.close(); } catch(e) {}
-                        console.warn('[CloudSync] ⚠️ Auto-refresh timeout — exibindo banner manual');
-                        _showReconnectBanner();
-                    }
-                }, 20000);
-            }
-
-            // ── Listener: recebe token renovado do popup de auto-refresh ─────
-            window.addEventListener('message', function(evt) {
-                if (!evt.data || evt.data.type !== 'gdrive_autorefresh_token') return;
-                const { access_token, expires_in, state } = evt.data;
-                const expected = sessionStorage.getItem('gdrive_autorefresh_state');
-                if (!expected || expected !== state) return;
-                sessionStorage.removeItem('gdrive_autorefresh_state');
-                clearTimeout(_autoRefreshTimeout);
-                try { _autoRefreshPopup?.close(); } catch(e) {}
-                _autoRefreshing = false;
-                if (access_token) {
-                    _gdriveToken = {
-                        access_token,
-                        expires_at: Date.now() + (parseInt(expires_in, 10) || 3600) * 1000,
-                        client_id:  _gdriveToken?.client_id || localStorage.getItem('cs_gdrive_client_id') || ''
-                    };
-                    _activeProvider = 'gdrive';
-                    _saveTokens();
-                    _updateUI();
-                    document.getElementById('cs_reconnect_banner')?.remove();
-                    const mins = Math.round((parseInt(expires_in, 10) || 3600) / 60);
-                    console.log('[CloudSync] ✅ Token Google Drive renovado automaticamente — válido por ~' + mins + ' min');
-                    _showSyncIndicator('🔄 Token renovado (+' + mins + 'min)');
-                } else {
-                    // prompt=none falhou (ex: sessão Google expirou no browser) — banner manual
-                    console.warn('[CloudSync] ⚠️ Auto-refresh retornou sem token — exibindo banner manual');
-                    _showReconnectBanner();
-                }
-            });
+            // (via refresh_token + Edge Function — sem popup, imune a bloqueador
+            //  de popup do navegador. Ver _refreshGDriveAccessToken() mais abaixo,
+            //  perto de connectGDrive().)
+            let _autoRefreshing = false;
 
             // ── Persiste / restaura tokens ───────────────────────────────────
             function _saveTokens() {
@@ -10559,7 +10499,9 @@ body.dark-mode,
                 const params = new URLSearchParams({
                     client_id:     clientId,
                     redirect_uri:  location.origin + location.pathname,
-                    response_type: 'token',
+                    response_type: 'code',
+                    access_type:   'offline',
+                    include_granted_scopes: 'true',
                     scope:         'https://www.googleapis.com/auth/drive.appdata https://www.googleapis.com/auth/drive.file',
                     state:         state_val,
                     prompt:        'consent'
@@ -10567,31 +10509,83 @@ body.dark-mode,
                 window.location.href = 'https://accounts.google.com/o/oauth2/v2/auth?' + params;
             }
 
-            function _handleGDriveImplicitCallback(hashParams) {
-                const accessToken = hashParams.get('access_token');
-                const state_val   = hashParams.get('state');
-                const expiresIn   = parseInt(hashParams.get('expires_in') || '3600', 10);
-                if (!accessToken) return false;
-                if (sessionStorage.getItem('gdrive_state') !== state_val) {
-                    Toast.show('⚠️ Falha de segurança no callback Google (state inválido).', 'danger');
+            // ── Troca o "code" recebido do Google por access_token + refresh_token
+            //    via Edge Function (o client_secret nunca fica no navegador) ──────
+            async function _exchangeGDriveCode(code, clientIdUsed) {
+                try {
+                    const resp = await fetch(GDRIVE_OAUTH_FN, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            action:       'exchange',
+                            code:         code,
+                            redirect_uri: location.origin + location.pathname
+                        })
+                    });
+                    const data = await resp.json();
+                    if (!resp.ok || !data.access_token) {
+                        console.warn('[CloudSync] ⚠️ Falha ao trocar code por token:', data);
+                        Toast.show('⚠️ Falha ao conectar Google Drive. Tente novamente.', 'danger', 4000);
+                        return false;
+                    }
+                    _gdriveToken = {
+                        access_token:  data.access_token,
+                        refresh_token: data.refresh_token || _gdriveToken?.refresh_token || null,
+                        expires_at:    Date.now() + (parseInt(data.expires_in || '3600', 10) * 1000),
+                        client_id:     clientIdUsed || ''
+                    };
+                    _activeProvider = 'gdrive';
+                    _saveTokens();
+                    _updateUI();
+                    Toast.show('✅ Google Drive conectado! Sincronizando...', 'success', 3000);
+                    setTimeout(() => { gdrivePull(true).catch(()=>{}); }, 800);
+                    _startPolling();
+                    return true;
+                } catch (e) {
+                    console.warn('[CloudSync] ⚠️ Erro de rede ao trocar code:', e);
+                    Toast.show('⚠️ Erro de rede ao conectar Google Drive.', 'danger', 4000);
                     return false;
                 }
-                _gdriveToken = {
-                    access_token: accessToken,
-                    expires_at:   Date.now() + expiresIn * 1000,
-                    client_id:    sessionStorage.getItem('gdrive_client') || ''
-                };
-                _activeProvider = 'gdrive';
-                _saveTokens();
-                sessionStorage.removeItem('gdrive_state');
-                sessionStorage.removeItem('gdrive_client');
-                _updateUI();
-                history.replaceState({}, '', location.pathname);
-                Toast.show('✅ Google Drive conectado! Sincronizando...', 'success', 3000);
-                // Ao conectar: pull imediato + inicia polling
-                setTimeout(() => { gdrivePull(true).catch(()=>{}); }, 800);
-                _startPolling();
-                return true;
+            }
+
+            // ── Renova o access_token usando o refresh_token, via Edge Function.
+            //    Sem popup, sem depender de bloqueador de popup do navegador. ────
+            async function _refreshGDriveAccessToken() {
+                if (_autoRefreshing) return false;
+                if (!_gdriveToken || !_gdriveToken.refresh_token) {
+                    _showReconnectBanner();
+                    return false;
+                }
+                _autoRefreshing = true;
+                try {
+                    const resp = await fetch(GDRIVE_OAUTH_FN, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ action: 'refresh', refresh_token: _gdriveToken.refresh_token })
+                    });
+                    const data = await resp.json();
+                    if (!resp.ok || !data.access_token) {
+                        console.warn('[CloudSync] ⚠️ Falha ao renovar token via refresh_token:', data);
+                        // refresh_token pode ter sido revogado — pede reconexão manual
+                        _showReconnectBanner();
+                        return false;
+                    }
+                    _gdriveToken = {
+                        ..._gdriveToken,
+                        access_token: data.access_token,
+                        expires_at:   Date.now() + (parseInt(data.expires_in || '3600', 10) * 1000)
+                        // refresh_token geralmente não vem de novo — mantém o existente (spread acima)
+                    };
+                    _saveTokens();
+                    const mins = Math.round((data.expires_in || 3600) / 60);
+                    console.log('[CloudSync] ✅ Token Google Drive renovado silenciosamente — válido por ~' + mins + ' min');
+                    return true;
+                } catch (e) {
+                    console.warn('[CloudSync] ⚠️ Erro de rede ao renovar token:', e);
+                    return false;
+                } finally {
+                    _autoRefreshing = false;
+                }
             }
 
             // ── Obtém ou cria o fileId no Drive (por loja) ──────────────────
@@ -11052,36 +11046,40 @@ body.dark-mode,
 
             // ── Trata callback OAuth2 na URL ──────────────────────────────────
             function _handleOAuthCallback() {
+                // ── Google Drive: Authorization Code flow → volta como query string
+                //    (?code=...&state=...), não como hash. Trata isso primeiro. ────
+                const searchParams = new URLSearchParams(location.search);
+                const gCode  = searchParams.get('code');
+                const gState = searchParams.get('state');
+                const gError = searchParams.get('error');
+                if (gCode || gError) {
+                    history.replaceState({}, '', location.pathname);
+                    if (gError) {
+                        console.warn('[CloudSync] ⚠️ Google OAuth retornou erro:', gError);
+                        Toast.show('⚠️ Conexão com Google Drive cancelada ou negada.', 'warning', 4000);
+                        return;
+                    }
+                    if (sessionStorage.getItem('gdrive_state') !== gState) {
+                        Toast.show('⚠️ Falha de segurança no callback Google (state inválido).', 'danger');
+                        return;
+                    }
+                    const clientIdUsed = sessionStorage.getItem('gdrive_client') || '';
+                    sessionStorage.removeItem('gdrive_state');
+                    sessionStorage.removeItem('gdrive_client');
+                    _exchangeGDriveCode(gCode, clientIdUsed);
+                    return;
+                }
+
+                // ── OneDrive: continua no fluxo implícito (hash) ────────────────
                 const rawHash = location.hash.substring(1);
                 if (!rawHash) return;
                 const hashParams = new URLSearchParams(rawHash);
                 if (!hashParams.get('access_token')) return;
 
-                // ── Modo popup de auto-refresh silencioso ──────────────────────
-                // Se este documento foi aberto como popup (window.opener existe) E
-                // existe um estado de auto-refresh salvo, posta o token de volta
-                // ao pai e fecha — sem inicializar o sistema novamente.
-                const stateVal       = hashParams.get('state');
-                const autoRefSt      = window.opener && sessionStorage.getItem('gdrive_autorefresh_state');
-                const parentAutoRefSt = window.opener && window.opener.sessionStorage?.getItem?.('gdrive_autorefresh_state');
-                if (window.opener && (autoRefSt === stateVal || parentAutoRefSt === stateVal)) {
-                    try {
-                        window.opener.postMessage({
-                            type:         'gdrive_autorefresh_token',
-                            access_token: hashParams.get('access_token'),
-                            expires_in:   hashParams.get('expires_in') || '3600',
-                            state:        stateVal
-                        }, location.origin);
-                    } catch(e) {}
-                    history.replaceState({}, '', location.pathname);
-                    try { window.close(); } catch(e) {}
-                    return;
+                const stateVal = hashParams.get('state');
+                if (sessionStorage.getItem('od_state') === stateVal) {
+                    _handleOneDriveImplicitCallback(hashParams);
                 }
-                // ── Fluxo normal de login ──────────────────────────────────────
-                if      (sessionStorage.getItem('gdrive_state') === stateVal) _handleGDriveImplicitCallback(hashParams);
-                else if (sessionStorage.getItem('od_state')     === stateVal) _handleOneDriveImplicitCallback(hashParams);
-                else if (sessionStorage.getItem('gdrive_state'))              _handleGDriveImplicitCallback(hashParams);
-                else if (sessionStorage.getItem('od_state'))                  _handleOneDriveImplicitCallback(hashParams);
             }
 
             // ── Sync ao focar na aba (pull inteligente) ───────────────────────
@@ -11102,16 +11100,16 @@ body.dark-mode,
                 const tok = _activeProvider === 'gdrive' ? _gdriveToken : _onedriveToken;
                 if (!tok) return;
                 if (_isExpired(tok)) {
-                    // Token expirado: auto-refresh (GDrive) ou banner (OneDrive)
+                    // Token expirado: auto-refresh (GDrive, via refresh_token) ou banner (OneDrive)
                     if (_activeProvider === 'gdrive' && !_autoRefreshing) {
-                        _autoRefreshGDriveToken();
+                        _refreshGDriveAccessToken();
                     } else if (_activeProvider !== 'gdrive') {
                         _showReconnectBanner();
                     }
                 } else if (_activeProvider === 'gdrive' && _isNearExpiry(tok) && !_autoRefreshing) {
                     // Token próximo de expirar (< 10 min): renova preventivamente
                     console.log('[CloudSync] ⏰ Token Google Drive expira em < 10 min — renovação preventiva...');
-                    _autoRefreshGDriveToken();
+                    _refreshGDriveAccessToken();
                 }
             }
             function _showReconnectBanner() {
