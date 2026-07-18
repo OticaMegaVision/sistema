@@ -15010,7 +15010,25 @@ tbody tr td{border:1.5px solid #000;padding:2mm;text-align:center;font-weight:70
                 const payLabels = { pix:'PIX', cash:'Dinheiro', debit:'Débito', credit:'Crédito', installment:'Crediário' };
                 const company = state.company || {};
                 const goal    = parseFloat(company.salesGoal) || 0;
-                const goalPct = goal > 0 ? Math.round((totalSales / goal) * 100) : 0;
+                const now       = new Date();
+                const daysInMonth   = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+                const daysPassed    = now.getDate();
+                const daysLeft      = Math.max(0, daysInMonth - daysPassed);
+                const monthSales    = (state.sales || []).filter(s => {
+                    const d = new Date(s.date + 'T12:00:00');
+                    return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
+                }).reduce((a, s) => a + (s.total || 0), 0);
+                const prevMonthDate = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+                const prevMonthSales = (state.sales || []).filter(s => {
+                    const d = new Date(s.date + 'T12:00:00');
+                    return d.getMonth() === prevMonthDate.getMonth() && d.getFullYear() === prevMonthDate.getFullYear();
+                }).reduce((a, s) => a + (s.total || 0), 0);
+                const goalPct       = goal > 0 ? Math.round((monthSales / goal) * 100) : 0;
+                const goalRemaining = Math.max(0, goal - monthSales);
+                const dailyNeeded   = (goal > 0 && daysLeft > 0) ? goalRemaining / daysLeft : 0;
+                const expectedPct   = daysInMonth > 0 ? Math.round((daysPassed / daysInMonth) * 100) : 0;
+                const onPace        = goalPct >= expectedPct;
+                const vsPrevMonth   = prevMonthSales > 0 ? Math.round(((monthSales - prevMonthSales) / prevMonthSales) * 100) : null;
                 const addrParts = [company.address, company.number, company.neighborhood, company.city, company.state].filter(Boolean);
                 const companyAddress = addrParts.join(', ') || 'Endereço não configurado';
 
@@ -15084,13 +15102,23 @@ tbody tr td{border:1.5px solid #000;padding:2mm;text-align:center;font-weight:70
                             <span class="card-title">Meta do Mês</span>
                             <div style="display:flex;align-items:center;gap:6px;">
                                 <div class="card-icon" style="background:#fff5ee;color:#ff6b00;"><i class="fas fa-bullseye"></i></div>
-                                <i class="fas fa-pen" style="font-size:0.65rem;color:var(--gray);" title="Editar meta"></i>
+                                ${goal > 0 ? `<span class="kpi-trend-badge ${onPace ? 'up' : 'down'}">${onPace ? '▲' : '▼'} ${onPace ? 'No ritmo' : 'Abaixo do ritmo'}</span>` : ''}
+                                <i class="fas fa-pen" style="font-size:0.62rem;color:var(--gray);" title="Editar meta"></i>
                             </div>
                         </div>
                         ${goal > 0 ? `
-                            <div class="card-value" style="color:#ff6b00;">${goalPct}%</div>
-                            <div id="dash-sub-meta" style="font-size:0.76rem;color:var(--gray);">${Utils.formatCurrency(totalSales)} de ${Utils.formatCurrency(goal)}</div>
-                            <div class="kpi-progress-wrap"><div class="kpi-progress-bar" style="width:${Math.min(100, goalPct)}%;background:#ff6b00;"></div></div>
+                            <div style="display:flex;align-items:baseline;gap:8px;">
+                                <div class="card-value" style="color:#ff6b00;">${goalPct}%</div>
+                                <div style="font-size:0.72rem;color:var(--gray);">${Utils.formatCurrency(monthSales)} de ${Utils.formatCurrency(goal)}</div>
+                            </div>
+                            <div class="kpi-progress-wrap"><div class="kpi-progress-bar" style="width:${Math.min(100, goalPct)}%;background:${onPace ? '#ff6b00' : '#dc3545'};"></div></div>
+                            <div style="display:flex;flex-wrap:wrap;gap:4px 14px;font-size:0.68rem;color:var(--gray);margin-top:6px;">
+                                <span><i class="fas fa-calendar-day" style="margin-right:3px;color:#ff6b00;"></i>${daysLeft} dia${daysLeft !== 1 ? 's' : ''} restante${daysLeft !== 1 ? 's' : ''}</span>
+                                ${goalRemaining > 0 ? `<span><i class="fas fa-flag-checkered" style="margin-right:3px;color:#ff6b00;"></i>Faltam ${Utils.formatCurrency(goalRemaining)}</span>` : `<span style="color:#22c55e;"><i class="fas fa-check-circle" style="margin-right:3px;"></i>Meta batida!</span>`}
+                                ${dailyNeeded > 0 ? `<span><i class="fas fa-gauge-high" style="margin-right:3px;color:#ff6b00;"></i>${Utils.formatCurrency(dailyNeeded)}/dia p/ bater</span>` : ''}
+                                ${vsPrevMonth !== null ? `<span style="color:${vsPrevMonth >= 0 ? '#22c55e' : '#dc3545'};"><i class="fas fa-${vsPrevMonth >= 0 ? 'arrow-up' : 'arrow-down'}" style="margin-right:3px;"></i>${Math.abs(vsPrevMonth)}% vs mês passado</span>` : ''}
+                            </div>
+                            ${this._sparkline(state.sales, 'date', 'total', onPace ? '#ff6b00' : '#dc3545')}
                         ` : `
                             <div class="card-value" style="color:#ff6b00;font-size:1rem;">Definir meta</div>
                             <div style="font-size:0.76rem;color:var(--gray);">Clique aqui para configurar a meta de vendas do mês</div>
