@@ -12432,6 +12432,7 @@ body.dark-mode,
                 state: '',
                 primaryColor: '#ff6b00',
                 secondaryColor: '#ffcc00',
+                salesGoal: 0,
                 creditTax: 2.5,
                 warrantyDays: 90,
                 commission: 5,
@@ -15008,6 +15009,8 @@ tbody tr td{border:1.5px solid #000;padding:2mm;text-align:center;font-weight:70
                 const topPay = Object.entries(payMethodCounts).sort((a,b)=>b[1]-a[1])[0];
                 const payLabels = { pix:'PIX', cash:'Dinheiro', debit:'Débito', credit:'Crédito', installment:'Crediário' };
                 const company = state.company || {};
+                const goal    = parseFloat(company.salesGoal) || 0;
+                const goalPct = goal > 0 ? Math.round((totalSales / goal) * 100) : 0;
                 const addrParts = [company.address, company.number, company.neighborhood, company.city, company.state].filter(Boolean);
                 const companyAddress = addrParts.join(', ') || 'Endereço não configurado';
 
@@ -15076,7 +15079,39 @@ tbody tr td{border:1.5px solid #000;padding:2mm;text-align:center;font-weight:70
                             ${company.pix   ? `<span class="dash-info-empresa"><i class="fas fa-qrcode" style="color:#8b5cf6;margin-right:4px;width:14px;text-align:center;"></i>PIX: ${company.pix}</span>` : ''}
                         </div>
                     </div>
+                    <div class="card" style="--card-accent:#ff6b00;grid-column:span 2;cursor:pointer;" onclick="Dashboard.editGoal()" title="Clique para definir/editar a meta">
+                        <div class="card-header">
+                            <span class="card-title">Meta do Mês</span>
+                            <div style="display:flex;align-items:center;gap:6px;">
+                                <div class="card-icon" style="background:#fff5ee;color:#ff6b00;"><i class="fas fa-bullseye"></i></div>
+                                <i class="fas fa-pen" style="font-size:0.65rem;color:var(--gray);" title="Editar meta"></i>
+                            </div>
+                        </div>
+                        ${goal > 0 ? `
+                            <div class="card-value" style="color:#ff6b00;">${goalPct}%</div>
+                            <div id="dash-sub-meta" style="font-size:0.76rem;color:var(--gray);">${Utils.formatCurrency(totalSales)} de ${Utils.formatCurrency(goal)}</div>
+                            <div class="kpi-progress-wrap"><div class="kpi-progress-bar" style="width:${Math.min(100, goalPct)}%;background:#ff6b00;"></div></div>
+                        ` : `
+                            <div class="card-value" style="color:#ff6b00;font-size:1rem;">Definir meta</div>
+                            <div style="font-size:0.76rem;color:var(--gray);">Clique aqui para configurar a meta de vendas do mês</div>
+                        `}
+                    </div>
                 `;
+            },
+
+            editGoal() {
+                const current = state.company.salesGoal || 0;
+                const input = prompt('Qual a meta de vendas deste mês? (R$)', current > 0 ? String(current) : '');
+                if (input === null) return;
+                const parsed = parseFloat(input.replace(/\./g, '').replace(',', '.'));
+                if (isNaN(parsed) || parsed < 0) {
+                    Toast.show('⚠️ Valor inválido.', 'danger', 3000);
+                    return;
+                }
+                state.company.salesGoal = parsed;
+                App.saveData();
+                this.updateCards();
+                Toast.show('✅ Meta atualizada!', 'success', 2500);
             },
 
             updateSalesChart() {
