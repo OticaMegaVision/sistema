@@ -9604,9 +9604,16 @@ body.dark-mode,
                 if (!item || !item.id) return;
                 const storeId = window._currentStore || 'barueri';
                 const col = _COL_MAP[table] || table;
-                // ✅ Garante _updatedAt sempre presente — essencial para o merge inteligente
                 const now = new Date().toISOString();
-                const doc = { ...item, _store: storeId, _updatedAt: item._updatedAt || now };
+                // ✅ FIX SYNC CRÍTICO: sempre usa timestamp fresco ao empurrar uma mudança.
+                // Antes: "item._updatedAt || now" reaproveitava um _updatedAt antigo (de um
+                // push anterior) sempre que o código que chamou pushItem só atualizava o campo
+                // "updated_at" (nome errado, não é o campo lido pelo merge). Resultado: o merge
+                // em _applyCloudData comparava timestamps desatualizados e podia manter a versão
+                // antiga (ex: parcela não paga) de outro dispositivo, fazendo a baixa "sumir".
+                // Agora: toda chamada a pushItem representa uma mudança local recém-feita,
+                // então SEMPRE gravamos "now" — nunca um _updatedAt herdado.
+                const doc = { ...item, _store: storeId, _updatedAt: now };
                 try {
                     await sbUpsertDoc(storeId, col, item.id, doc);
                     // Atualiza o item no state local com _updatedAt para manter consistência
@@ -11907,7 +11914,7 @@ body.dark-mode,
                                     parc.valorOriginal = parc.valorOriginal || valorParc;
                                     parc.value = parseFloat(saldo.toFixed(2)); parc.valor = parc.value;
                                     parc.paid = false; parc.status = 'parcial'; parc.formaPagamento = forma;
-                                    sale.updated_at = new Date().toISOString();
+                                    sale._updatedAt = new Date().toISOString();
                                     (window.LocalFirst ? LocalFirst.pushItem('sales',sale) : Promise.resolve()).catch(()=>{}).finally(()=>{ ContasManager.renderAll().catch(()=>{}); Dashboard.update().catch(()=>{}); });
                                     Toast.show(`💰 Pagamento parcial de R$ ${paidVal.toFixed(2).replace('.',',')} registrado. Saldo: R$ ${saldo.toFixed(2).replace('.',',')}`, 'warning', 5000);
                                 } else {
@@ -11918,7 +11925,7 @@ body.dark-mode,
                                     Toast.show(`Parcela ${num} quitada! ✅`, 'success');
                                     this.gerarComprovanteVenda(itemId, itemDescricao||`Parcela ${num}`, itemValor||valorParc, itemCliente, itemCategoria, itemVencimento, forma, obs);
                                 }
-                                sale.updated_at = new Date().toISOString();
+                                sale._updatedAt = new Date().toISOString();
                                 (window.LocalFirst ? LocalFirst.pushItem('sales',sale) : Promise.resolve()).catch(()=>{}).finally(()=>{ ContasManager.renderAll().catch(()=>{}); Dashboard.update().catch(()=>{}); });
                             }
                         }
@@ -11926,7 +11933,7 @@ body.dark-mode,
                         sale[`retiradaPaga_dual${dualIdx}`] = true;
                         // Fix: verifica quitação total após registrar retirada dual
                         if (ContasManager.checkPaymentComplete(sale)) sale.paymentStatus = 'pago';
-                        sale.updated_at = new Date().toISOString();
+                        sale._updatedAt = new Date().toISOString();
                         // Salva apenas a venda modificada
                         if (window.LocalFirst) LocalFirst.pushItem('sales', sale).catch(()=>{});
                         Toast.show('Retirada registrada! ✅', 'success');
@@ -11952,7 +11959,7 @@ body.dark-mode,
                                 parc.valorOriginal = parc.valorOriginal || valorParc;
                                 parc.value = parseFloat(saldo.toFixed(2)); parc.valor = parc.value;
                                 parc.paid = false; parc.status = 'parcial'; parc.formaPagamento = forma;
-                                sale.updated_at = new Date().toISOString();
+                                sale._updatedAt = new Date().toISOString();
                                 (window.LocalFirst ? LocalFirst.pushItem('sales',sale) : Promise.resolve()).catch(()=>{}).finally(()=>{ ContasManager.renderAll().catch(()=>{}); Dashboard.update().catch(()=>{}); });
                                 Toast.show(`💰 Pagamento parcial de R$ ${paidVal.toFixed(2).replace('.',',')} registrado. Saldo: R$ ${saldo.toFixed(2).replace('.',',')}`, 'warning', 5000);
                             } else {
@@ -11963,7 +11970,7 @@ body.dark-mode,
                                 Toast.show(`Parcela ${num} quitada! ✅`, 'success');
                                 this.gerarComprovanteVenda(itemId, itemDescricao||`Parcela ${num}`, itemValor||valorParc, itemCliente, itemCategoria, itemVencimento, forma, obs);
                             }
-                            sale.updated_at = new Date().toISOString();
+                            sale._updatedAt = new Date().toISOString();
                             (window.LocalFirst ? LocalFirst.pushItem('sales',sale) : Promise.resolve()).catch(()=>{}).finally(()=>{ ContasManager.renderAll().catch(()=>{}); Dashboard.update().catch(()=>{}); });
                         }
                     }
@@ -11976,13 +11983,13 @@ body.dark-mode,
                     }
                     sale.retiradaPaga = true;
                     if (this.checkPaymentComplete(sale)) sale.paymentStatus = 'pago';
-                    sale.updated_at = new Date().toISOString();
+                    sale._updatedAt = new Date().toISOString();
                     (window.LocalFirst ? LocalFirst.pushItem('sales',sale) : Promise.resolve()).catch(()=>{}).finally(()=>{ ContasManager.renderAll().catch(()=>{}); Dashboard.update().catch(()=>{}); });
                     Toast.show('Pagamento na retirada registrado! ✅', 'success');
                     this.gerarComprovanteVenda(itemId, itemDescricao||'Pagamento na Retirada', itemValor, itemCliente, itemCategoria, itemVencimento, forma, obs);
                 } else if (tipo === 'total') {
                     sale.paymentStatus = 'pago';
-                    sale.updated_at = new Date().toISOString();
+                    sale._updatedAt = new Date().toISOString();
                     (window.LocalFirst ? LocalFirst.pushItem('sales',sale) : Promise.resolve()).catch(()=>{}).finally(()=>{ ContasManager.renderAll().catch(()=>{}); Dashboard.update().catch(()=>{}); });
                     Toast.show('Pagamento registrado! ✅', 'success');
                     this.gerarComprovanteVenda(itemId, itemDescricao||'Pagamento Total', itemValor||sale.total||0, itemCliente, itemCategoria, itemVencimento, forma, obs);
@@ -21903,7 +21910,7 @@ ${container.innerHTML}
                 if (situacao === 'pago') {
                     sale.paymentStatus = 'pago';
                     sale.paidAt = new Date().toISOString();
-                    sale.updated_at = sale.paidAt;
+                    sale._updatedAt = sale.paidAt;
                     if (sale.paymentDetails && sale.paymentDetails.parcels) {
                         sale.paymentDetails.parcels.forEach(function(p){
                             p.status='pago'; p.paid=true;
@@ -21916,7 +21923,7 @@ ${container.innerHTML}
                     if(lbl) lbl.textContent='✅ Marcado como PAGO — não aparece em Contas a Receber';
                 } else {
                     sale.paymentStatus = 'pendente';
-                    sale.updated_at = new Date().toISOString();
+                    sale._updatedAt = new Date().toISOString();
                     delete sale.paidAt;
                     if (sale.paymentDetails && sale.paymentDetails.parcels) {
                         sale.paymentDetails.parcels.forEach(function(p){
@@ -22161,7 +22168,7 @@ ${container.innerHTML}
                 btnEl.style.boxShadow='0 2px 8px '+c+'55';
                 btnEl.dataset.ativo='1';
                 sale.status = novoStatus;
-                sale.updated_at = new Date().toISOString();
+                sale._updatedAt = new Date().toISOString();
                 App.saveData();
                 if (window.LocalFirst) LocalFirst.pushItem('sales', sale);
                 Sales.renderHistory();
@@ -22178,7 +22185,7 @@ ${container.innerHTML}
                 var sale = state.sales.find(function(s){ return s.id===saleId; });
                 if (!sale) return;
                 sale.status = sel.value;
-                sale.updated_at = new Date().toISOString();
+                sale._updatedAt = new Date().toISOString();
                 App.saveData();
                 if (window.LocalFirst) LocalFirst.pushItem('sales', sale);
                 Sales.renderHistory();
