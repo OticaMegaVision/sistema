@@ -9757,6 +9757,16 @@ body.dark-mode,
             // ── switchStore ───────────────────────────────────────────────────
             async switchStore(storeId) {
                 window._currentStore = storeId;
+                // ✅ FIX MISTURA DE LOJAS: state._contasManuais é uma variável global
+                // (não namespaced por loja). Se a loja nova ainda não tiver um doc
+                // 'contas_financeiras' salvo (loja nova/sem lançamentos), o fallback
+                // dentro de ContasManager.getAll() acabava devolvendo os dados da
+                // loja ANTERIOR (ainda presos nessa variável), misturando Contas a
+                // Pagar/Receber entre lojas diferentes. Limpamos aqui, antes do sync,
+                // para garantir que a loja nova sempre comece "zerada" até o
+                // getAll() carregar (do IDB/nuvem) os dados que realmente pertencem
+                // a ela — nunca os da loja anterior.
+                state._contasManuais = null;
                 await this.sync('switch_store');
             },
 
@@ -11784,21 +11794,27 @@ body.dark-mode,
                 document.body.appendChild(overlay);
                 overlay.querySelector('#_bxCancel').onclick = () => overlay.remove();
                 overlay.onclick = e => { if (e.target === overlay) overlay.remove(); };
-                overlay.querySelector('#_bxConfirm').onclick = function() {
+                overlay.querySelector('#_bxConfirm').onclick = async function() {
                     if (this._bxExecuting) return;
                     const paidVal    = parseFloat(overlay.querySelector('#_bxVal').value) || 0;
                     const forma      = overlay.querySelector('#_bxForma').value;
                     const obs        = overlay.querySelector('#_bxObs').value.trim();
                     if (paidVal <= 0) { Toast.show('Informe um valor válido', 'warning'); return; }
                     this._bxExecuting = true; this.disabled = true; this.textContent = '⏳ Salvando...';
-                    const idx2 = contas.findIndex(c => c.id === id);
+                    // ✅ FIX "baixa não salvava na 1ª vez": o array 'contas' capturado na
+                    // abertura do modal podia ficar desatualizado se, entre abrir o modal
+                    // e clicar em Confirmar, um sync em segundo plano atualizasse o cache.
+                    // Buscamos a lista mais recente agora, na hora de gravar, para nunca
+                    // sobrescrever com uma cópia velha.
+                    const contasAgora = await ContasManager.getAll();
+                    const idx2 = contasAgora.findIndex(c => c.id === id);
                     if (idx2 >= 0) {
-                        const valorOriginal = parseFloat(contas[idx2].valor || 0);
+                        const valorOriginal = parseFloat(contasAgora[idx2].valor || 0);
                         const isParcial     = paidVal < valorOriginal - 0.009; // tolerância de 1 centavo
 
                         // Registra histórico de pagamentos parciais
-                        if (!contas[idx2].pagamentosParciais) contas[idx2].pagamentosParciais = [];
-                        contas[idx2].pagamentosParciais.push({
+                        if (!contasAgora[idx2].pagamentosParciais) contasAgora[idx2].pagamentosParciais = [];
+                        contasAgora[idx2].pagamentosParciais.push({
                             data:   new Date().toISOString(),
                             valor:  paidVal,
                             forma:  forma || '—',
@@ -11807,25 +11823,33 @@ body.dark-mode,
 
                         if (isParcial) {
                             const saldo = Math.max(0, valorOriginal - paidVal);
-                            contas[idx2].valor         = parseFloat(saldo.toFixed(2));
-                            contas[idx2].valorOriginal = contas[idx2].valorOriginal || valorOriginal;
-                            contas[idx2].pago          = false;
-                            contas[idx2].formaPagamento = forma || '—';
-                            if (obs) contas[idx2].obs = obs;
+                            contasAgora[idx2].valor         = parseFloat(saldo.toFixed(2));
+                            contasAgora[idx2].valorOriginal = contasAgora[idx2].valorOriginal || valorOriginal;
+                            contasAgora[idx2].pago          = false;
+                            contasAgora[idx2].formaPagamento = forma || '—';
+                            if (obs) contasAgora[idx2].obs = obs;
                             overlay.remove();
-                            ContasManager.saveAll(contas).then(() => { ContasManager.renderAll().catch(()=>{}); Dashboard.update().catch(()=>{}); }).catch(()=>{});
+                            ContasManager.saveAll(contasAgora).then(() => { ContasManager.renderAll().catch(()=>{}); Dashboard.update().catch(()=>{}); }).catch(()=>{});
                             Toast.show(`💰 Pagamento parcial de R$ ${paidVal.toFixed(2).replace('.',',')} registrado. Saldo restante: R$ ${saldo.toFixed(2).replace('.',',')}`, 'warning', 5000);
                         } else {
-                            contas[idx2].pago           = true;
-                            contas[idx2].dataPagamento  = new Date().toISOString();
-                            contas[idx2].paidValue      = paidVal;
-                            contas[idx2].formaPagamento = forma || '—';
-                            if (obs) contas[idx2].obs = obs;
+                            contasAgora[idx2].pago           = true;
+                            contasAgora[idx2].dataPagamento  = new Date().toISOString();
+                            contasAgora[idx2].paidValue      = paidVal;
+                            contasAgora[idx2].formaPagamento = forma || '—';
+                            if (obs) contasAgora[idx2].obs = obs;
                             overlay.remove();
-                            ContasManager.saveAll(contas).then(() => { ContasManager.renderAll().catch(()=>{}); Dashboard.update().catch(()=>{}); }).catch(()=>{});
+                            ContasManager.saveAll(contasAgora).then(() => { ContasManager.renderAll().catch(()=>{}); Dashboard.update().catch(()=>{}); }).catch(()=>{});
                             Toast.show('Baixa registrada! ✅', 'success');
                             ContasManager.gerarComprovante(id);
                         }
+                    } else {
+                        // Conta não encontrada na lista mais recente (raro: pode ter sido
+                        // removida/alterada por outro dispositivo) — avisa em vez de falhar
+                        // silenciosamente, para o usuário nunca ficar sem saber o que houve.
+                        this._bxExecuting = false; this.disabled = false; this.textContent = '✔ Confirmar';
+                        overlay.remove();
+                        Toast.show('⚠️ Esta conta foi alterada em outro dispositivo. Atualize a lista e tente novamente.', 'warning', 5000);
+                        ContasManager.renderAll().catch(()=>{});
                     }
                 };
             },
