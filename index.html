@@ -9553,6 +9553,29 @@ body.dark-mode,
                     console.error('[RxDB v17] _fetchAllData erro:', e.message);
                 }
 
+                // ✅ FIX "configurações voltam ao padrão": o backup do localStorage
+                // (gravação síncrona, mais confiável que o IndexedDB em cenários de
+                // reload rápido — ex: logout) só era consultado quando o banco
+                // principal estava TOTALMENTE vazio. Numa loja com clientes/vendas
+                // reais isso nunca acontece, então esse backup nunca era usado como
+                // rede de segurança para configurações (empresa, mensagens do
+                // WhatsApp etc). Agora sempre complementamos com ele — o que já foi
+                // carregado do IndexedDB tem prioridade; o backup só preenche o que
+                // faltar, nunca sobrescreve algo que já veio do IDB.
+                try {
+                    const cfgBackup = window.LocalStorageBackup && LocalStorageBackup.load(storeId);
+                    if (cfgBackup) {
+                        if (cfgBackup.company && typeof cfgBackup.company === 'object')
+                            state.company = Object.assign({}, cfgBackup.company, state.company || {});
+                        if (cfgBackup.config && typeof cfgBackup.config === 'object')
+                            state.config = Object.assign({}, cfgBackup.config, state.config || {});
+                        if (cfgBackup.wppMensagens && typeof cfgBackup.wppMensagens === 'object')
+                            state.wppMensagens = Object.assign({}, cfgBackup.wppMensagens, state.wppMensagens || {});
+                        if (cfgBackup.lastOsCounter && typeof cfgBackup.lastOsCounter === 'object')
+                            state.lastOsCounter = Object.assign({}, cfgBackup.lastOsCounter, state.lastOsCounter || {});
+                    }
+                } catch(_e) {}
+
                 // ── Fallback: se IDB está vazio, restaura do backup localStorage ──
                 // Cobre: modo privado, limpeza de dados, iOS Safari, novo dispositivo sem Drive
                 const MAIN_TABLES = ['clients','products','sales','expenses','prescriptions','suppliers','services'];
@@ -9564,15 +9587,6 @@ body.dark-mode,
                         MAIN_TABLES.forEach(k => {
                             if (Array.isArray(backup[k]) && backup[k].length > 0) state[k] = backup[k];
                         });
-                        if (backup.company && typeof backup.company === 'object')
-                            Object.assign(state.company || (state.company = {}), backup.company);
-                        if (backup.config && typeof backup.config === 'object')
-                            Object.assign(state.config || (state.config = {}), backup.config);
-                        if (backup.lastOsCounter && typeof backup.lastOsCounter === 'object')
-                            state.lastOsCounter = { ...(state.lastOsCounter || {}), ...backup.lastOsCounter };
-                        // ✅ FIX BUG WHATSAPP: restaura mensagens também no fallback local
-                        if (backup.wppMensagens && typeof backup.wppMensagens === 'object')
-                            Object.assign(state.wppMensagens || (state.wppMensagens = {}), backup.wppMensagens);
                         // Re-escreve no IDB para recuperar persistência nativa
                         setTimeout(() => {
                             try { LocalFirst.rewriteAll(true).catch(() => {}); } catch(_e) {}
@@ -9692,8 +9706,14 @@ body.dark-mode,
                 // Atualiza painel
                 try { this._updatePanel?.(); } catch(e) {}
                 // Backup localStorage (config/company/lastOsCounter)
-                // FIX BUG#1: passa storeId explícito para evitar salvar na loja errada
-                if (window.LocalStorageBackup) LocalStorageBackup.scheduleSave(storeId);
+                // ✅ FIX: salva IMEDIATO (síncrono) em vez de agendar com debounce de 2s.
+                // Uma config só é salva quando o usuário clica em "Salvar" (ação pouco
+                // frequente), então não há custo real em ser síncrono aqui — e isso
+                // elimina a janela de risco onde o usuário sai do app/fecha a aba antes
+                // do debounce disparar, valendo pra QUALQUER configuração editável
+                // (dados da empresa, notificações, mensagens do WhatsApp etc), não só
+                // para o caso específico que motivou o fix original.
+                if (window.LocalStorageBackup) LocalStorageBackup.save(storeId);
             },
 
             // ── rewriteAll ────────────────────────────────────────────────────
@@ -10363,6 +10383,11 @@ body.dark-mode,
                     // à nuvem — por isso mensagens personalizadas nunca chegavam a
                     // outros dispositivos, mesmo com o restante do sistema sincronizando.
                     wppMensagens:       state.wppMensagens        || {},
+                    // ✅ FIX SYNC: notificações e config de backup também ficavam de
+                    // fora do pacote enviado à nuvem — corrigido para que TODA
+                    // configuração editável sincronize entre dispositivos.
+                    notificacoes:       state.notificacoes       || {},
+                    backupConfig:       state.backupConfig       || {},
                     contasFinanceiras:  contasFinanceiras,
                     tombstones:         tombstones   // ← deleções propagadas para outros navegadores
                 };
@@ -10472,6 +10497,15 @@ body.dark-mode,
                 // preenche chaves que ainda não existem localmente.
                 if (remote.wppMensagens && typeof remote.wppMensagens === 'object') {
                     state.wppMensagens = Object.assign({}, remote.wppMensagens, state.wppMensagens || {});
+                }
+                // ✅ FIX SYNC: restaura notificações e config de backup de outro
+                // dispositivo, com a mesma regra seguro-padrão (local nunca é
+                // sobrescrito por uma versão antiga vinda da nuvem).
+                if (remote.notificacoes && typeof remote.notificacoes === 'object') {
+                    state.notificacoes = Object.assign({}, remote.notificacoes, state.notificacoes || {});
+                }
+                if (remote.backupConfig && typeof remote.backupConfig === 'object') {
+                    state.backupConfig = Object.assign({}, remote.backupConfig, state.backupConfig || {});
                 }
                 if (remote.lastOsCounter && typeof remote.lastOsCounter === 'object') state.lastOsCounter = { ...(state.lastOsCounter || {}), ...remote.lastOsCounter };
                 // FIX: restaura contas financeiras do Drive
