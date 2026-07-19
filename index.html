@@ -9148,21 +9148,31 @@ body.dark-mode,
                 data:       docData,
                 updated_at: new Date().toISOString()
             };
+            // ✅ FIX BUG "mensagem apaga ao sair e entrar": antes resolvíamos a
+            // Promise no onsuccess do request.put(), que dispara assim que a
+            // operação é enfileirada — NÃO garante que a transação foi
+            // efetivamente commitada em disco. Se um reload (ex: logout)
+            // acontecesse logo em seguida, a escrita podia se perder mesmo
+            // com o "await" tendo retornado normalmente. Agora aguardamos
+            // tx.oncomplete, que só dispara após o commit real.
             await new Promise((resolve, reject) => {
                 const tx  = db.transaction(DB_STORE, 'readwrite');
-                const req = tx.objectStore(DB_STORE).put(row);
-                req.onsuccess = () => resolve();
-                req.onerror   = () => reject(req.error);
+                tx.objectStore(DB_STORE).put(row);
+                tx.oncomplete = () => resolve();
+                tx.onerror    = () => reject(tx.error);
+                tx.onabort    = () => reject(tx.error || new Error('tx aborted'));
             });
             _broadcastChange({ type: 'upsert', storeId, col, docId, docData });
         }
         async function sbDeleteDoc(storeId, col, docId) {
             const db = await _openIDB();
+            // ✅ Mesma correção: aguarda tx.oncomplete, não apenas req.onsuccess.
             await new Promise((resolve, reject) => {
                 const tx  = db.transaction(DB_STORE, 'readwrite');
-                const req = tx.objectStore(DB_STORE).delete(_idbKey(storeId, col, docId));
-                req.onsuccess = () => resolve();
-                req.onerror   = () => reject(req.error);
+                tx.objectStore(DB_STORE).delete(_idbKey(storeId, col, docId));
+                tx.oncomplete = () => resolve();
+                tx.onerror    = () => reject(tx.error);
+                tx.onabort    = () => reject(tx.error || new Error('tx aborted'));
             });
             _broadcastChange({ type: 'delete', storeId, col, docId });
         }
