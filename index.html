@@ -10349,6 +10349,10 @@ body.dark-mode,
                     company:            company,
                     config:             state.config             || {},
                     lastOsCounter:      state.lastOsCounter      || {},
+                    // ✅ FIX SYNC: wppMensagens não estava incluído no payload enviado
+                    // à nuvem — por isso mensagens personalizadas nunca chegavam a
+                    // outros dispositivos, mesmo com o restante do sistema sincronizando.
+                    wppMensagens:       state.wppMensagens        || {},
                     contasFinanceiras:  contasFinanceiras,
                     tombstones:         tombstones   // ← deleções propagadas para outros navegadores
                 };
@@ -10452,6 +10456,13 @@ body.dark-mode,
                     state.company = Object.assign(state.company || {}, remote.company);
                 }
                 if (remote.config        && typeof remote.config        === 'object') Object.assign(state.config        || (state.config        = {}), remote.config);
+                // ✅ FIX SYNC: restaura mensagens de WhatsApp personalizadas de outro
+                // dispositivo. O local sempre "ganha" em caso de mesma chave (para não
+                // apagar uma edição recente que ainda não subiu pra nuvem) — a nuvem só
+                // preenche chaves que ainda não existem localmente.
+                if (remote.wppMensagens && typeof remote.wppMensagens === 'object') {
+                    state.wppMensagens = Object.assign({}, remote.wppMensagens, state.wppMensagens || {});
+                }
                 if (remote.lastOsCounter && typeof remote.lastOsCounter === 'object') state.lastOsCounter = { ...(state.lastOsCounter || {}), ...remote.lastOsCounter };
                 // FIX: restaura contas financeiras do Drive
                 // FIX SYNC BUG: so sobrescreve se a nuvem for mais recente que o ultimo save local.
@@ -17604,12 +17615,28 @@ tbody tr td{border:1.5px solid #000;padding:2mm;text-align:center;font-weight:70
         const ConfigWpp = {
             _current: 'aniversario',
             _previewOpen: false,
+            _initialized: false,
 
             init() {
                 this.selectMsg('aniversario');
             },
 
             selectMsg(key) {
+                // ✅ FIX "sempre volta para mensagem anterior": antes de trocar de
+                // template, guarda em memória o que estava sendo editado no textarea
+                // atual. Sem isso, trocar de mensagem sem clicar em "Salvar" antes
+                // descartava silenciosamente qualquer edição em andamento.
+                // Guard "_initialized": pula essa preservação na primeiríssima
+                // chamada (feita por init()), pois nesse momento o textarea ainda
+                // está vazio/não carregado — preservar aqui apagaria a mensagem
+                // real antes mesmo dela ser exibida.
+                const taAnterior = document.getElementById('wppTextarea');
+                if (this._initialized && taAnterior && this._current) {
+                    if (!state.wppMensagens) state.wppMensagens = {};
+                    state.wppMensagens[this._current] = taAnterior.value;
+                }
+                this._initialized = true;
+
                 this._current = key;
                 this._previewOpen = false;
 
