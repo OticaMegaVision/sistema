@@ -17729,10 +17729,24 @@ tbody tr td{border:1.5px solid #000;padding:2mm;text-align:center;font-weight:70
                 // chamada (feita por init()), pois nesse momento o textarea ainda
                 // está vazio/não carregado — preservar aqui apagaria a mensagem
                 // real antes mesmo dela ser exibida.
+                // ✅ FIX "atualização de mensagem padrão não aparecia": a proteção
+                // acima salvava o texto MESMO quando ele ainda era só o padrão de
+                // fábrica (usuário nunca editou nada) — isso "congelava" o padrão
+                // antigo como se fosse uma mensagem personalizada, e futuras
+                // atualizações do padrão deixavam de aparecer para quem nunca tinha
+                // editado. Agora só preservamos se o texto realmente for diferente
+                // do padrão atual — ou seja, se for uma edição de verdade.
                 const taAnterior = document.getElementById('wppTextarea');
                 if (this._initialized && taAnterior && this._current) {
                     if (!state.wppMensagens) state.wppMensagens = {};
-                    state.wppMensagens[this._current] = taAnterior.value;
+                    const isCustomizado = taAnterior.value !== WPP_DEFAULTS[this._current];
+                    if (isCustomizado) {
+                        state.wppMensagens[this._current] = taAnterior.value;
+                    } else {
+                        // Texto igual ao padrão: remove qualquer "congelamento" antigo
+                        // para que futuras atualizações do padrão passem a aparecer.
+                        delete state.wppMensagens[this._current];
+                    }
                 }
                 this._initialized = true;
 
