@@ -10508,25 +10508,53 @@ body.dark-mode,
                     state.backupConfig = Object.assign({}, remote.backupConfig, state.backupConfig || {});
                 }
                 if (remote.lastOsCounter && typeof remote.lastOsCounter === 'object') state.lastOsCounter = { ...(state.lastOsCounter || {}), ...remote.lastOsCounter };
-                // FIX: restaura contas financeiras do Drive
-                // FIX SYNC BUG: so sobrescreve se a nuvem for mais recente que o ultimo save local.
-                // Antes: sobrescrita cega apagava baixas registradas antes do push chegar a nuvem.
-                if (Array.isArray(remote.contasFinanceiras) && remote.contasFinanceiras.length > 0) {
-                    const localSavedAt = (() => { try { return localStorage.getItem('contas_fs_savedAt_' + storeId) || '0'; } catch(_e) { return '0'; } })();
-                    const remoteTs     = remote._ts || '0';
-                    const remoteIsNewer = remoteTs >= localSavedAt;
-                    if (remoteIsNewer) {
-                        state._contasManuais = remote.contasFinanceiras;
-                        try {
-                            const storeKey = 'contas_financeiras_' + storeId;
-                            if (window.IDB && IDB._cache) IDB._cache[storeKey] = JSON.stringify(remote.contasFinanceiras);
-                            if (window.ContasManager) ContasManager.saveAll(remote.contasFinanceiras).catch(()=>{});
-                        } catch(e) {}
-                    } else {
-                        // Nuvem esta desatualizada: agenda push para sincronizar os dados locais
-                        console.log('[ContasManager] FIX SYNC: dados locais mais recentes que a nuvem — mantendo local e re-agendando push.');
-                        if (window.LocalFirst) try { LocalFirst._scheduleCloudSync(); } catch(_e) {}
-                    }
+                // ✅ FIX SYNC CRÍTICO: merge item-por-item nas contas financeiras
+                // (igual clientes/vendas/produtos), em vez de comparar o arquivo
+                // inteiro. O jeito antigo comparava só a "data de salvamento" do
+                // arquivo inteiro contra o último save local — então se o Celular
+                // sincronizasse ANTES do push do PC chegar na nuvem, ele baixava a
+                // versão ainda não-paga, gravava ela localmente (o que reagendava
+                // um novo envio à nuvem "carimbado com agora"), e esse reenvio
+                // conseguia sobrescrever a baixa correta feita no PC — fazendo a
+                // parcela "voltar" nos dois aparelhos. Agora cada conta é comparada
+                // pelo seu próprio _updatedAt, então uma baixa recente nunca é
+                // apagada por uma versão desatualizada vinda de outro dispositivo.
+                if (Array.isArray(remote.contasFinanceiras)) {
+                    const localContasMap = {};
+                    (state._contasManuais || []).forEach(c => { if (c && c.id) localContasMap[c.id] = c; });
+
+                    const mergedContas = {};
+                    Object.assign(mergedContas, localContasMap);
+
+                    remote.contasFinanceiras.forEach(remoteConta => {
+                        if (!remoteConta || !remoteConta.id) return;
+                        // Ignora contas excluídas localmente após o timestamp remoto
+                        if (_isDeletedLocally(storeId, 'contas_financeiras', remoteConta.id, remoteTs)) return;
+
+                        const localConta = localContasMap[remoteConta.id];
+                        if (!localConta) {
+                            mergedContas[remoteConta.id] = remoteConta;
+                        } else {
+                            const remoteDate = new Date(remoteConta._updatedAt || remoteTs || 0).getTime();
+                            const localDate  = new Date(localConta._updatedAt  || 0).getTime();
+                            if (remoteDate > localDate) mergedContas[remoteConta.id] = remoteConta;
+                            // Se local for mais recente (ou empatar), mantém local
+                        }
+                    });
+
+                    const contasFinal = Object.values(mergedContas);
+                    state._contasManuais = contasFinal;
+                    try {
+                        const storeKey = 'contas_financeiras_' + storeId;
+                        if (window.IDB && IDB._cache) IDB._cache[storeKey] = JSON.stringify(contasFinal);
+                        // Persiste o resultado do merge no IDB local (sem reagendar
+                        // push extra — o próprio ciclo normal de sync já propaga
+                        // qualquer item que só existia localmente).
+                        sbUpsertDoc(storeId, 'config', 'contas_financeiras', {
+                            _doc_id: 'contas_financeiras', items: contasFinal,
+                            _updatedAt: new Date().toISOString(), _store: storeId
+                        }).catch(()=>{});
+                    } catch(e) {}
                 }
                 // FIX LOOP: rewriteAll(true) = persiste no IDB (incluindo logo/company)
                 // SEM toasts e SEM cloud push-back, quebrando o ciclo pull→push→pull
@@ -11791,7 +11819,8 @@ body.dark-mode,
                             descricao: desc, valor, vencimento: venc,
                             parte: document.getElementById('contaParte').value.trim(),
                             categoria: document.getElementById('contaCategoria').value.trim(),
-                            obs: document.getElementById('contaObs').value.trim()
+                            obs: document.getElementById('contaObs').value.trim(),
+                            _updatedAt: new Date().toISOString()
                         };
                     }
                     Toast.show('Conta atualizada!','success');
@@ -11804,7 +11833,8 @@ body.dark-mode,
                         categoria: document.getElementById('contaCategoria').value.trim(),
                         obs: document.getElementById('contaObs').value.trim(),
                         pago: false,
-                        criado: new Date().toISOString()
+                        criado: new Date().toISOString(),
+                        _updatedAt: new Date().toISOString()
                     });
                     Toast.show('Conta adicionada!','success');
                 }
@@ -11883,6 +11913,11 @@ body.dark-mode,
                             contasAgora[idx2].pago          = false;
                             contasAgora[idx2].formaPagamento = forma || '—';
                             if (obs) contasAgora[idx2].obs = obs;
+                            // ✅ FIX SYNC: carimba _updatedAt no exato momento da baixa —
+                            // é esse campo que o merge entre dispositivos usa para saber
+                            // qual versão é a mais recente. Sem ele, um dispositivo que
+                            // sincroniza atrasado pode "ressuscitar" a conta como não paga.
+                            contasAgora[idx2]._updatedAt = new Date().toISOString();
                             overlay.remove();
                             ContasManager.saveAll(contasAgora).then(() => { ContasManager.renderAll().catch(()=>{}); Dashboard.update().catch(()=>{}); }).catch(()=>{});
                             Toast.show(`💰 Pagamento parcial de R$ ${paidVal.toFixed(2).replace('.',',')} registrado. Saldo restante: R$ ${saldo.toFixed(2).replace('.',',')}`, 'warning', 5000);
@@ -11892,6 +11927,8 @@ body.dark-mode,
                             contasAgora[idx2].paidValue      = paidVal;
                             contasAgora[idx2].formaPagamento = forma || '—';
                             if (obs) contasAgora[idx2].obs = obs;
+                            // ✅ FIX SYNC: idem — carimba _updatedAt também na baixa total.
+                            contasAgora[idx2]._updatedAt = new Date().toISOString();
                             overlay.remove();
                             ContasManager.saveAll(contasAgora).then(() => { ContasManager.renderAll().catch(()=>{}); Dashboard.update().catch(()=>{}); }).catch(()=>{});
                             Toast.show('Baixa registrada! ✅', 'success');
@@ -12345,6 +12382,14 @@ body.dark-mode,
                 overlay.querySelector('#_excConfirmar').onclick = async () => {
                     overlay.remove();
                     const contas = await this.getAll();
+                    // ✅ FIX SYNC: registra tombstone da exclusão, mesmo padrão usado
+                    // para clientes/produtos/vendas — sem isso, um dispositivo que
+                    // ainda tem a conta antiga localmente podia "ressuscitá-la" de
+                    // volta na nuvem depois de você já ter excluído em outro aparelho.
+                    try {
+                        const storeId = window._currentStore || 'barueri';
+                        if (window.CloudSync) CloudSync._recordDeletion(storeId, 'contas_financeiras', id);
+                    } catch(_e) {}
                     await this.saveAll(contas.filter(c => c.id !== id));
                     Toast.show('Conta excluída', 'info');
                     await this.renderAll();
