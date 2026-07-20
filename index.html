@@ -10376,6 +10376,12 @@ body.dark-mode,
                     prescriptions:      state.prescriptions      || [],
                     suppliers:          state.suppliers          || [],
                     services:           state.services           || [],
+                    // ✅ FIX SYNC: CRM (contatos, tarefas, NPS) não estava incluído no
+                    // pacote sincronizado com a nuvem — corrigido para participar do
+                    // mesmo merge item-por-item usado pelas outras coleções.
+                    crmContatos:        state.crmContatos        || [],
+                    crmTarefas:         state.crmTarefas         || [],
+                    crmNps:             state.crmNps             || [],
                     company:            company,
                     config:             state.config             || {},
                     lastOsCounter:      state.lastOsCounter      || {},
@@ -10445,7 +10451,7 @@ body.dark-mode,
                 // Antes: state[k] = remote[k] substituía TUDO pelos dados remotos, apagando
                 // alterações locais que ainda não tinham sido enviadas para a nuvem.
                 // Agora: para cada item, mantemos a versão com _updatedAt mais recente.
-                const cols = ['clients','products','sales','expenses','prescriptions','suppliers','services'];
+                const cols = ['clients','products','sales','expenses','prescriptions','suppliers','services','crmContatos','crmTarefas','crmNps'];
                 cols.forEach(k => {
                     if (!Array.isArray(remote[k])) return;
 
@@ -12640,7 +12646,7 @@ body.dark-mode,
                 nextAutoBackup: null
             },
             wppMensagens: {
-                aniversario: "🎂 *Feliz Aniversário, {{NOME}}!* 🎉\n\nHoje, *{{DATA}}*, é um dia muito especial e nós da *{{EMPRESA}}* queremos celebrar junto com você! 🥳\n\nQue este novo ano seja repleto de muita saúde, alegria e visão nítida! 👁️✨\n\nTemos um presente especial esperando por você — venha nos visitar! 🎁\n\n━━━━━━━━━━━━━━━━━━━━\n*{{EMPRESA}}*\n📍 {{ENDERECO}}\n📞 {{TELEFONE}}",
+                aniversario: "🎂 *Feliz Aniversário, {{NOME}}!* 🎉\n\nHoje, *{{DATA}}*, é um dia muito especial e nós da *{{EMPRESA}}* queremos celebrar junto com você! 🥳\n\nQue este novo ano seja repleto de muita saúde, alegria e visão nítida! 👁️✨\n\nTemos um desconto especial esperando por você — venha nos visitar! 🎁\n\n━━━━━━━━━━━━━━━━━━━━\n*{{EMPRESA}}*\n📍 {{ENDERECO}}\n📞 {{TELEFONE}}",
                 oculosVencido: "Olá *{{NOME}}*! 👋\n\nPassando para dar um recado importante! 😊\n\nVerificamos que faz aproximadamente *{{MESES}} meses* que você adquiriu seus óculos conosco (OS {{OS}} — {{DATA_VENDA}}).\n\n👓 Especialistas recomendam *revisão anual* da receita para garantir a saúde dos seus olhos e o conforto visual!\n\nQue tal agendar uma consulta de revisão? Temos condições especiais para clientes recorrentes! 🎁\n\n━━━━━━━━━━━━━━━━━━━━\n*{{EMPRESA}}*\n📍 {{ENDERECO}}\n📞 {{TELEFONE}}",
                 statusPedido: "Olá *{{NOME}}*! 👋\n\nSegue a atualização do seu pedido:\n\n🏪 *{{EMPRESA}}*\n━━━━━━━━━━━━━━━━━━━━\n📋 *OS Nº:* {{OS}}\n📅 *Data da compra:* {{DATA_VENDA}}\n🚚 *Previsão de entrega:* {{PREVISAO}}\n\n🔄 *Status atual:*\n➡️ *{{STATUS}}*\n\n{{MSG_STATUS}}\n━━━━━━━━━━━━━━━━━━━━\nDúvidas? Fale conosco! 😊\n📞 {{TELEFONE}}",
                 receituario: "👁️ *RECEITUÁRIO ÓPTICO*\n━━━━━━━━━━━━━━━━━━━━\n🏪 *{{EMPRESA}}*\n📍 {{ENDERECO}}\n📞 {{TELEFONE}}\n━━━━━━━━━━━━━━━━━━━━\n\n👤 *Paciente:* {{PACIENTE}}\n📅 *Data:* {{DATA}}\n\n*🔵 OLHO DIREITO (OD)*\n{{DADOS_OD}}\n\n*🔴 OLHO ESQUERDO (OE)*\n{{DADOS_OE}}\n\n{{DADOS_EXTRA}}\n━━━━━━━━━━━━━━━━━━━━\n_Documento gerado por {{EMPRESA}}_\n_Válido mediante assinatura do profissional._",
@@ -16988,7 +16994,7 @@ tbody tr td{border:1.5px solid #000;padding:2mm;text-align:center;font-weight:70
                 if (!data)       { Toast.show('Informe a data', 'warning'); return; }
                 if (!resumo)     { Toast.show('Informe um resumo do contato', 'warning'); return; }
 
-                const contato = { id: editId || 'CONT-' + Date.now(), clienteId, clienteNome, canal, tipo, data, resumo, resultado, criadoEm: editId ? undefined : new Date().toISOString() };
+                const contato = { id: editId || 'CONT-' + Date.now(), clienteId, clienteNome, canal, tipo, data, resumo, resultado, criadoEm: editId ? undefined : new Date().toISOString(), _updatedAt: new Date().toISOString() };
                 if (!editId) contato.criadoEm = new Date().toISOString();
 
                 if (editId) {
@@ -17032,6 +17038,7 @@ tbody tr td{border:1.5px solid #000;padding:2mm;text-align:center;font-weight:70
 
             excluirContato(id) {
                 Modal.showConfirm('Excluir este contato?', () => {
+                    try { if (window.CloudSync) CloudSync._recordDeletion(window._currentStore || 'barueri', 'crmContatos', id); } catch(_e) {}
                     state.crmContatos = (state.crmContatos || []).filter(c => c.id !== id);
                     this._save();
                     this.renderContatos();
@@ -17098,7 +17105,7 @@ tbody tr td{border:1.5px solid #000;padding:2mm;text-align:center;font-weight:70
                 if (!data)      { Toast.show('Informe a data prazo', 'warning'); return; }
                 if (!descricao) { Toast.show('Informe a descrição', 'warning'); return; }
 
-                const tarefa = { id: editId || 'TAR-' + Date.now(), clienteId, clienteNome, tipo, data, prioridade, descricao, concluida: false, criadoEm: new Date().toISOString() };
+                const tarefa = { id: editId || 'TAR-' + Date.now(), clienteId, clienteNome, tipo, data, prioridade, descricao, concluida: false, criadoEm: new Date().toISOString(), _updatedAt: new Date().toISOString() };
 
                 if (editId) {
                     const idx = (state.crmTarefas || []).findIndex(t => t.id === editId);
@@ -17142,6 +17149,7 @@ tbody tr td{border:1.5px solid #000;padding:2mm;text-align:center;font-weight:70
                 if (!t) return;
                 t.concluida = !t.concluida;
                 t.concluidoEm = t.concluida ? new Date().toISOString() : null;
+                t._updatedAt = new Date().toISOString();
                 this._save();
                 this.renderTarefas();
                 this.renderSummaryCards();
@@ -17150,6 +17158,7 @@ tbody tr td{border:1.5px solid #000;padding:2mm;text-align:center;font-weight:70
 
             excluirTarefa(id) {
                 Modal.showConfirm('Excluir esta tarefa?', () => {
+                    try { if (window.CloudSync) CloudSync._recordDeletion(window._currentStore || 'barueri', 'crmTarefas', id); } catch(_e) {}
                     state.crmTarefas = (state.crmTarefas || []).filter(t => t.id !== id);
                     this._save();
                     this.renderTarefas();
@@ -17357,7 +17366,7 @@ tbody tr td{border:1.5px solid #000;padding:2mm;text-align:center;font-weight:70
                 if (nota === '')      { Toast.show('Selecione uma nota de 0 a 10', 'warning'); return; }
                 if (!data)            { Toast.show('Informe a data', 'warning'); return; }
 
-                const item = { id: editId || 'NPS-' + Date.now(), clienteId, clienteNome, nota: parseInt(nota), data, canal, comentario, criadoEm: editId ? undefined : new Date().toISOString() };
+                const item = { id: editId || 'NPS-' + Date.now(), clienteId, clienteNome, nota: parseInt(nota), data, canal, comentario, criadoEm: editId ? undefined : new Date().toISOString(), _updatedAt: new Date().toISOString() };
                 if (!state.crmNps) state.crmNps = [];
                 if (editId) {
                     const idx = state.crmNps.findIndex(x => x.id === editId);
@@ -17384,6 +17393,7 @@ tbody tr td{border:1.5px solid #000;padding:2mm;text-align:center;font-weight:70
 
             excluirNps(id) {
                 Modal.showConfirm('Excluir esta avaliação?', () => {
+                    try { if (window.CloudSync) CloudSync._recordDeletion(window._currentStore || 'barueri', 'crmNps', id); } catch(_e) {}
                     state.crmNps = (state.crmNps || []).filter(x => x.id !== id);
                     this._save();
                     this.renderNps();
@@ -17645,7 +17655,7 @@ tbody tr td{border:1.5px solid #000;padding:2mm;text-align:center;font-weight:70
             statusPedido: "Olá *{{NOME}}*! 👋\n\nSegue a atualização do seu pedido:\n\n🏪 *{{EMPRESA}}*\n━━━━━━━━━━━━━━━━━━━━\n📋 *OS Nº:* {{OS}}\n📅 *Data da compra:* {{DATA_VENDA}}\n🚚 *Previsão de entrega:* {{PREVISAO}}\n\n🔄 *Status atual:*\n➡️ *{{STATUS}}*\n\n{{MSG_STATUS}}\n━━━━━━━━━━━━━━━━━━━━\nDúvidas? Fale conosco! 😊\n📞 {{TELEFONE}}",
             receituario: "👁️ *RECEITUÁRIO ÓPTICO*\n━━━━━━━━━━━━━━━━━━━━\n🏪 *{{EMPRESA}}*\n📍 {{ENDERECO}}\n📞 {{TELEFONE}}\n━━━━━━━━━━━━━━━━━━━━\n\n👤 *Paciente:* {{PACIENTE}}\n📅 *Data:* {{DATA}}\n\n*🔵 OLHO DIREITO (OD)*\n{{DADOS_OD}}\n\n*🔴 OLHO ESQUERDO (OE)*\n{{DADOS_OE}}\n\n{{DADOS_EXTRA}}\n━━━━━━━━━━━━━━━━━━━━\n_Documento gerado por {{EMPRESA}}_\n_Válido mediante assinatura do profissional._",
             comprovante: "✅ *COMPROVANTE DE PAGAMENTO*\n━━━━━━━━━━━━━━━━━━━━\n🏪 *{{EMPRESA}}*\n📍 {{ENDERECO}}\n━━━━━━━━━━━━━━━━━━━━\n\n👤 *Cliente:* {{NOME}}\n🆔 *CPF:* {{CPF}}\n\n📋 *OS Nº:* {{OS}}\n🔢 *Parcela:* {{PARCELA}}\n📅 *Vencimento:* {{VENCIMENTO}}\n📅 *Data Pagamento:* {{DATA_PAGAMENTO}}\n\n💵 *VALOR PAGO: {{VALOR}}*\n💳 *Forma:* {{FORMA_PAGAMENTO}}\n\n✅ *PAGAMENTO CONFIRMADO*\n\n━━━━━━━━━━━━━━━━━━━━\n📞 {{TELEFONE}}\n_Documento gerado por {{EMPRESA}}_",
-            cobranca: "Olá *{{NOME}}*! 👋\n\nPassando para te lembrar de um valor em aberto conosco:\n\n━━━━━━━━━━━━━━━━━━━━\n📋 *{{DESCRICAO}}*\n💰 *Valor:* {{VALOR}}\n📅 *Vencimento:* {{VENCIMENTO}}\n━━━━━━━━━━━━━━━━━━━━\n\nPor favor, entre em contato para regularizar ou combinar o pagamento. 😊\n\n📞 {{TELEFONE}}\n_{{EMPRESA}}_",
+            cobranca: "Olá *{{NOME}}*! 👋\n\nEstou passando para lembrar sobre uma parcela com vencimento em *{{VENCIMENTO}}*.\n\n━━━━━━━━━━━━━━━━━━━━\n📋 *{{DESCRICAO}}*\n💰 *Valor:* {{VALOR}}\n━━━━━━━━━━━━━━━━━━━━\n\nPor favor, entre em contato conosco ou envie o comprovante de pagamento, caso já tenha realizado o pagamento. 😊\n\n📞 {{TELEFONE}}\n_{{EMPRESA}}_",
             confirmacaoOS: "Olá *{{NOME}}*! 👋\n\n✅ Seu pedido foi registrado com sucesso na *{{EMPRESA}}*!\n\n━━━━━━━━━━━━━━━━━━━━\n📋 *OS Nº:* {{OS}}\n📅 *Data:* {{DATA_VENDA}}\n🚚 *Previsão de entrega:* {{PREVISAO}}\n💳 *Pagamento:* {{PAGAMENTO}}\n💰 *Total:* {{TOTAL}}\n━━━━━━━━━━━━━━━━━━━━\n\nAvisaremos quando estiver pronto! 👓\n\nQualquer dúvida estamos à disposição.\n📞 {{TELEFONE}}",
             lembreteRetirada: "Olá *{{NOME}}*! 👋\n\n🎉 *Seus óculos estão prontos para retirada!*\n\n━━━━━━━━━━━━━━━━━━━━\n🏪 *{{EMPRESA}}*\n📋 *OS Nº:* {{OS}}\n━━━━━━━━━━━━━━━━━━━━\n\n{{SALDO_RETIRADA}}\n\nVenha nos visitar, estamos aguardando você! 😊\n\n📍 {{ENDERECO}}\n📞 {{TELEFONE}}"
         };
