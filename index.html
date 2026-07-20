@@ -9896,6 +9896,20 @@ body.dark-mode,
                         }
                     }
                     results._contasReceber += contasReceberVendas;
+
+                    // ✅ FIX PAINEL: "A Pagar" contava só contas manuais, mas a tela real
+                    // de Contas a Pagar também inclui despesas cadastradas (viram conta a
+                    // pagar automaticamente). Mesmo cuidado de isolamento por loja já usado
+                    // acima para vendas: lê state.expenses só se for a loja atual, senão
+                    // busca direto do IDB da loja correta.
+                    let despesas = [];
+                    if (isCurrentStore) {
+                        despesas = state.expenses || [];
+                    } else {
+                        try { despesas = await sbGetCollection(storeId, 'expenses'); } catch(_de) { despesas = []; }
+                    }
+                    const despesasPendentes = despesas.filter(exp => !(exp.status === 'pago' || exp.pago || exp.paid)).length;
+                    results._contasPagar += despesasPendentes;
                 } catch(_e) { results._contasPagar = 0; results._contasReceber = 0; }
                 return results;
             },
