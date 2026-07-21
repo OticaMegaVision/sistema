@@ -6354,7 +6354,16 @@ body.dark-mode,
                         <!-- ── CREDIÁRIO ── -->
                         <div id="installmentDetails">
                             <div class="entrada-retirada-box" style="margin-top:12px;margin-bottom:14px;">
-                                <h5><i class="fas fa-hand-holding-usd"></i> Entrada &amp; Retirada</h5>
+                                <!-- Indicador de passos (só visual — não afeta nenhum campo/handler) -->
+                                <div style="display:flex;align-items:center;gap:8px;margin-bottom:14px;">
+                                    <div style="width:22px;height:22px;border-radius:50%;background:#ff6b00;color:#fff;font-size:0.68rem;font-weight:800;display:flex;align-items:center;justify-content:center;flex-shrink:0;">1</div>
+                                    <span style="font-size:0.76rem;font-weight:700;color:#e55a00;">Entrada</span>
+                                    <div style="flex:1;height:2px;background:#ffe0b2;"></div>
+                                    <div style="width:22px;height:22px;border-radius:50%;background:#ffe0b2;color:#e55a00;font-size:0.68rem;font-weight:800;display:flex;align-items:center;justify-content:center;flex-shrink:0;">2</div>
+                                    <span style="font-size:0.76rem;font-weight:700;color:#a06a3a;">Parcelas</span>
+                                </div>
+
+                                <h5 style="display:flex;align-items:center;gap:6px;"><i class="fas fa-hand-holding-usd"></i> Entrada &amp; Retirada</h5>
                                 <div class="form-row" style="margin-bottom:0;">
                                     <div class="form-group">
                                         <label>Entrada (%)</label>
@@ -6371,6 +6380,15 @@ body.dark-mode,
                                         <label>Valor na Retirada (R$)</label>
                                         <input type="text" inputmode="numeric" class="form-control" id="retiradaEntry" style="font-weight:800;color:#e65100;font-size:1.05rem;" placeholder="0,00" oninput="Utils.maskMoney(this); Sales.PAY.instFromValue()" value="0">
                                     </div>
+                                </div>
+
+                                <!-- Separador visual entre Passo 1 e Passo 2 (só decorativo) -->
+                                <div style="height:1px;background:linear-gradient(90deg,transparent,#ffe0b2,transparent);margin:14px 0;"></div>
+                                <div style="display:flex;align-items:center;gap:6px;margin-bottom:10px;">
+                                    <i class="fas fa-calendar-alt" style="color:#e55a00;font-size:0.8rem;"></i>
+                                    <span style="font-size:0.76rem;font-weight:700;color:#e55a00;">Parcelamento do restante</span>
+                                </div>
+                                <div class="form-row" style="margin-bottom:0;">
                                     <div class="form-group">
                                         <label>Nº de Parcelas</label>
                                         <select id="installmentCount" class="form-control" onchange="Sales.PAY.instFromValue()">
