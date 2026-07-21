@@ -9421,6 +9421,16 @@ body.dark-mode,
             crmContatos: 'crmContatos', crmTarefas: 'crmTarefas', crmNps: 'crmNps'
         };
 
+        // ✅ FIX MÉDIO #7 (auditoria de vendas): rótulos das formas de pagamento
+        // centralizados aqui — antes, esse mesmo mapa estava copiado em 9 lugares
+        // diferentes do código. Agora toda tela usa esta única fonte, então
+        // adicionar uma forma de pagamento nova (ex: "Boleto") só precisa ser
+        // feito aqui, sem risco de esquecer de atualizar algum lugar.
+        const PAYMENT_METHOD_LABELS = {
+            pix: 'PIX', cash: 'Dinheiro', debit: 'Débito', credit: 'Crédito',
+            installment: 'Crediário', mixed: 'Misto'
+        };
+
         // ══════════════════════════════════════════════════════════════════════
         //  LocalFirst — RxDB v17-compatible Local-First engine
         // ══════════════════════════════════════════════════════════════════════
@@ -11406,7 +11416,7 @@ body.dark-mode,
 
                 // ── Injeta parcelas de vendas em Contas a Receber ──────────────
                 const metodosAVista = ['pix', 'cash', 'debit', 'credit'];
-                const metodoLabel   = {pix:'PIX', cash:'Dinheiro', debit:'Débito', credit:'Crédito', installment:'Crediário'};
+                const metodoLabel   = PAYMENT_METHOD_LABELS;
                 const contasVendas  = [];
 
                 // Fix Bug #1: substituído forEach+return por for...of+continue
@@ -11428,7 +11438,7 @@ body.dark-mode,
                         // BUG FIX: sempre inclui retirada (paga ou não) para que apareça em Pagos após baixa
                         const retiradaMista = parseFloat(det.retiradaValue || 0);
                         if (retiradaMista > 0.01) {
-                            const mixLabel = sale.mixedPayments.map(r => ({pix:'PIX',cash:'Dinheiro',debit:'Débito',credit:'Crédito',installment:'Crediário'}[r.method]||r.method)).join('+');
+                            const mixLabel = sale.mixedPayments.map(r => (PAYMENT_METHOD_LABELS[r.method]||r.method)).join('+');
                             contasVendas.push({
                                 id: 'venda_' + sale.id + '_retirada',
                                 tipo: 'receber',
@@ -11448,7 +11458,7 @@ body.dark-mode,
                     if (sale.paymentMode === 'dual' && sale.dualPayments?.length === 2) {
                         for (const [idx, slot] of sale.dualPayments.entries()) {
                             const slotLabel = idx === 0 ? '1ª' : '2ª';
-                            const mLbl = {pix:'PIX',cash:'Dinheiro',debit:'Débito',credit:'Crédito',installment:'Crediário'}[slot.method] || slot.method;
+                            const mLbl = PAYMENT_METHOD_LABELS[slot.method] || slot.method;
                             if (slot.method === 'installment') {
                                 // Parcelas do crediário desta forma
                                 // BUG FIX: inclui parcelas pagas com pago:true (igual a Contas a Pagar manuais)
@@ -15160,7 +15170,7 @@ tbody tr td{border:1.5px solid #000;padding:2mm;text-align:center;font-weight:70
                 const payMethodCounts = {};
                 (state.sales||[]).forEach(s => { payMethodCounts[s.paymentMethod] = (payMethodCounts[s.paymentMethod]||0) + 1; });
                 const topPay = Object.entries(payMethodCounts).sort((a,b)=>b[1]-a[1])[0];
-                const payLabels = { pix:'PIX', cash:'Dinheiro', debit:'Débito', credit:'Crédito', installment:'Crediário' };
+                const payLabels = PAYMENT_METHOD_LABELS;
                 const company = state.company || {};
                 const goal    = parseFloat(company.salesGoal) || 0;
                 const now       = new Date();
@@ -19154,7 +19164,7 @@ ${container.innerHTML}
                     'cancelado':   { label: '❌ Cancelado',          cls: 'danger'    },
                 };
 
-                const METH_LBL = {pix:'PIX', cash:'Dinheiro', debit:'Débito', credit:'Crédito', installment:'Crediário'};
+                const METH_LBL = PAYMENT_METHOD_LABELS;
 
                 // Helper: resumo de pagamento da venda
                 const getPayLabel = (s) => {
@@ -19644,6 +19654,37 @@ ${container.innerHTML}
             //   Crediário        → entrada + retirada + parcelas mensais
             //   Status parcelas  → 'aberto' | 'pago' | 'vencido'
             // ══════════════════════════════════════════════════════════════
+            // ✅ FIX CRÍTICO #1 (auditoria de vendas): soma meses a uma data sem deixar
+            // o JavaScript "estourar" para o mês seguinte quando o dia não existe no mês
+            // de destino (ex: dia 31 + 1 mês em um mês de 28/30 dias). Antes disso, usar
+            // Date.setMonth() diretamente fazia parcelas de vencimento em dias 29/30/31
+            // pularem/desalinharem o mês a partir da 2ª parcela em diante.
+            _addMonthsClamped(baseDateStr, monthsToAdd, dayOverride) {
+                const base = new Date(baseDateStr + 'T12:00:00');
+                const day  = dayOverride || base.getDate();
+                const totalMonthIndex = base.getMonth() + monthsToAdd;
+                const targetYear  = base.getFullYear() + Math.floor(totalMonthIndex / 12);
+                const targetMonth = ((totalMonthIndex % 12) + 12) % 12;
+                const lastDayOfTargetMonth = new Date(targetYear, targetMonth + 1, 0).getDate();
+                const finalDay = Math.min(day, lastDayOfTargetMonth);
+                return new Date(targetYear, targetMonth, finalDay, 12, 0, 0);
+            },
+
+            // ✅ FIX CRÍTICO #2 (auditoria de vendas): distribui os centavos da divisão
+            // total/parcelas de forma que a soma de todas as parcelas bata exatamente
+            // com o valor total (a última parcela absorve a diferença de arredondamento).
+            // Antes: cada parcela era total/N sem ajuste, então a soma podia ficar 1-2
+            // centavos a mais ou a menos que o valor real da venda.
+            _distribuirParcelas(valorTotal, nParcelas) {
+                const valores = [];
+                const baseCent = Math.floor((valorTotal * 100) / nParcelas);
+                let somaCent = 0;
+                for (let i = 0; i < nParcelas - 1; i++) { valores.push(baseCent); somaCent += baseCent; }
+                const totalCent = Math.round(valorTotal * 100);
+                valores.push(totalCent - somaCent); // última parcela absorve a sobra/falta
+                return valores.map(c => c / 100);
+            },
+
             PAY: {
                 // Formata moeda
                 fmt(v) { return 'R$ ' + Math.max(0, isNaN(v)?0:v).toFixed(2).replace('.',',').replace(/\B(?=(\d{3})+(?!\d))/g,'.'); },
@@ -19866,25 +19907,26 @@ ${container.innerHTML}
                     const fixedDay     = parseInt(document.getElementById('fixedDay')?.value)        || 0;
 
                     const parcels = [];
+                    // ✅ FIX CRÍTICO #2: valores distribuídos de forma que a soma bata
+                    // exatamente com "remaining" (última parcela absorve os centavos).
+                    const valoresParcelas = Sales._distribuirParcelas(remaining, nParcelas);
                     for (let i = 1; i <= nParcelas; i++) {
-                        const dueDate = new Date(firstDate + 'T12:00:00');
-                        dueDate.setMonth(dueDate.getMonth() + (i - 1));
-                        if (fixedDay) {
-                            const maxDay = new Date(dueDate.getFullYear(), dueDate.getMonth() + 1, 0).getDate();
-                            dueDate.setDate(Math.min(fixedDay, maxDay));
-                        }
+                        // ✅ FIX CRÍTICO #1: soma meses sem estourar quando o dia não
+                        // existe no mês de destino (ex: dia 31 em fevereiro).
+                        const dueDate = Sales._addMonthsClamped(firstDate, i - 1, fixedDay || null);
+                        const valorParcelaAtual = valoresParcelas[i - 1];
                         const today = new Date();
                         const diffMs = today - dueDate;
                         const daysLate = diffMs > 0 ? Math.ceil(diffMs / 86400000) : 0;
                         let multaJuros = 0;
                         if (daysLate > 0) {
-                            multaJuros = parcValue * (lateFee/100) + parcValue * (dailyInterest/100) * daysLate;
+                            multaJuros = valorParcelaAtual * (lateFee/100) + valorParcelaAtual * (dailyInterest/100) * daysLate;
                         }
                         const status = daysLate > 0 ? 'vencido' : 'aberto';
                         parcels.push({
                             number: i,
                             dueDate: dueDate.toISOString().slice(0,10),
-                            value: parcValue,
+                            value: valorParcelaAtual,
                             paidDate: null,
                             paidValue: null,
                             status,
@@ -20050,7 +20092,7 @@ ${container.innerHTML}
             },
 
             getMixedPaymentSummary() {
-                const labels = { pix:'PIX', cash:'Dinheiro', debit:'Débito', credit:'Crédito', installment:'Crediário' };
+                const labels = PAYMENT_METHOD_LABELS;
                 return (state.currentSale.mixedPayments || [])
                     .map(r => `${labels[r.method]||r.method}: ${Utils.formatCurrency(r.value)}`).join(' + ');
             },
@@ -20082,7 +20124,7 @@ ${container.innerHTML}
             },
 
             calcDual() {
-                const lbl   = {pix:'PIX',cash:'Dinheiro',debit:'Débito',credit:'Crédito',installment:'Crediário'};
+                const lbl   = PAYMENT_METHOD_LABELS;
                 const total = state.currentSale._grossTotal || state.currentSale.total || 0;
                 const m1    = document.getElementById('dual1Method')?.value || 'pix';
                 const m2    = document.getElementById('dual2Method')?.value || 'cash';
@@ -20154,14 +20196,15 @@ ${container.innerHTML}
                 if (!slot || slot.method !== 'installment' || slot.value <= 0) return [];
                 const saldo    = Math.max(0, slot.value - (slot.entry || 0) - (slot.retirada || 0));
                 const nParc    = slot.parcelas || 2;
-                const parcVal  = nParc > 0 ? saldo / nParc : 0;
+                // ✅ FIX CRÍTICO #1 e #2 (mesma correção aplicada ao crediário simples):
+                // datas sem estourar o mês + centavos que fecham exatamente com o saldo.
+                const valoresParcelas = this._distribuirParcelas(saldo, nParc);
                 const parcelas = [];
                 for (let i = 1; i <= nParc; i++) {
-                    const due = new Date(firstDateStr + 'T12:00:00');
-                    due.setMonth(due.getMonth() + (i - 1));
+                    const due = this._addMonthsClamped(firstDateStr, i - 1);
                     parcelas.push({
                         number: i, dueDate: due.toISOString().slice(0,10),
-                        value: parcVal, paidDate: null, paidValue: null,
+                        value: valoresParcelas[i - 1], paidDate: null, paidValue: null,
                         // Bug #D Fix: lê da configuração em vez de hardcodar 2% e 0.033%
                         status: 'aberto', daysLate: 0,
                         lateFee: parseFloat(document.getElementById('lateFee')?.value) || 2,
@@ -20432,8 +20475,24 @@ ${container.innerHTML}
                     parcel.paidDate = paidDate;
                     if (paidDate) {
                         parcel.status = 'pago';
+                        parcel.paid   = true; // ✅ FIX CRÍTICO #4
+                    } else {
+                        parcel.status = 'aberto';
+                        parcel.paid   = false;
                     }
                     this.renderInstallmentsTable();
+                    // ✅ FIX CRÍTICO #3: persiste direto na venda real, igual ao markAsPaid.
+                    if (state.editingSaleId) {
+                        const realSale = state.sales.find(s => s.id === state.editingSaleId);
+                        const realParcel = realSale?.paymentDetails?.parcels?.find(p => p.number === parcelNumber);
+                        if (realSale && realParcel) {
+                            realParcel.paidDate = parcel.paidDate;
+                            realParcel.status   = parcel.status;
+                            realParcel.paid     = parcel.paid;
+                            realSale._updatedAt = new Date().toISOString();
+                            SupaSync.inserirVenda(realSale).catch(() => {});
+                        }
+                    }
                 }
             },
 
@@ -20443,6 +20502,16 @@ ${container.innerHTML}
                 if (parcel) {
                     parcel.paidValue = paidValue;
                     this.renderInstallmentsTable();
+                    // ✅ FIX CRÍTICO #3: persiste direto na venda real.
+                    if (state.editingSaleId) {
+                        const realSale = state.sales.find(s => s.id === state.editingSaleId);
+                        const realParcel = realSale?.paymentDetails?.parcels?.find(p => p.number === parcelNumber);
+                        if (realSale && realParcel) {
+                            realParcel.paidValue = paidValue;
+                            realSale._updatedAt   = new Date().toISOString();
+                            SupaSync.inserirVenda(realSale).catch(() => {});
+                        }
+                    }
                 }
             },
 
@@ -20548,10 +20617,32 @@ ${container.innerHTML}
                     const rawVal = overlay.querySelector('#_markPaidInput').value;
                     const paidVal = parseFloat(String(rawVal).replace(',','.'));
                     if (!paidVal || paidVal <= 0) { Toast.show('Informe um valor válido','warning'); return; }
-                    parcel.paidDate = new Date().toISOString().slice(0, 10);
+                    const paidDateStr = new Date().toISOString().slice(0, 10);
+                    // ✅ FIX CRÍTICO #4: preenche paid + status juntos (mesma convenção
+                    // já usada em Contas a Receber), evitando parcela paga aparecer como
+                    // pendente em telas que só checam um dos dois campos.
+                    parcel.paidDate  = paidDateStr;
                     parcel.paidValue = paidVal;
-                    parcel.status = 'pago';
+                    parcel.status    = 'pago';
+                    parcel.paid      = true;
                     this.renderInstallmentsTable();
+
+                    // ✅ FIX CRÍTICO #3: grava direto na venda real (state.sales) e
+                    // sincroniza na hora — antes, esse pagamento só existia numa cópia
+                    // temporária da tela (state.currentSale) e se perdia silenciosamente
+                    // se o usuário saísse sem clicar em "Salvar Venda".
+                    if (state.editingSaleId) {
+                        const realSale = state.sales.find(s => s.id === state.editingSaleId);
+                        const realParcel = realSale?.paymentDetails?.parcels?.find(p => p.number === parcelNumber);
+                        if (realSale && realParcel) {
+                            realParcel.paidDate  = paidDateStr;
+                            realParcel.paidValue = paidVal;
+                            realParcel.status    = 'pago';
+                            realParcel.paid      = true;
+                            realSale._updatedAt  = new Date().toISOString();
+                            SupaSync.inserirVenda(realSale).catch(() => {});
+                        }
+                    }
                     Toast.show('Pagamento registrado com sucesso!');
                     overlay.remove();
                 };
@@ -20685,7 +20776,7 @@ ${container.innerHTML}
                 const fc = v => Utils.formatCurrency(v);
 
                 const statusMap = { pending:'Aguardando', production:'Em Produção', ready:'Pronto p/ Retirada', delivered:'Entregue', cancelled:'Cancelado' };
-                const pagMap    = { pix:'PIX', cash:'Dinheiro', debit:'Débito', credit:'Crédito', installment:'Crediário', mixed:'Misto' };
+                const pagMap    = PAYMENT_METHOD_LABELS;
                 const isMixed   = sale.paymentMethod === 'mixed' && Array.isArray(sale.mixedPayments) && sale.mixedPayments.length > 0;
 
                 // ── Logo: posicionamento absoluto para html2canvas ──
@@ -21571,7 +21662,7 @@ ${container.innerHTML}
                 const phone  = (client.whatsapp || client.phone || '').replace(/\D/g,'');
                 if (!phone)  { Toast.show('Cliente sem WhatsApp/telefone cadastrado','warning'); return; }
                 const fd = d => d ? new Date(d+'T12:00:00').toLocaleDateString('pt-BR') : '—';
-                const METH = {pix:'PIX',cash:'Dinheiro',debit:'Débito',credit:'Crédito',installment:'Crediário'};
+                const METH = PAYMENT_METHOD_LABELS;
                 let pag = METH[sale.paymentMethod] || sale.paymentMethod || '—';
                 if (sale.paymentMode === 'dual' && sale.dualPayments?.length === 2)
                     pag = sale.dualPayments.map(d => METH[d.method]||d.method).join(' + ');
@@ -21867,6 +21958,14 @@ ${container.innerHTML}
                         : [{ date: new Date().toISOString(), status: 'Criada' }]
                 };
                 
+                // ✅ FIX ALTO #5 (auditoria de vendas): captura as quantidades ANTIGAS
+                // dos itens antes de sobrescrever a venda, para calcular corretamente
+                // a diferença de estoque numa edição (ex: trocar 1 lente por 2 não pode
+                // baixar 2 do estoque sem devolver a 1 que já tinha sido baixada antes).
+                const itensAntigos = state.editingSaleId
+                    ? (state.sales.find(s => s.id === state.editingSaleId)?.items || [])
+                    : [];
+
                 if (state.editingSaleId) {
                     const index = state.sales.findIndex(s => s.id === state.editingSaleId);
                     if (index !== -1) {
@@ -21879,6 +21978,35 @@ ${container.innerHTML}
                     if (!state.lastOsCounter) state.lastOsCounter = {};
                     state.lastOsCounter[currentYear] = (state.lastOsCounter[currentYear] || 1) + 1;
                 }
+
+                // ✅ FIX ALTO #5: baixa de estoque. Só afeta itens com productId que
+                // batam com um produto real cadastrado (lentes, armações, tratamentos —
+                // serviços não têm estoque). Numa edição, aplica só a DIFERENÇA entre o
+                // que tinha antes e o que ficou agora, nunca a quantidade inteira de novo.
+                try {
+                    const deltaPorProduto = {};
+                    const somarQty = (items, sinal) => {
+                        (items || []).forEach(it => {
+                            if (!it.productId) return;
+                            deltaPorProduto[it.productId] = (deltaPorProduto[it.productId] || 0) + sinal * (it.qty || 0);
+                        });
+                    };
+                    somarQty(sale.items, +1);       // quantidades novas: baixam do estoque
+                    somarQty(itensAntigos, -1);      // quantidades antigas (se editando): devolvem ao estoque
+
+                    const produtosAlterados = [];
+                    Object.keys(deltaPorProduto).forEach(prodId => {
+                        const delta = deltaPorProduto[prodId];
+                        if (!delta) return; // sem mudança líquida nesse produto
+                        const prod = state.products.find(p => p.id === prodId);
+                        if (!prod || prod.qty === undefined) return; // produto sem controle de estoque
+                        prod.qty = Math.max(0, (prod.qty || 0) - delta);
+                        prod._updatedAt = new Date().toISOString();
+                        produtosAlterados.push(prod);
+                    });
+                    // Sincroniza cada produto alterado (mesmo mecanismo já usado em todo o sistema)
+                    produtosAlterados.forEach(p => SupaSync.upsertProduto(p).catch(() => {}));
+                } catch(_stockErr) { console.warn('[Sales.save] Aviso: falha ao ajustar estoque:', _stockErr?.message); }
                 
                 // Salva localmente de forma assíncrona mas garante que state já está atualizado
                 App.saveData(true); // silent=true evita toast duplicado
@@ -22375,6 +22503,19 @@ ${container.innerHTML}
 
             delete(id) {
                 Modal.showConfirm('Excluir esta venda?', () => {
+                    // ✅ FIX ALTO #5: devolve ao estoque os itens da venda excluída,
+                    // antes de removê-la do state.
+                    try {
+                        const saleToDelete = state.sales.find(s => s.id === id);
+                        (saleToDelete?.items || []).forEach(it => {
+                            if (!it.productId) return;
+                            const prod = state.products.find(p => p.id === it.productId);
+                            if (!prod || prod.qty === undefined) return;
+                            prod.qty = (prod.qty || 0) + (it.qty || 0);
+                            prod._updatedAt = new Date().toISOString();
+                            SupaSync.upsertProduto(prod).catch(() => {});
+                        });
+                    } catch(_stockErr) { console.warn('[Sales.delete] Aviso: falha ao restaurar estoque:', _stockErr?.message); }
                     state.sales = state.sales.filter(s => s.id !== id);
                     App.saveData();
                     LocalFirst.deleteItem('sales', id);
