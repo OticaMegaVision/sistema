@@ -10368,6 +10368,21 @@ body.dark-mode,
             //  de popup do navegador. Ver _refreshGDriveAccessToken() mais abaixo,
             //  perto de connectGDrive().)
             let _autoRefreshing = false;
+            // ✅ FIX SYNC OneDrive: flag equivalente para renovação silenciosa do token OneDrive
+            let _autoRefreshingOD = false;
+
+            // ── PKCE helpers (usado no novo fluxo Authorization Code + PKCE do OneDrive) ──
+            function _base64url(buffer) {
+                let str = '';
+                const bytes = new Uint8Array(buffer);
+                for (let i = 0; i < bytes.length; i++) str += String.fromCharCode(bytes[i]);
+                return btoa(str).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+            }
+            async function _pkceChallenge(verifier) {
+                const enc = new TextEncoder().encode(verifier);
+                const digest = await crypto.subtle.digest('SHA-256', enc);
+                return _base64url(digest);
+            }
 
             // ── Persiste / restaura tokens ───────────────────────────────────
             function _saveTokens() {
@@ -10779,6 +10794,30 @@ body.dark-mode,
                 _pushing = true;
                 if (silent) _updateWidget('push', '↑ Enviando...');
                 try {
+                    // ✅ FIX RACE-CONDITION (causa da "venda que some" entre aparelhos):
+                    // antes de enviar, baixa e mescla o que já está no Drive. Sem isso,
+                    // se o OUTRO dispositivo enviou uma venda há poucos segundos e este
+                    // aparelho ainda não deu pull, o upload abaixo sobrescreveria o
+                    // arquivo inteiro e a venda do outro dispositivo seria perdida (até
+                    // um pull que talvez nunca aconteça antes do próximo push local).
+                    // _applyCloudData faz merge item-a-item por _updatedAt, então isso
+                    // nunca reverte uma mudança local mais recente.
+                    try {
+                        const fileIdPre = await _gdriveGetOrCreateFileId();
+                        if (fileIdPre) {
+                            const preResp = await fetch(
+                                'https://www.googleapis.com/drive/v3/files/' + fileIdPre + '?alt=media',
+                                { headers: { Authorization: 'Bearer ' + _gdriveToken.access_token } }
+                            );
+                            if (preResp.ok) {
+                                const preRemote = await preResp.json();
+                                await _applyCloudData(preRemote, true);
+                            }
+                        }
+                    } catch(_mergeErr) {
+                        console.warn('[CloudSync] merge pré-push (Drive) falhou — seguindo só com dados locais:', _mergeErr.message);
+                    }
+
                     const data = JSON.stringify(_collectAllData(), null, 2);
                     const fileId = await _gdriveGetOrCreateFileId();
                     if (fileId) {
@@ -10897,23 +10936,132 @@ body.dark-mode,
             //  ONEDRIVE
             // ════════════════════════════════════════════════════════════════
 
+            // ✅ FIX SYNC CRÍTICO — OneDrive: o fluxo antigo era "implicit" (response_type=token),
+            // que a Microsoft NUNCA devolve com refresh_token. Resultado: o access_token expirava
+            // em ~1h e o dispositivo parava de sincronizar silenciosamente até o usuário notar o
+            // banner e reconectar manualmente — a causa mais provável de "um aparelho não vê mais
+            // as vendas do outro" depois de um tempo de uso. Agora usamos Authorization Code + PKCE
+            // (fluxo de cliente público, sem client_secret) com scope "offline_access", que devolve
+            // um refresh_token e permite renovar o access_token silenciosamente (igual ao Google Drive).
             async function connectOneDrive() {
                 const clientId = (document.getElementById('onedriveClientId')?.value?.trim()) || ONEDRIVE_DEFAULT_CLIENT;
                 if (!clientId) { Toast.show('⚠️ Informe o Client ID do Azure para conectar.', 'warning', 5000); return; }
+                try { localStorage.setItem('cs_od_client_id', clientId); } catch(e) {}
                 const state_val = _randomStr(16);
-                sessionStorage.setItem('od_state',  state_val);
-                sessionStorage.setItem('od_client', clientId);
+                const verifier  = _randomStr(64);
+                sessionStorage.setItem('od_state',    state_val);
+                sessionStorage.setItem('od_client',   clientId);
+                sessionStorage.setItem('od_verifier', verifier);
+                const challenge = await _pkceChallenge(verifier);
                 const params = new URLSearchParams({
-                    client_id:     clientId,
-                    redirect_uri:  location.origin + location.pathname,
-                    response_type: 'token',
-                    scope:         'https://graph.microsoft.com/Files.ReadWrite',
-                    state:         state_val,
-                    nonce:         _randomStr(16)
+                    client_id:             clientId,
+                    redirect_uri:          location.origin + location.pathname,
+                    response_type:         'code',
+                    response_mode:         'query',
+                    scope:                 'https://graph.microsoft.com/Files.ReadWrite offline_access',
+                    state:                 state_val,
+                    code_challenge:        challenge,
+                    code_challenge_method: 'S256'
                 });
                 window.location.href = 'https://login.microsoftonline.com/consumers/oauth2/v2.0/authorize?' + params;
             }
 
+            // ── Troca o "code" (PKCE) por access_token + refresh_token ────────
+            // Diferente do Google, o endpoint de token da Microsoft aceita CORS para
+            // apps registrados como "Single-page application" no Azure, então a troca
+            // pode ser feita direto do navegador, sem precisar de Edge Function.
+            async function _exchangeOneDriveCode(code, clientIdUsed) {
+                try {
+                    const verifier = sessionStorage.getItem('od_verifier') || '';
+                    const body = new URLSearchParams({
+                        client_id:     clientIdUsed,
+                        scope:         'https://graph.microsoft.com/Files.ReadWrite offline_access',
+                        code:          code,
+                        redirect_uri:  location.origin + location.pathname,
+                        grant_type:    'authorization_code',
+                        code_verifier: verifier
+                    });
+                    const resp = await fetch('https://login.microsoftonline.com/consumers/oauth2/v2.0/token', {
+                        method:  'POST',
+                        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                        body:    body.toString()
+                    });
+                    const data = await resp.json();
+                    if (!resp.ok || !data.access_token) {
+                        console.warn('[CloudSync] ⚠️ Falha ao trocar code OneDrive por token:', data);
+                        Toast.show('⚠️ Falha ao conectar OneDrive. Tente novamente.', 'danger', 4000);
+                        return false;
+                    }
+                    _onedriveToken = {
+                        access_token:  data.access_token,
+                        refresh_token: data.refresh_token || null,
+                        expires_at:    Date.now() + (parseInt(data.expires_in || '3600', 10) * 1000),
+                        client_id:     clientIdUsed || ''
+                    };
+                    _activeProvider = 'onedrive';
+                    _saveTokens();
+                    sessionStorage.removeItem('od_state');
+                    sessionStorage.removeItem('od_client');
+                    sessionStorage.removeItem('od_verifier');
+                    _updateUI();
+                    Toast.show('✅ OneDrive conectado! Sincronizando...', 'success', 3000);
+                    setTimeout(() => { onedrivePull(true).catch(()=>{}); }, 800);
+                    _startPolling();
+                    return true;
+                } catch (e) {
+                    console.warn('[CloudSync] ⚠️ Erro de rede ao trocar code OneDrive:', e);
+                    Toast.show('⚠️ Erro de rede ao conectar OneDrive.', 'danger', 4000);
+                    return false;
+                }
+            }
+
+            // ── Renova o access_token do OneDrive usando o refresh_token ──────
+            // (silencioso, sem popup — evita que a sincronização pare depois de ~1h)
+            async function _refreshOneDriveAccessToken() {
+                if (_autoRefreshingOD) return false;
+                if (!_onedriveToken || !_onedriveToken.refresh_token) {
+                    _showReconnectBanner();
+                    return false;
+                }
+                _autoRefreshingOD = true;
+                try {
+                    const body = new URLSearchParams({
+                        client_id:     _onedriveToken.client_id || localStorage.getItem('cs_od_client_id') || '',
+                        scope:         'https://graph.microsoft.com/Files.ReadWrite offline_access',
+                        refresh_token: _onedriveToken.refresh_token,
+                        grant_type:    'refresh_token'
+                    });
+                    const resp = await fetch('https://login.microsoftonline.com/consumers/oauth2/v2.0/token', {
+                        method:  'POST',
+                        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                        body:    body.toString()
+                    });
+                    const data = await resp.json();
+                    if (!resp.ok || !data.access_token) {
+                        console.warn('[CloudSync] ⚠️ Falha ao renovar token OneDrive via refresh_token:', data);
+                        _showReconnectBanner();
+                        return false;
+                    }
+                    _onedriveToken = {
+                        ..._onedriveToken,
+                        access_token:  data.access_token,
+                        refresh_token: data.refresh_token || _onedriveToken.refresh_token,
+                        expires_at:    Date.now() + (parseInt(data.expires_in || '3600', 10) * 1000)
+                    };
+                    _saveTokens();
+                    const mins = Math.round((data.expires_in || 3600) / 60);
+                    console.log('[CloudSync] ✅ Token OneDrive renovado silenciosamente — válido por ~' + mins + ' min');
+                    return true;
+                } catch (e) {
+                    console.warn('[CloudSync] ⚠️ Erro de rede ao renovar token OneDrive:', e);
+                    return false;
+                } finally {
+                    _autoRefreshingOD = false;
+                }
+            }
+
+            // Mantido apenas por compatibilidade caso algum navegador ainda tenha
+            // um callback implícito antigo pendente (ex: aba aberta antes da atualização).
             function _handleOneDriveImplicitCallback(hashParams) {
                 const accessToken = hashParams.get('access_token');
                 const state_val   = hashParams.get('state');
@@ -10974,6 +11122,21 @@ body.dark-mode,
                 if (_pushing) return;
                 _pushing = true;
                 try {
+                    // ✅ FIX RACE-CONDITION (mesmo problema do Google Drive, ver comentário
+                    // equivalente em gdrivePush): mescla o remoto antes de sobrescrever.
+                    try {
+                        const preResp = await fetch(
+                            'https://graph.microsoft.com/v1.0/me/drive/root:/' + encodeURIComponent(_fileName()) + ':/content',
+                            { headers: { Authorization: 'Bearer ' + _onedriveToken.access_token } }
+                        );
+                        if (preResp.ok) {
+                            const preRemote = await preResp.json();
+                            await _applyCloudData(preRemote, true);
+                        }
+                    } catch(_mergeErr) {
+                        console.warn('[CloudSync] merge pré-push (OneDrive) falhou — seguindo só com dados locais:', _mergeErr.message);
+                    }
+
                     const data = JSON.stringify(_collectAllData(), null, 2);
                     const r = await fetch(
                         'https://graph.microsoft.com/v1.0/me/drive/root:/' + encodeURIComponent(_fileName()) + ':/content',
@@ -11196,31 +11359,41 @@ body.dark-mode,
 
             // ── Trata callback OAuth2 na URL ──────────────────────────────────
             function _handleOAuthCallback() {
-                // ── Google Drive: Authorization Code flow → volta como query string
-                //    (?code=...&state=...), não como hash. Trata isso primeiro. ────
+                // ── Google Drive E OneDrive agora usam Authorization Code flow →
+                //    ambos voltam como query string (?code=...&state=...). Como os
+                //    dois usam o mesmo formato, identificamos QUAL provedor iniciou
+                //    o fluxo comparando o "state" recebido com o que foi salvo antes
+                //    do redirect (gdrive_state vs od_state) — evita processar o
+                //    código do provedor errado. ──────────────────────────────────
                 const searchParams = new URLSearchParams(location.search);
-                const gCode  = searchParams.get('code');
-                const gState = searchParams.get('state');
-                const gError = searchParams.get('error');
-                if (gCode || gError) {
+                const code  = searchParams.get('code');
+                const state_ = searchParams.get('state');
+                const error = searchParams.get('error');
+                if (code || error) {
                     history.replaceState({}, '', location.pathname);
-                    if (gError) {
-                        console.warn('[CloudSync] ⚠️ Google OAuth retornou erro:', gError);
-                        Toast.show('⚠️ Conexão com Google Drive cancelada ou negada.', 'warning', 4000);
+                    if (error) {
+                        console.warn('[CloudSync] ⚠️ OAuth retornou erro:', error);
+                        Toast.show('⚠️ Conexão cancelada ou negada.', 'warning', 4000);
                         return;
                     }
-                    if (sessionStorage.getItem('gdrive_state') !== gState) {
-                        Toast.show('⚠️ Falha de segurança no callback Google (state inválido).', 'danger');
+                    if (sessionStorage.getItem('gdrive_state') === state_) {
+                        const clientIdUsed = sessionStorage.getItem('gdrive_client') || '';
+                        sessionStorage.removeItem('gdrive_state');
+                        sessionStorage.removeItem('gdrive_client');
+                        _exchangeGDriveCode(code, clientIdUsed);
                         return;
                     }
-                    const clientIdUsed = sessionStorage.getItem('gdrive_client') || '';
-                    sessionStorage.removeItem('gdrive_state');
-                    sessionStorage.removeItem('gdrive_client');
-                    _exchangeGDriveCode(gCode, clientIdUsed);
+                    if (sessionStorage.getItem('od_state') === state_) {
+                        const clientIdUsed = sessionStorage.getItem('od_client') || '';
+                        _exchangeOneDriveCode(code, clientIdUsed);
+                        return;
+                    }
+                    Toast.show('⚠️ Falha de segurança no callback OAuth (state inválido).', 'danger');
                     return;
                 }
 
-                // ── OneDrive: continua no fluxo implícito (hash) ────────────────
+                // ── Compatibilidade: alguma aba antiga ainda pode voltar pelo
+                //    fluxo implícito (hash) se estava aberta durante a atualização. ──
                 const rawHash = location.hash.substring(1);
                 if (!rawHash) return;
                 const hashParams = new URLSearchParams(rawHash);
@@ -11250,16 +11423,19 @@ body.dark-mode,
                 const tok = _activeProvider === 'gdrive' ? _gdriveToken : _onedriveToken;
                 if (!tok) return;
                 if (_isExpired(tok)) {
-                    // Token expirado: auto-refresh (GDrive, via refresh_token) ou banner (OneDrive)
+                    // Token expirado: auto-refresh silencioso via refresh_token (ambos os provedores agora)
                     if (_activeProvider === 'gdrive' && !_autoRefreshing) {
                         _refreshGDriveAccessToken();
-                    } else if (_activeProvider !== 'gdrive') {
-                        _showReconnectBanner();
+                    } else if (_activeProvider === 'onedrive' && !_autoRefreshingOD) {
+                        _refreshOneDriveAccessToken();
                     }
                 } else if (_activeProvider === 'gdrive' && _isNearExpiry(tok) && !_autoRefreshing) {
                     // Token próximo de expirar (< 10 min): renova preventivamente
                     console.log('[CloudSync] ⏰ Token Google Drive expira em < 10 min — renovação preventiva...');
                     _refreshGDriveAccessToken();
+                } else if (_activeProvider === 'onedrive' && _isNearExpiry(tok) && !_autoRefreshingOD) {
+                    console.log('[CloudSync] ⏰ Token OneDrive expira em < 10 min — renovação preventiva...');
+                    _refreshOneDriveAccessToken();
                 }
             }
             function _showReconnectBanner() {
