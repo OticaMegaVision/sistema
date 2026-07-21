@@ -5587,6 +5587,23 @@ body.dark-mode,
             <section id="sales" class="section" aria-labelledby="pageTitle">
                 <div class="form-container no-print">
                     <h2 class="section-title">NOVA ORDEM DE SERVIÇO</h2>
+
+                    <!-- ✅ Barra de etapas (visual/orientativa — não interfere em nenhuma
+                         lógica existente, apenas ajuda a visualizar o fluxo da OS) -->
+                    <div style="display:flex;gap:6px;margin:0 0 18px;background:#fff;border-radius:14px;padding:8px;box-shadow:var(--shadow-card, 0 2px 16px rgba(0,0,0,.08));">
+                        <div style="flex:1;text-align:center;padding:10px 4px;border-radius:10px;font-size:0.72rem;font-weight:700;background:var(--grad-primary, linear-gradient(135deg,#ff6b00,#ffaa00));color:#fff;box-shadow:var(--shadow-orange, 0 4px 20px rgba(255,107,0,.25));">
+                            <span style="display:block;font-size:0.62rem;opacity:0.85;font-weight:600;letter-spacing:0.5px;margin-bottom:2px;">01</span>Dados da OS
+                        </div>
+                        <div style="flex:1;text-align:center;padding:10px 4px;border-radius:10px;font-size:0.72rem;font-weight:700;color:#c9a86b;">
+                            <span style="display:block;font-size:0.62rem;opacity:0.85;font-weight:600;letter-spacing:0.5px;margin-bottom:2px;">02</span>Cliente
+                        </div>
+                        <div style="flex:1;text-align:center;padding:10px 4px;border-radius:10px;font-size:0.72rem;font-weight:700;color:#c9a86b;">
+                            <span style="display:block;font-size:0.62rem;opacity:0.85;font-weight:600;letter-spacing:0.5px;margin-bottom:2px;">03</span>Itens
+                        </div>
+                        <div style="flex:1;text-align:center;padding:10px 4px;border-radius:10px;font-size:0.72rem;font-weight:700;color:#c9a86b;">
+                            <span style="display:block;font-size:0.62rem;opacity:0.85;font-weight:600;letter-spacing:0.5px;margin-bottom:2px;">04</span>Pagamento
+                        </div>
+                    </div>
                     
                     <!-- DADOS DA OS -->
                     <div class="cliente-card">
@@ -5911,27 +5928,27 @@ body.dark-mode,
 
                             <!-- Painel Armação -->
                             <div id="itemTabArmacao" style="display:none;animation:fadeIn 0.2s ease;">
-                                <div style="background:#f9f9f9;border:1.5px solid #c8e6c9;border-radius:12px;padding:12px;display:flex;flex-direction:column;gap:10px;">
+                                <div style="background:#f9f9f9;border:1.5px solid #ffcbb0;border-radius:12px;padding:12px;display:flex;flex-direction:column;gap:10px;">
                                     <div style="display:flex;align-items:center;gap:8px;margin-bottom:2px;">
-                                        <div style="width:28px;height:28px;background:#e8f5e9;border-radius:8px;display:flex;align-items:center;justify-content:center;">
-                                            <i class="fas fa-glasses" style="color:#2e7d32;font-size:12px;"></i>
+                                        <div style="width:28px;height:28px;background:#ffe4d1;border-radius:8px;display:flex;align-items:center;justify-content:center;">
+                                            <i class="fas fa-glasses" style="color:#e85500;font-size:12px;"></i>
                                         </div>
-                                        <span style="font-weight:700;font-size:0.82rem;color:#2e7d32;">Selecionar Armação</span>
+                                        <span style="font-weight:700;font-size:0.82rem;color:#e85500;">Selecionar Armação</span>
                                     </div>
-                                    <select id="armacaoSelect" class="form-control" style="border-radius:8px;border-color:#a5d6a7;background:#fff;font-size:0.85rem;">
+                                    <select id="armacaoSelect" class="form-control" style="border-radius:8px;border-color:#ffb385;background:#fff;font-size:0.85rem;">
                                         <option value="">🔍 Escolha uma armação...</option>
                                     </select>
                                     <div style="display:flex;gap:10px;align-items:center;">
                                         <div style="flex:1;">
                                             <label style="font-size:11px;color:#888;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;">Quantidade</label>
-                                            <div style="display:flex;align-items:center;gap:0;border:1.5px solid #a5d6a7;border-radius:8px;overflow:hidden;background:#fff;width:fit-content;">
-                                                <button type="button" onclick="Sales.changeQty('armacaoQty',-1)" style="width:34px;height:34px;border:none;background:#e8f5e9;color:#2e7d32;font-size:16px;font-weight:700;cursor:pointer;">−</button>
+                                            <div style="display:flex;align-items:center;gap:0;border:1.5px solid #ffb385;border-radius:8px;overflow:hidden;background:#fff;width:fit-content;">
+                                                <button type="button" onclick="Sales.changeQty('armacaoQty',-1)" style="width:34px;height:34px;border:none;background:#ffe4d1;color:#e85500;font-size:16px;font-weight:700;cursor:pointer;">−</button>
                                                 <input type="number" id="armacaoQty" value="1" min="1" style="width:44px;height:34px;border:none;text-align:center;font-size:0.9rem;font-weight:700;color:#333;outline:none;">
-                                                <button type="button" onclick="Sales.changeQty('armacaoQty',1)" style="width:34px;height:34px;border:none;background:#e8f5e9;color:#2e7d32;font-size:16px;font-weight:700;cursor:pointer;">+</button>
+                                                <button type="button" onclick="Sales.changeQty('armacaoQty',1)" style="width:34px;height:34px;border:none;background:#ffe4d1;color:#e85500;font-size:16px;font-weight:700;cursor:pointer;">+</button>
                                             </div>
                                         </div>
                                         <button type="button" onclick="Sales.addArmacao()"
-                                            style="flex:1;padding:10px;border-radius:10px;border:none;background:linear-gradient(135deg,#43a047,#2e7d32);color:#fff;font-weight:700;font-size:0.83rem;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px;box-shadow:0 3px 10px rgba(46,125,50,0.25);">
+                                            style="flex:1;padding:10px;border-radius:10px;border:none;background:linear-gradient(135deg,#ff7a30,#e85500);color:#fff;font-weight:700;font-size:0.83rem;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px;box-shadow:0 3px 10px rgba(232,85,0,0.25);">
                                             <i class="fas fa-plus-circle"></i> Adicionar Armação
                                         </button>
                                     </div>
@@ -5940,27 +5957,27 @@ body.dark-mode,
 
                             <!-- Painel Serviço -->
                             <div id="itemTabServico" style="display:none;animation:fadeIn 0.2s ease;">
-                                <div style="background:#f9f9f9;border:1.5px solid #b3e5fc;border-radius:12px;padding:12px;display:flex;flex-direction:column;gap:10px;">
+                                <div style="background:#f9f9f9;border:1.5px solid #ffd699;border-radius:12px;padding:12px;display:flex;flex-direction:column;gap:10px;">
                                     <div style="display:flex;align-items:center;gap:8px;margin-bottom:2px;">
-                                        <div style="width:28px;height:28px;background:#e1f5fe;border-radius:8px;display:flex;align-items:center;justify-content:center;">
-                                            <i class="fas fa-tools" style="color:#0277bd;font-size:12px;"></i>
+                                        <div style="width:28px;height:28px;background:#fff3d9;border-radius:8px;display:flex;align-items:center;justify-content:center;">
+                                            <i class="fas fa-tools" style="color:#ff8f00;font-size:12px;"></i>
                                         </div>
-                                        <span style="font-weight:700;font-size:0.82rem;color:#0277bd;">Selecionar Serviço</span>
+                                        <span style="font-weight:700;font-size:0.82rem;color:#ff8f00;">Selecionar Serviço</span>
                                     </div>
-                                    <select id="servicoSelect" class="form-control" style="border-radius:8px;border-color:#81d4fa;background:#fff;font-size:0.85rem;">
+                                    <select id="servicoSelect" class="form-control" style="border-radius:8px;border-color:#ffc266;background:#fff;font-size:0.85rem;">
                                         <option value="">🔍 Escolha um serviço...</option>
                                     </select>
                                     <div style="display:flex;gap:10px;align-items:center;">
                                         <div style="flex:1;">
                                             <label style="font-size:11px;color:#888;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;">Quantidade</label>
-                                            <div style="display:flex;align-items:center;gap:0;border:1.5px solid #81d4fa;border-radius:8px;overflow:hidden;background:#fff;width:fit-content;">
-                                                <button type="button" onclick="Sales.changeQty('servicoQty',-1)" style="width:34px;height:34px;border:none;background:#e1f5fe;color:#0277bd;font-size:16px;font-weight:700;cursor:pointer;">−</button>
+                                            <div style="display:flex;align-items:center;gap:0;border:1.5px solid #ffc266;border-radius:8px;overflow:hidden;background:#fff;width:fit-content;">
+                                                <button type="button" onclick="Sales.changeQty('servicoQty',-1)" style="width:34px;height:34px;border:none;background:#fff3d9;color:#ff8f00;font-size:16px;font-weight:700;cursor:pointer;">−</button>
                                                 <input type="number" id="servicoQty" value="1" min="1" style="width:44px;height:34px;border:none;text-align:center;font-size:0.9rem;font-weight:700;color:#333;outline:none;">
-                                                <button type="button" onclick="Sales.changeQty('servicoQty',1)" style="width:34px;height:34px;border:none;background:#e1f5fe;color:#0277bd;font-size:16px;font-weight:700;cursor:pointer;">+</button>
+                                                <button type="button" onclick="Sales.changeQty('servicoQty',1)" style="width:34px;height:34px;border:none;background:#fff3d9;color:#ff8f00;font-size:16px;font-weight:700;cursor:pointer;">+</button>
                                             </div>
                                         </div>
                                         <button type="button" onclick="Sales.addServico()"
-                                            style="flex:1;padding:10px;border-radius:10px;border:none;background:linear-gradient(135deg,#039be5,#0277bd);color:#fff;font-weight:700;font-size:0.83rem;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px;box-shadow:0 3px 10px rgba(2,119,189,0.25);">
+                                            style="flex:1;padding:10px;border-radius:10px;border:none;background:linear-gradient(135deg,#ffa726,#ff8f00);color:#fff;font-weight:700;font-size:0.83rem;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px;box-shadow:0 3px 10px rgba(255,143,0,0.25);">
                                             <i class="fas fa-plus-circle"></i> Adicionar Serviço
                                         </button>
                                     </div>
@@ -5969,27 +5986,27 @@ body.dark-mode,
 
                             <!-- Painel Tratamento -->
                             <div id="itemTabTratamento" style="display:none;animation:fadeIn 0.2s ease;">
-                                <div style="background:#f9f9f9;border:1.5px solid #ce93d8;border-radius:12px;padding:12px;display:flex;flex-direction:column;gap:10px;">
+                                <div style="background:#f9f9f9;border:1.5px solid #f0c780;border-radius:12px;padding:12px;display:flex;flex-direction:column;gap:10px;">
                                     <div style="display:flex;align-items:center;gap:8px;margin-bottom:2px;">
-                                        <div style="width:28px;height:28px;background:#f3e5f5;border-radius:8px;display:flex;align-items:center;justify-content:center;">
-                                            <i class="fas fa-flask" style="color:#7b1fa2;font-size:12px;"></i>
+                                        <div style="width:28px;height:28px;background:#fdf0d9;border-radius:8px;display:flex;align-items:center;justify-content:center;">
+                                            <i class="fas fa-flask" style="color:#b36b00;font-size:12px;"></i>
                                         </div>
-                                        <span style="font-weight:700;font-size:0.82rem;color:#7b1fa2;">Selecionar Tratamento</span>
+                                        <span style="font-weight:700;font-size:0.82rem;color:#b36b00;">Selecionar Tratamento</span>
                                     </div>
-                                    <select id="tratamentoSelect" class="form-control" style="border-radius:8px;border-color:#ce93d8;background:#fff;font-size:0.85rem;">
+                                    <select id="tratamentoSelect" class="form-control" style="border-radius:8px;border-color:#e0af5c;background:#fff;font-size:0.85rem;">
                                         <option value="">🔍 Escolha um tratamento...</option>
                                     </select>
                                     <div style="display:flex;gap:10px;align-items:center;">
                                         <div style="flex:1;">
                                             <label style="font-size:11px;color:#888;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;">Quantidade</label>
-                                            <div style="display:flex;align-items:center;gap:0;border:1.5px solid #ce93d8;border-radius:8px;overflow:hidden;background:#fff;width:fit-content;">
-                                                <button type="button" onclick="Sales.changeQty('tratamentoQty',-1)" style="width:34px;height:34px;border:none;background:#f3e5f5;color:#7b1fa2;font-size:16px;font-weight:700;cursor:pointer;">−</button>
+                                            <div style="display:flex;align-items:center;gap:0;border:1.5px solid #e0af5c;border-radius:8px;overflow:hidden;background:#fff;width:fit-content;">
+                                                <button type="button" onclick="Sales.changeQty('tratamentoQty',-1)" style="width:34px;height:34px;border:none;background:#fdf0d9;color:#b36b00;font-size:16px;font-weight:700;cursor:pointer;">−</button>
                                                 <input type="number" id="tratamentoQty" value="1" min="1" style="width:44px;height:34px;border:none;text-align:center;font-size:0.9rem;font-weight:700;color:#333;outline:none;">
-                                                <button type="button" onclick="Sales.changeQty('tratamentoQty',1)" style="width:34px;height:34px;border:none;background:#f3e5f5;color:#7b1fa2;font-size:16px;font-weight:700;cursor:pointer;">+</button>
+                                                <button type="button" onclick="Sales.changeQty('tratamentoQty',1)" style="width:34px;height:34px;border:none;background:#fdf0d9;color:#b36b00;font-size:16px;font-weight:700;cursor:pointer;">+</button>
                                             </div>
                                         </div>
                                         <button type="button" onclick="Sales.addTratamento()"
-                                            style="flex:1;padding:10px;border-radius:10px;border:none;background:linear-gradient(135deg,#ab47bc,#7b1fa2);color:#fff;font-weight:700;font-size:0.83rem;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px;box-shadow:0 3px 10px rgba(123,31,162,0.25);">
+                                            style="flex:1;padding:10px;border-radius:10px;border:none;background:linear-gradient(135deg,#d68a00,#b36b00);color:#fff;font-weight:700;font-size:0.83rem;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px;box-shadow:0 3px 10px rgba(179,107,0,0.25);">
                                             <i class="fas fa-plus-circle"></i> Adicionar Tratamento
                                         </button>
                                     </div>
@@ -5999,7 +6016,7 @@ body.dark-mode,
                     </div>
 
                     <!-- TOTAIS -->
-                    <div class="cliente-card">
+                    <div class="cliente-card" style="border-top:3px solid var(--orange-1,#ff6b00);">
                         <h3>💰 TOTAIS</h3>
                         <div class="form-row">
                             <div class="form-group">
@@ -6016,7 +6033,7 @@ body.dark-mode,
                             </div>
                             <div class="form-group">
                                 <label>TOTAL</label>
-                                <div class="form-control" id="totalDisplay" style="font-weight: bold; color: var(--primary);" aria-live="polite">R$ 0,00</div>
+                                <div class="form-control" id="totalDisplay" style="font-weight:900;font-size:1.15rem;color:#fff;background:var(--grad-primary,linear-gradient(135deg,#ff6b00,#ffaa00));border:none;box-shadow:var(--shadow-orange,0 4px 20px rgba(255,107,0,.25));" aria-live="polite">R$ 0,00</div>
                             </div>
                         </div>
                     </div>
@@ -19789,8 +19806,10 @@ ${container.innerHTML}
                 if (hint) hint.style.display = 'none';
 
                 const typeIcon = { lente:'fa-eye', armacao:'fa-glasses', servico:'fa-tools', tratamento:'fa-flask', default:'fa-tag' };
-                const typeColor = { lente:'#ff6b00', armacao:'#2e7d32', servico:'#0277bd', tratamento:'#7b1fa2', default:'#888' };
-                const typeBg   = { lente:'#fff3e0', armacao:'#e8f5e9', servico:'#e1f5fe', tratamento:'#f3e5f5', default:'#f5f5f5' };
+                // ✅ Paleta unificada (mesmas cores das abas de item acima) — mantém
+                // a lista de itens da OS consistente com o painel de adição.
+                const typeColor = { lente:'#ff6b00', armacao:'#e85500', servico:'#ff8f00', tratamento:'#b36b00', default:'#888' };
+                const typeBg   = { lente:'#fff3e0', armacao:'#ffe4d1', servico:'#fff3d9', tratamento:'#fdf0d9', default:'#f5f5f5' };
 
                 let html = `<div style="padding:8px 0 4px;">`;
                 state.currentSale.items.forEach((item, i) => {
@@ -19830,7 +19849,10 @@ ${container.innerHTML}
             showItemTab(tab) {
                 const tabs   = { lente:'itemTabLente', armacao:'itemTabArmacao', servico:'itemTabServico', tratamento:'itemTabTratamento' };
                 const btns   = { lente:'tabBtnLente',  armacao:'tabBtnArmacao',  servico:'tabBtnServico', tratamento:'tabBtnTratamento' };
-                const colors = { lente:['#ff6b00','#ff6b00'], armacao:['#43a047','#2e7d32'], servico:['#039be5','#0277bd'], tratamento:['#ab47bc','#7b1fa2'] };
+                // ✅ Paleta unificada (laranja/âmbar/dourado) para casar com a
+                // identidade visual da marca — antes cada aba tinha uma cor
+                // solta (verde/azul/roxo) que destoava do resto do sistema.
+                const colors = { lente:['#ff6b00','#e65100'], armacao:['#ff7a30','#e85500'], servico:['#ffa726','#ff8f00'], tratamento:['#d68a00','#b36b00'] };
                 Object.keys(tabs).forEach(key => {
                     const panel = document.getElementById(tabs[key]);
                     const btn   = document.getElementById(btns[key]);
