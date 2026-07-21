@@ -9563,8 +9563,13 @@ body.dark-mode,
                 // edição local aconteceu há poucos segundos NESTA MESMA loja, confia
                 // no que já está em memória em vez de arriscar sobrescrever com uma
                 // leitura do IDB que pode ainda não refletir essa gravação.
+                // ✅ Janela ampliada de 4s → 10s: o caminho completo edição → push
+                // (debounce local de 1.5s + debounce de nuvem de 0.8s + tempo de
+                // upload em rede) pode facilmente ultrapassar 4s em conexões móveis
+                // mais lentas, reabrindo a mesma janela de risco que este guard
+                // existe para fechar.
                 const recentLocalEdit = this._lastLocalConfigEdit
-                    && (Date.now() - this._lastLocalConfigEdit < 4000)
+                    && (Date.now() - this._lastLocalConfigEdit < 10000)
                     && this._lastLocalConfigEditStore === storeId;
                 if (!recentLocalEdit) {
                     state.company       = {};
@@ -10590,10 +10595,39 @@ body.dark-mode,
                 });
                 // FIX SYNC: aplica company com deep merge para garantir que logo e
                 // todos os campos sejam copiados (não apenas os que existem localmente)
-                if (remote.company && typeof remote.company === 'object') {
-                    state.company = Object.assign(state.company || {}, remote.company);
+                //
+                // ✅ FIX "META VOLTA AO VALOR ANTERIOR": antes, company/config eram
+                // sobrescritos ÀS CEGAS pelo remoto, sem comparar qual é mais recente
+                // (diferente de clients/sales/products, que já comparam _updatedAt
+                // item-a-item). Isso quebrava de duas formas:
+                //  1) gdrivePush/onedrivePush chamam _applyCloudData(preRemote) como
+                //     "pre-merge" ANTES de subir os dados. Se o usuário tivesse acabado
+                //     de editar a meta, esse pre-merge baixava o arquivo antigo (a nova
+                //     meta ainda não tinha sido enviada) e sobrescrevia state.company em
+                //     memória com o valor velho — e o upload que vinha em seguida
+                //     re-enviava esse valor velho para a nuvem, apagando a edição local
+                //     e impedindo que outros dispositivos a recebessem.
+                //  2) O polling (a cada 15s) podia puxar um snapshot antigo do Drive
+                //     enquanto um push mais recente ainda estava em andamento, causando
+                //     o mesmo efeito de "reverter" a edição feita há poucos segundos.
+                // Fix: só aplicamos o remoto se ele for MAIS NOVO que a última edição
+                // local de config/empresa desta loja. Se a edição local for mais recente
+                // que o snapshot remoto, mantemos o valor local intacto.
+                const localConfigEditTs = (window.LocalFirst && LocalFirst._lastLocalConfigEditStore === storeId)
+                    ? (LocalFirst._lastLocalConfigEdit || 0) : 0;
+                const remoteTsMs = remoteTs ? new Date(remoteTs).getTime() : 0;
+                const localConfigIsNewer = localConfigEditTs > 0 && localConfigEditTs > remoteTsMs;
+
+                if (localConfigIsNewer) {
+                    console.log('[CloudSync] company/config: edição local recente (' + storeId + ') é mais nova que o snapshot remoto — mantendo valores locais (meta, dados da empresa etc).');
+                } else {
+                    if (remote.company && typeof remote.company === 'object') {
+                        state.company = Object.assign(state.company || {}, remote.company);
+                    }
+                    if (remote.config && typeof remote.config === 'object') {
+                        Object.assign(state.config || (state.config = {}), remote.config);
+                    }
                 }
-                if (remote.config        && typeof remote.config        === 'object') Object.assign(state.config        || (state.config        = {}), remote.config);
                 // ✅ FIX SYNC: restaura mensagens de WhatsApp personalizadas de outro
                 // dispositivo. O local sempre "ganha" em caso de mesma chave (para não
                 // apagar uma edição recente que ainda não subiu pra nuvem) — a nuvem só
@@ -11267,8 +11301,16 @@ body.dark-mode,
             function _silentPull() {
                 // FIX DELETE-SYNC: não faz pull enquanto há push pendente.
                 // Evita a race condition: delete → poll puxa dado antigo → restaura item.
-                if (_pushTimer !== null) {
-                    console.log('[CloudSync] ⏸ Pull adiado — push pendente em andamento');
+                //
+                // ✅ FIX RACE "META VOLTA AO ANTERIOR": antes só checava _pushTimer
+                // (o timer do debounce), mas ele é zerado assim que o debounce dispara
+                // — ANTES do upload (gdrivePush/onedrivePush) realmente terminar. Nessa
+                // janela (rede lenta, alguns segundos), um poll podia disparar, ver
+                // _pushTimer === null e prosseguir, puxando um snapshot do Drive que
+                // ainda não tinha a mudança recém-feita. Agora também checamos _pushing,
+                // que fica true durante todo o upload (não só durante o debounce).
+                if (_pushTimer !== null || _pushing) {
+                    console.log('[CloudSync] ⏸ Pull adiado — push pendente ou em andamento');
                     return;
                 }
                 try {
