@@ -9877,7 +9877,7 @@ body.dark-mode,
                     try { if (window.CloudSync) CloudSync.autoSync(); } catch(e) {}
                     // Agenda snapshot OPFS junto ao cloud sync (debounce 60s)
                     try { OPFS.scheduleSnapshot(window._currentStore || 'barueri'); } catch(_e) {}
-                }, 700); // ✅ CORRIGIDO: reduzido de 1500ms → 700ms para sync mais rápido
+                }, 1500); // ✅ CORRIGIDO: reduzido de 5000ms → 1500ms para sync mais rápido
             },
 
             // ── switchStore ───────────────────────────────────────────────────
@@ -10354,10 +10354,10 @@ body.dark-mode,
             function _lsFileIdKey(provider) { return 'cs_' + provider + '_file_id_' + (window._currentStore || 'barueri'); }
             function _lsPullTsKey()         { return 'cs_last_pull_ts_' + (window._currentStore || 'barueri'); }
             // REAL-TIME SYNC: polling adaptativo (30s ativo / 120s background)
-            const POLL_ACTIVE_MS          = 8000;   // ✅ CORRIGIDO: 15s → 8s (sync ainda mais rápido entre dispositivos)
-            const POLL_BACKGROUND_MS      = 20000;  // ✅ CORRIGIDO: 45s → 20s em background
+            const POLL_ACTIVE_MS          = 15000;  // ✅ CORRIGIDO: 30s → 15s (sync mais rápido entre dispositivos)
+            const POLL_BACKGROUND_MS      = 45000;  // ✅ CORRIGIDO: 120s → 45s em background
             const POLL_INTERVAL_MS        = POLL_ACTIVE_MS;
-            const PUSH_DEBOUNCE_MS        = 400;     // ✅ CORRIGIDO: 800ms → 400ms após última mudança
+            const PUSH_DEBOUNCE_MS        = 800;     // push 0.8s após última mudança
 
             let _gdriveToken    = null;
             let _onedriveToken  = null;
@@ -10734,7 +10734,6 @@ body.dark-mode,
                 try { Suppliers.renderTable?.(); }      catch(e) {}
                 try { Utils.updatePixKey?.(); }         catch(e) {}
                 try { ContasManager.renderAll?.(); }    catch(e) {}
-                try { window.NotificationsEngine?.runChecks(); } catch(e) {}
                 try { setTimeout(() => window.RxDBPanel?.refresh(), 500); } catch(e) {}
                 // Salva timestamp do último pull
                 localStorage.setItem(_lsPullTsKey(), remote._ts || new Date().toISOString());
@@ -12750,99 +12749,6 @@ body.dark-mode,
             },
         };
         window.ContasManager = ContasManager;
-
-        // ==================== MOTOR DE NOTIFICAÇÕES ====================
-        // ✅ FIX: os toggles em Configurações > Notificações (contas a vencer,
-        // contas vencidas, etc.) eram salvos mas nada no sistema realmente os
-        // lia ou disparava um alerta — a tela funcionava, mas não "ativava"
-        // nada de fato. Este motor lê state.notificacoes e dispara um alerta
-        // (Toast + notificação do navegador, quando permitida) para contas a
-        // pagar/receber a vencer ou vencidas, verificando periodicamente e
-        // evitando repetir o mesmo aviso no mesmo dia.
-        const NotificationsEngine = {
-            _intervalTimer: null,
-
-            async requestPermission() {
-                if (!('Notification' in window)) return false;
-                if (Notification.permission === 'granted') return true;
-                if (Notification.permission === 'denied') return false;
-                try { return (await Notification.requestPermission()) === 'granted'; }
-                catch(e) { return false; }
-            },
-
-            _notifiedKey() { return 'notif_sent_' + (window._currentStore || 'barueri'); },
-
-            _getSentToday() {
-                const hoje = new Date().toISOString().split('T')[0];
-                try {
-                    const raw = localStorage.getItem(this._notifiedKey());
-                    const data = raw ? JSON.parse(raw) : null;
-                    if (data && data.date === hoje) return data;
-                } catch(e) {}
-                return { date: hoje, ids: [] };
-            },
-
-            _fire(title, body, tag) {
-                try { if (window.Toast) Toast.show(title + ': ' + body, 'warning', 6000); } catch(e) {}
-                try {
-                    if ('Notification' in window && Notification.permission === 'granted') {
-                        new Notification(title, { body, tag });
-                    }
-                } catch(e) {}
-            },
-
-            fmt(v) { return 'R$ ' + parseFloat(v||0).toLocaleString('pt-BR', {minimumFractionDigits:2, maximumFractionDigits:2}); },
-
-            // ── Contas a Pagar / Receber (vencendo em até 3 dias ou vencidas) ──
-            async checkFinanceiro() {
-                const cfg = state.notificacoes || {};
-                if (cfg.paymentDue === false && cfg.paymentOverdue === false) return;
-                if (!window.ContasManager) return;
-                let contas;
-                try { contas = await ContasManager.getAll(); } catch(e) { return; }
-                if (!Array.isArray(contas) || !contas.length) return;
-
-                const hoje = new Date(); hoje.setHours(0, 0, 0, 0);
-                const sent = this._getSentToday();
-                let changed = false;
-
-                contas.forEach(c => {
-                    if (!c || c.pago || !c.vencimento) return;
-                    const venc = new Date(c.vencimento + 'T00:00:00');
-                    if (isNaN(venc.getTime())) return;
-                    const diffDias = Math.round((venc - hoje) / 86400000);
-                    const tipoLabel = c.tipo === 'pagar' ? 'Conta a pagar' : 'Conta a receber';
-                    const id = 'fin_' + c.id + '_' + (diffDias < 0 ? 'vencida' : 'avencer');
-                    if (sent.ids.includes(id)) return;
-
-                    if (diffDias < 0 && cfg.paymentOverdue !== false) {
-                        this._fire('⚠️ ' + tipoLabel + ' vencida', (c.descricao || 'Conta') + ' — ' + this.fmt(c.valor), id);
-                        sent.ids.push(id); changed = true;
-                    } else if (diffDias >= 0 && diffDias <= 3 && cfg.paymentDue !== false) {
-                        this._fire('📅 ' + tipoLabel + ' a vencer', (c.descricao || 'Conta') + ' vence em ' + diffDias + ' dia(s) — ' + this.fmt(c.valor), id);
-                        sent.ids.push(id); changed = true;
-                    }
-                });
-
-                if (changed) {
-                    try { localStorage.setItem(this._notifiedKey(), JSON.stringify(sent)); } catch(e) {}
-                }
-            },
-
-            async runChecks() {
-                try { await this.checkFinanceiro(); } catch(e) { console.warn('[NotificationsEngine] erro:', e.message); }
-            },
-
-            start() {
-                if (this._intervalTimer) return;
-                setTimeout(() => this.runChecks(), 6000);
-                // Reverifica a cada 30 min (cobre virada de dia e novas contas sincronizadas)
-                this._intervalTimer = setInterval(() => this.runChecks(), 30 * 60 * 1000);
-            }
-        };
-        window.NotificationsEngine = NotificationsEngine;
-        window.addEventListener('load', () => setTimeout(() => NotificationsEngine.start(), 5000));
-
         const WppConfirm = {
             _url: '', _msg: '', _phone: '',
 
@@ -18755,21 +18661,6 @@ tbody tr td{border:1.5px solid #000;padding:2mm;text-align:center;font-weight:70
                 IDB.set('notificacoes', JSON.stringify(state.notificacoes)).catch(() => {});
                 App.saveData(true);
                 SupaSync.upsertConfig().catch(() => {});
-                // ✅ FIX: antes esses toggles não ativavam nada de fato — agora,
-                // ao salvar com algum alerta ligado, pede permissão de notificação
-                // do navegador e já roda uma checagem imediata (contas a vencer/vencidas).
-                (async () => {
-                    const algumAtivo = state.notificacoes.paymentDue || state.notificacoes.paymentOverdue ||
-                        state.notificacoes.lowStock || state.notificacoes.outOfStock ||
-                        state.notificacoes.osReady || state.notificacoes.osDelay;
-                    if (algumAtivo && window.NotificationsEngine) {
-                        const granted = await NotificationsEngine.requestPermission();
-                        if (!granted && 'Notification' in window && Notification.permission === 'denied') {
-                            Toast.show('⚠️ Notificações do navegador estão bloqueadas. Os alertas ainda aparecerão dentro do sistema.', 'warning', 6000);
-                        }
-                        NotificationsEngine.runChecks();
-                    }
-                })();
                 Toast.show('Configurações de notificações salvas!');
             },
 
