@@ -7799,6 +7799,16 @@ body.dark-mode,
                     <div class="form-container">
                         <h3 style="color: var(--primary); margin-bottom: 1.5rem;">Configurações de Notificações</h3>
 
+                        <!-- ✅ NOVO: status real da permissão de notificação do navegador —
+                             sem isso, os alertas abaixo eram apenas preferências salvas,
+                             sem nenhum aviso de fato sendo disparado para o usuário. -->
+                        <div id="notifPermBox" style="border-radius:10px;padding:12px 14px;margin-bottom:1.25rem;font-size:0.85rem;display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;">
+                            <span id="notifPermText">Verificando permissão do navegador...</span>
+                            <button type="button" id="notifPermBtn" class="btn btn-sm btn-primary" style="display:none;" onclick="NotificationEngine.requestPermission().then(()=>Config.updateNotifPermUI())">
+                                <i class="fas fa-bell"></i> Ativar notificações do navegador
+                            </button>
+                        </div>
+
                         <div style="margin-bottom: 1.5rem;">
                             <h4>Alertas de Estoque</h4>
                             <div style="display: grid; gap: 0.75rem; margin-top: 0.5rem;">
@@ -7840,6 +7850,9 @@ body.dark-mode,
 
                         <div class="btn-group" style="margin-top: 1.5rem;">
                             <button type="button" class="btn btn-success" onclick="Config.saveNotificacoes()">Salvar Notificações</button>
+                            <button type="button" class="btn btn-secondary" onclick="NotificationEngine.check(true)">
+                                <i class="fas fa-sync"></i> Verificar agora
+                            </button>
                         </div>
                     </div>
                 </div>
@@ -12783,6 +12796,147 @@ body.dark-mode,
             },
         };
         window.ContasManager = ContasManager;
+
+        // ══════════════════════════════════════════════════════════════════════
+        //  NotificationEngine — ✅ NOVO: implementação real dos alertas
+        //  configurados em Configurações → Notificações.
+        //  Antes, os toggles (estoque baixo, OS pronta, OS atrasada, conta a
+        //  vencer/vencida) apenas salvavam a preferência — nada de fato lia
+        //  esses valores para avisar o usuário. Este módulo faz a verificação
+        //  periódica de verdade e dispara:
+        //   1) uma notificação do navegador (Notification API), se permitida;
+        //   2) um toast dentro do app, sempre (funciona mesmo sem permissão).
+        //  Cada alerta é disparado só UMA VEZ por item (controle via
+        //  localStorage), para não repetir a mesma notificação a cada checagem.
+        // ══════════════════════════════════════════════════════════════════════
+        const NotificationEngine = {
+            _checking: false,
+            _timer: null,
+            _CHECK_INTERVAL_MS: 5 * 60 * 1000, // verifica a cada 5 minutos
+
+            async requestPermission() {
+                if (!('Notification' in window)) return 'unsupported';
+                if (Notification.permission === 'granted' || Notification.permission === 'denied') {
+                    return Notification.permission;
+                }
+                try { return await Notification.requestPermission(); }
+                catch(e) { return 'denied'; }
+            },
+
+            _seenKey() { return 'notif_seen_' + (window._currentStore || 'barueri'); },
+            _loadSeen() {
+                try {
+                    const raw = localStorage.getItem(this._seenKey());
+                    return raw ? new Set(JSON.parse(raw)) : new Set();
+                } catch(e) { return new Set(); }
+            },
+            _saveSeen(set) {
+                try {
+                    // Mantém limitado às últimas 500 chaves para não crescer para sempre
+                    localStorage.setItem(this._seenKey(), JSON.stringify(Array.from(set).slice(-500)));
+                } catch(e) {}
+            },
+
+            // Dispara um alerta (uma vez por "id") — notificação do navegador
+            // (se houver permissão) + toast dentro do app (sempre).
+            _fire(id, seen, title, body) {
+                if (seen.has(id)) return false;
+                seen.add(id);
+                try {
+                    if ('Notification' in window && Notification.permission === 'granted') {
+                        new Notification(title, { body, tag: id });
+                    }
+                } catch(e) {}
+                try { Toast.show(title + ' — ' + body, 'warning', 6000); } catch(e) {}
+                return true;
+            },
+
+            // force=true (botão "Verificar agora"): ignora o registro de "já visto"
+            // desta sessão, útil para o usuário forçar uma nova checagem manual.
+            async check(force) {
+                if (this._checking) return;
+                this._checking = true;
+                try {
+                    const cfg = state.notificacoes || {};
+                    const seen = force ? new Set() : this._loadSeen();
+                    let changed = false;
+
+                    // ── Estoque ──────────────────────────────────────────────
+                    if (cfg.outOfStock !== false || cfg.lowStock !== false) {
+                        (state.products || []).forEach(p => {
+                            if (!p || !p.id) return;
+                            const qty = p.qty ?? p.stock ?? 0;
+                            const min = p.minQty ?? 5;
+                            if (cfg.outOfStock !== false && qty === 0) {
+                                if (this._fire('stock_out_' + p.id, seen, '🔴 Produto esgotado', p.name || 'Produto')) changed = true;
+                            } else if (cfg.lowStock !== false && qty > 0 && qty <= min) {
+                                if (this._fire('stock_low_' + p.id, seen, '🟡 Estoque baixo', (p.name || 'Produto') + ' — restam ' + qty)) changed = true;
+                            }
+                        });
+                    }
+
+                    // ── Ordens de Serviço ────────────────────────────────────
+                    if (cfg.osReady !== false) {
+                        (state.sales || []).forEach(s => {
+                            if (!s || !s.id) return;
+                            if (s.status === 'pronto' || s.status === 'ready') {
+                                if (this._fire('os_ready_' + s.id, seen, '📦 OS pronta para retirada', 'OS ' + (s.number || s.id))) changed = true;
+                            }
+                        });
+                    }
+                    if (cfg.osDelay !== false) {
+                        const days = cfg.osDelayDays || 7;
+                        const now = Date.now();
+                        const ENTREGUES = ['entregue', 'delivered', 'concluido', 'finalizado', 'closed', 'cancelado'];
+                        (state.sales || []).forEach(s => {
+                            if (!s || !s.id || !s.deliveryForecast || ENTREGUES.includes(s.status)) return;
+                            const due = new Date(s.deliveryForecast + 'T12:00:00').getTime();
+                            if (isNaN(due)) return;
+                            const diasAtraso = Math.floor((now - due) / 86400000);
+                            if (diasAtraso >= days) {
+                                if (this._fire('os_delay_' + s.id, seen, '⏰ OS atrasada', 'OS ' + (s.number || s.id) + ' — ' + diasAtraso + ' dia(s) de atraso')) changed = true;
+                            }
+                        });
+                    }
+
+                    // ── Financeiro (Contas a Pagar/Receber) ─────────────────
+                    if ((cfg.paymentDue !== false || cfg.paymentOverdue !== false) && window.ContasManager) {
+                        try {
+                            const contas = await ContasManager.getAll();
+                            const hoje = new Date().toISOString().slice(0, 10);
+                            (contas || []).forEach(c => {
+                                if (!c || !c.id || c.pago || !c.vencimento) return;
+                                const label = (c.tipo === 'receber' ? '💰 Conta a receber' : '💸 Conta a pagar') + (c.vencimento < hoje ? ' vencida' : ' vence hoje');
+                                if (c.vencimento < hoje && cfg.paymentOverdue !== false) {
+                                    if (this._fire('conta_overdue_' + c.id, seen, '🔴 ' + label, c.descricao || 'Conta')) changed = true;
+                                } else if (c.vencimento === hoje && cfg.paymentDue !== false) {
+                                    if (this._fire('conta_due_' + c.id, seen, '🟡 ' + label, c.descricao || 'Conta')) changed = true;
+                                }
+                            });
+                        } catch(e) {}
+                    }
+
+                    if (changed && !force) this._saveSeen(seen);
+                } finally {
+                    this._checking = false;
+                }
+            },
+
+            start() {
+                // Primeira checagem pouco depois do boot (dá tempo dos dados carregarem)
+                setTimeout(() => this.check().catch(()=>{}), 8000);
+                // Checagens periódicas
+                clearInterval(this._timer);
+                this._timer = setInterval(() => this.check().catch(()=>{}), this._CHECK_INTERVAL_MS);
+                // Reforça a checagem quando o usuário volta para a aba
+                document.addEventListener('visibilitychange', () => {
+                    if (document.visibilityState === 'visible') setTimeout(() => this.check().catch(()=>{}), 2000);
+                });
+            }
+        };
+        window.NotificationEngine = NotificationEngine;
+        window.addEventListener('load', () => NotificationEngine.start());
+
         const WppConfirm = {
             _url: '', _msg: '', _phone: '',
 
@@ -18426,6 +18580,11 @@ tbody tr td{border:1.5px solid #000;padding:2mm;text-align:center;font-weight:70
                     Config._clearDirty(); // permite que load() carregue dados frescos ao abrir a aba
                     Config.load();
                 }
+
+                // ✅ NOVO: atualiza o status de permissão de notificação do navegador
+                if (tabName === 'notificacoes' && window.NotificationEngine) {
+                    Config.updateNotifPermUI();
+                }
             },
 
             // ── LOJAS PRÉ-DEFINIDAS ─────────────────────────────────────────
@@ -18699,6 +18858,36 @@ tbody tr td{border:1.5px solid #000;padding:2mm;text-align:center;font-weight:70
                 }
             },
 
+            // ✅ NOVO: reflete o status real de permissão de notificação do
+            // navegador (Notification.permission) na aba Configurações → Notificações,
+            // e mostra o botão de ativação quando ainda não foi concedida.
+            updateNotifPermUI() {
+                const box = document.getElementById('notifPermBox');
+                const txt = document.getElementById('notifPermText');
+                const btn = document.getElementById('notifPermBtn');
+                if (!box || !txt || !btn) return;
+                if (!('Notification' in window)) {
+                    box.style.background = '#f8f9fa'; box.style.border = '1px solid #dee2e6';
+                    txt.textContent = '⚠️ Este navegador não suporta notificações do sistema. Os alertas ainda aparecem dentro do app.';
+                    btn.style.display = 'none';
+                    return;
+                }
+                const perm = Notification.permission;
+                if (perm === 'granted') {
+                    box.style.background = '#d4edda'; box.style.border = '1px solid #28a745';
+                    txt.textContent = '✅ Notificações do navegador ativadas — os alertas abaixo vão aparecer mesmo com o app em segundo plano.';
+                    btn.style.display = 'none';
+                } else if (perm === 'denied') {
+                    box.style.background = '#f8d7da'; box.style.border = '1px solid #dc3545';
+                    txt.textContent = '🚫 Notificações bloqueadas nas permissões do navegador. Ative manualmente nas configurações do site para receber alertas fora do app.';
+                    btn.style.display = 'none';
+                } else {
+                    box.style.background = '#fff3cd'; box.style.border = '1px solid #ffc107';
+                    txt.textContent = '🔔 Notificações do navegador ainda não ativadas — os alertas abaixo só vão aparecer dentro do app até você ativar.';
+                    btn.style.display = 'inline-block';
+                }
+            },
+
             saveNotificacoes() {
                 state.notificacoes = {
                     lowStock: document.getElementById('configNotifyLowStock').checked,
@@ -18716,6 +18905,19 @@ tbody tr td{border:1.5px solid #000;padding:2mm;text-align:center;font-weight:70
                 App.saveData(true);
                 SupaSync.upsertConfig().catch(() => {});
                 Toast.show('Configurações de notificações salvas!');
+                // ✅ NOVO: se algum alerta foi ligado, pede permissão do navegador
+                // (clique em "Salvar" já é um gesto do usuário, então o navegador
+                // permite abrir o prompt de permissão aqui) e roda uma verificação
+                // imediata para refletir a mudança sem esperar o próximo ciclo.
+                if (window.NotificationEngine) {
+                    const anyOn = state.notificacoes.lowStock || state.notificacoes.outOfStock ||
+                        state.notificacoes.osReady || state.notificacoes.osDelay ||
+                        state.notificacoes.paymentDue || state.notificacoes.paymentOverdue;
+                    if (anyOn && 'Notification' in window && Notification.permission === 'default') {
+                        NotificationEngine.requestPermission().then(() => this.updateNotifPermUI());
+                    }
+                    NotificationEngine.check().catch(()=>{});
+                }
             },
 
             uploadLogo(event) {
