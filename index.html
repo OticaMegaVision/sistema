@@ -1540,17 +1540,24 @@
             font-size: 1rem;
         }
 
-        .btn-edit { background: rgba(23,162,184,0.1); color: var(--info); }
-        .btn-edit:hover { background: var(--info); color: white; }
+        <!-- ✅ FIX cores de ação nas tabelas: Editar usava a mesma cor de Ver
+             (azul info) por causa de uma segunda declaração .btn-view mais
+             abaixo com !important sobrescrevendo o verde original — e PDF
+             usava exatamente o mesmo vermelho do Excluir. Resultado: nas
+             tabelas de Clientes/Produtos/Serviços/Fornecedores dava para
+             confundir os botões só pela cor. Agora cada ação tem uma cor
+             própria, com Editar usando o laranja da marca (ação mais usada). -->
+        .btn-edit { background: rgba(255,107,0,0.12); color: var(--primary); }
+        .btn-edit:hover { background: var(--primary); color: white; }
 
         .btn-delete { background: rgba(220,53,69,0.1); color: var(--danger); }
         .btn-delete:hover { background: var(--danger); color: white; }
 
-        .btn-view { background: rgba(40,167,69,0.1); color: var(--success); }
-        .btn-view:hover { background: var(--success); color: white; }
+        .btn-view { background: rgba(23,162,184,0.12); color: var(--info); }
+        .btn-view:hover { background: var(--info); color: white; }
 
-        .btn-pdf-icon { background: rgba(220,53,69,0.1); color: #dc3545; }
-        .btn-pdf-icon:hover { background: #dc3545; color: white; }
+        .btn-pdf-icon { background: rgba(255,170,0,0.15); color: #b36b00; }
+        .btn-pdf-icon:hover { background: #b36b00; color: white; }
 
         .btn-profissional {
             border-radius: 30px;
@@ -2101,7 +2108,6 @@
             cursor: pointer;
         }
         .prod-thumb-empty i { color: var(--gray, #6c757d); font-size: .95rem; }
-        .btn-view { background: rgba(23,162,184,.12) !important; color: #17a2b8 !important; }
 
         /* ===== PRODUTOS - UPLOAD DE IMAGEM ===== */
         .image-preview {
@@ -6609,7 +6615,7 @@ body.dark-mode,
                         <button class="btn btn-info btn-sm" onclick="Clients.exportToExcel()"><i class="fas fa-file-excel"></i> Exportar Excel</button>
                         <button class="btn btn-success btn-sm" onclick="document.getElementById('importClientsFile').click()"><i class="fas fa-upload"></i> Importar</button>
                         <input type="file" id="importClientsFile" accept=".xlsx,.csv" class="d-none" onchange="Clients.importFromFile(event)">
-                        <button class="btn btn-sm" style="background:#dc3545;color:white;border:none;" onclick="Clients.removeDuplicates()" title="Detectar e remover clientes duplicados (mesmo nome ou mesmo CPF)"><i class="fas fa-broom"></i> Remover Duplicatas</button>
+                        <button class="btn btn-danger btn-sm" onclick="Clients.removeDuplicates()" title="Detectar e remover clientes duplicados (mesmo nome ou mesmo CPF)"><i class="fas fa-broom"></i> Remover Duplicatas</button>
                     </div>
                 </div>
 
