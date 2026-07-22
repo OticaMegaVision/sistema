@@ -10394,7 +10394,7 @@ body.dark-mode,
             // dispositivos (ex: dar baixa em Contas a Pagar no celular e ver
             // atualizar no PC sem precisar dar F5).
             const POLL_ACTIVE_MS          = 5000;   // ✅ CORRIGIDO: 15s → 5s (bate com o texto "sync a cada 5s" da UI)
-            const POLL_BACKGROUND_MS      = 45000;  // 45s em background (aba oculta) — evita gasto de bateria/dados
+            const POLL_BACKGROUND_MS      = 15000;  // ✅ REDUZIDO: 45s → 15s em background (aba oculta) — ainda evita gasto excessivo de bateria/dados, mas sincroniza bem mais rápido
             const POLL_INTERVAL_MS        = POLL_ACTIVE_MS;
             const PUSH_DEBOUNCE_MS        = 800;     // push 0.8s após última mudança
 
@@ -10661,6 +10661,21 @@ body.dark-mode,
                         }
                     });
 
+                    // ✅ FIX SYNC CRÍTICO: remove itens que existem SÓ localmente mas
+                    // foram excluídos em OUTRO dispositivo. Antes, "merged" começava
+                    // com uma cópia de TODOS os itens locais e o loop acima só
+                    // adicionava/atualizava o que vinha no remoto — nunca removia nada.
+                    // Resultado: um item ausente do remoto (porque foi excluído em
+                    // outro aparelho) permanecia para sempre neste dispositivo, mesmo
+                    // com o tombstone da exclusão já tendo chegado (processado acima,
+                    // antes deste merge). Agora, qualquer item local com tombstone mais
+                    // recente que sua própria última edição é removido do resultado.
+                    Object.keys(merged).forEach(id => {
+                        if (_isDeletedLocally(storeId, k, id, merged[id]._updatedAt || merged[id].updatedAt || null)) {
+                            delete merged[id];
+                        }
+                    });
+
                     state[k] = Object.values(merged);
                 });
                 // FIX SYNC: aplica company com deep merge para garantir que logo e
@@ -10746,6 +10761,19 @@ body.dark-mode,
                             const localDate  = new Date(localConta._updatedAt  || 0).getTime();
                             if (remoteDate > localDate) mergedContas[remoteConta.id] = remoteConta;
                             // Se local for mais recente (ou empatar), mantém local
+                        }
+                    });
+
+                    // ✅ FIX SYNC CRÍTICO: mesma correção aplicada ao merge genérico
+                    // acima — remove contas que existem só localmente mas já foram
+                    // excluídas em outro dispositivo (tombstone recebido). Sem isso,
+                    // uma conta criada e excluída rapidamente no celular continuava
+                    // aparecendo no PC para sempre, porque o merge só adicionava/
+                    // atualizava contas presentes no remoto, nunca removia as que
+                    // sumiram de lá.
+                    Object.keys(mergedContas).forEach(id => {
+                        if (_isDeletedLocally(storeId, 'contas_financeiras', id, mergedContas[id]._updatedAt || null)) {
+                            delete mergedContas[id];
                         }
                     });
 
