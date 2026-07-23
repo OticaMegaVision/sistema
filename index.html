@@ -11514,6 +11514,15 @@ body.dark-mode,
                 _pushTimer = setTimeout(() => { _pushTimer = null; _silentPush(); }, PUSH_DEBOUNCE_MS);
             }
 
+            // ✅ FIX MISTURA DE LOJAS: cancela um push debounced que ainda não disparou.
+            // Necessário ao trocar de loja — sem isso, uma edição feita segundos antes
+            // da troca (ex: editar cliente na loja A) podia ter seu push disparar DEPOIS
+            // que window._currentStore já apontava para a loja B, subindo os dados
+            // (parcialmente resetados/da loja errada) para o arquivo da loja B no Drive.
+            function _cancelPendingPush() {
+                if (_pushTimer) { clearTimeout(_pushTimer); _pushTimer = null; }
+            }
+
             function _silentPush() {
                 try {
                     if (_activeProvider === 'gdrive'   && _gdriveToken   && !_isExpired(_gdriveToken))   gdrivePush(true).catch(()=>{});
@@ -11788,6 +11797,7 @@ body.dark-mode,
                 connectOneDrive, onedrivePush, onedrivePull, onedriveDisconnect,
                 showTab, _updateUI,
                 autoSync() { _schedulePush(); },
+                cancelPendingPush() { _cancelPendingPush(); },
                 forcePull() { return _activeProvider === 'gdrive' ? gdrivePull(false) : onedrivePull(false); },
                 _recordDeletion(storeId, col, id) { _recordDeletion(storeId, col, id); },
                 // ── Exposição pública do coletor de dados (para OPFS + exportação) ──
@@ -14819,6 +14829,34 @@ tbody tr td{border:1.5px solid #000;padding:2mm;text-align:center;font-weight:70
                 // Local-First: salva todo o state no IndexedDB em batch
                 const now = new Date().toISOString();
                 const storeId = window._currentStore || 'barueri';
+                // ✅ FIX BUG "CONFIGURAÇÕES SOMEM AO SAIR E ENTRAR" (notificações,
+                // backup automático, dados da empresa, financeiro etc.):
+                //
+                // saveData() primeiro re-envia TODAS as tabelas (clientes, produtos,
+                // vendas, despesas...) e só DEPOIS chama LocalFirst.pushConfig(), que
+                // é o passo que de fato grava company/config/notificacoes/backupConfig
+                // no IndexedDB. Numa loja com muitos registros esse laço pode levar
+                // vários segundos. A trava "_lastLocalConfigEdit" que protege esses
+                // dados contra serem sobrescritos por um sync concorrente só era
+                // marcada DENTRO do pushConfig(), ou seja, só no finalzinho.
+                //
+                // Se durante essa janela (edição já em memória, mas trava ainda não
+                // ligada) uma sincronização concorrente rodasse — outra aba via
+                // BroadcastChannel, o app voltando o foco, ou um pull do Google
+                // Drive/OneDrive chegando pelo polling — ela lia o IndexedDB AINDA
+                // COM O VALOR ANTIGO, resetava state.notificacoes/backupConfig/company
+                // para esse valor antigo (achando, com razão, que "não houve edição
+                // local recente"), e quando o pushConfig() finalmente rodava, gravava
+                // esse valor velho (já sobrescrito em memória) por cima da nuvem —
+                // apagando a edição real do usuário de forma silenciosa. O toast
+                // "salvo com sucesso" aparecia normalmente, mas ao sair e entrar de
+                // novo (ou trocar de aba/dispositivo) a configuração tinha voltado.
+                //
+                // Fix: marcar a trava AQUI, de forma síncrona, antes de iniciar
+                // qualquer trabalho assíncrono — fecha a janela de corrida inteira,
+                // não importa quanto tempo o laço de tabelas demore.
+                LocalFirst._lastLocalConfigEdit = Date.now();
+                LocalFirst._lastLocalConfigEditStore = storeId;
                 const TABLES = ['clients','products','sales','expenses','prescriptions','suppliers','services'];
                 // Normaliza timestamps
                 TABLES.forEach(key => {
@@ -14854,7 +14892,10 @@ tbody tr td{border:1.5px solid #000;padding:2mm;text-align:center;font-weight:70
                         // que chama sbDeleteDoc() diretamente — não precisamos apagar aqui.
                     }
                     // Salva config da empresa
-                    await LocalFirst.pushConfig();
+                    // ✅ FIX SEGURANÇA-SYNC: mesma fila usada pelo pull do Drive/OneDrive
+                    // (ver _withSyncLock) — garante que esta gravação nunca intercale
+                    // com uma leitura/aplicação de dados vindos da nuvem.
+                    await _withSyncLock('config:pushConfig[' + storeId + ']', () => LocalFirst.pushConfig());
                 } catch(e) {
                     console.warn('[saveData] Erro ao salvar no IndexedDB:', e.message);
                 } finally {
@@ -15200,7 +15241,7 @@ tbody tr td{border:1.5px solid #000;padding:2mm;text-align:center;font-weight:70
                             }
 
                             // 4. Grava config da empresa
-                            await LocalFirst.pushConfig();
+                            await _withSyncLock('config:pushConfig-restore[' + storeId + ']', () => LocalFirst.pushConfig());
 
                             // 5. Grava contas financeiras se existirem no backup
                             const contasBackup = newData._contasManuais || newData.contasFinanceiras || newData._contasFinanceiras || [];
@@ -24929,6 +24970,13 @@ const StoreManager = {
             // LocalFirst listeners managed automatically
         } catch(e) {}
         LocalFirst._realtimePaused = true;
+        // ✅ FIX MISTURA DE LOJAS: cancela qualquer push/cloud-sync debounced que
+        // ainda não disparou. Sem isso, uma edição feita pouco antes da troca podia
+        // ter seu upload disparar DEPOIS de window._currentStore já ser a loja nova,
+        // subindo dados errados (da loja anterior, ou já resetados) para o arquivo
+        // da loja nova no Drive/OneDrive — misturando as duas lojas na nuvem.
+        try { clearTimeout(LocalFirst._cloudSyncTimer); LocalFirst._cloudSyncTimer = null; } catch(_e) {}
+        try { if (window.CloudSync) CloudSync.cancelPendingPush(); } catch(_e) {}
 
         // 2. Troca loja e salva preferência em ambos os storages
         window._currentStore = lojaId;
@@ -24943,6 +24991,14 @@ const StoreManager = {
         try { if (window.CloudSync) { delete window.CloudSync._gdriveFileIdCache?.[lojaId]; } } catch(_e) {}
 
         // 4. Reseta state imediatamente (UI fica em branco por < 1s)
+        // ✅ FIX MISTURA DE LOJAS CRÍTICO: config/notificacoes/backupConfig não
+        // estavam nesta lista de reset. Resultado: ao trocar de loja, as
+        // configurações de Notificações e Backup Automático (e o objeto "config")
+        // continuavam sendo as da loja ANTERIOR até (e a menos que) a loja nova já
+        // tivesse um doc 'empresa' salvo — e mesmo aí, o Object.assign abaixo (passo
+        // 6) mesclava por cima do objeto antigo em vez de substituí-lo, deixando
+        // chaves da loja anterior misturadas com as da loja nova. Agora essas três
+        // chaves são sempre zeradas aqui, igual já acontecia com clients/products/etc.
         const keepMsgs = state.wppMensagens;
         Object.assign(state, {
             company: { name: loja.fullLabel, primaryColor:'#ff6b00', secondaryColor:'#ffcc00',
@@ -24950,6 +25006,7 @@ const StoreManager = {
                 lateFee:2, dailyInterest:0.033, logo:null, lojaAtual:lojaId },
             clients:[], products:[], services:[], suppliers:[], sales:[], expenses:[],
             prescriptions:[], crmContatos:[], crmTarefas:[], crmNps:[],
+            config:{}, notificacoes:{}, backupConfig:{},
             editingId:null, editingSaleId:null, lastOsCounter:{},
             wppMensagens: keepMsgs
         });
@@ -24982,11 +25039,21 @@ const StoreManager = {
 
                 // Config da empresa
                 const cfgRows = byCol['config'] || [];
+                // ✅ FIX MISTURA DE LOJAS: também lê o doc 'main' (mesma fonte usada por
+                // LocalFirst._fetchAllData no boot normal) — state.config só é persistido
+                // ali, nunca no doc 'empresa'. Sem isso, state.config da loja nova nunca
+                // era carregado durante a troca de loja.
+                const main = cfgRows.find(d => d._docId === 'main');
+                if (main) {
+                    if (main.config)        Object.assign(state.config, main.config);
+                    if (main.company)       Object.assign(state.company, main.company);
+                    if (main.lastOsCounter) state.lastOsCounter = { ...state.lastOsCounter, ...main.lastOsCounter };
+                }
                 const emp = cfgRows.find(d => d._docId === 'empresa');
                 if (emp) {
                     if (emp.company)       Object.assign(state.company, emp.company);
-                    if (emp.notificacoes)  Object.assign(state.notificacoes || {}, emp.notificacoes);
-                    if (emp.backupConfig)  Object.assign(state.backupConfig || {}, emp.backupConfig);
+                    if (emp.notificacoes)  Object.assign(state.notificacoes, emp.notificacoes);
+                    if (emp.backupConfig)  Object.assign(state.backupConfig, emp.backupConfig);
                     if (emp.lastOsCounter) state.lastOsCounter = { ...state.lastOsCounter, ...emp.lastOsCounter };
                     if (state.company.primaryColor)   document.documentElement.style.setProperty('--primary', state.company.primaryColor);
                     if (state.company.secondaryColor) document.documentElement.style.setProperty('--secondary', state.company.secondaryColor);
@@ -24995,9 +25062,14 @@ const StoreManager = {
                 const contas = cfgRows.find(d => d._docId === 'contas_financeiras');
                 IDB._cache['contas_financeiras_' + lojaId] = JSON.stringify(contas?.items || []);
 
+
                 // Atualiza UI completa
                 App.updateCompanyDisplay();
                 try { Config.load(); } catch(e) {}
+                // ✅ FIX MISTURA DE LOJAS: re-renderiza a tela de Backup Automático com o
+                // state.backupConfig já correto da loja nova (antes ficava com o visual
+                // da loja anterior até o usuário reabrir a aba manualmente).
+                try { Config.renderBackupStatus?.(); } catch(e) {}
                 Utils.updatePixKey();
                 // FIX BUG#4: restaura preferência de ocultar valores para a nova loja
                 try { Dashboard._restoreHideValues?.(); } catch(e) {}
