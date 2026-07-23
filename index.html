@@ -9486,6 +9486,51 @@ body.dark-mode,
         };
 
         // ══════════════════════════════════════════════════════════════════════
+        //  ✅ FIX SEGURANÇA-SYNC: mutex único compartilhado entre LocalFirst
+        //  (leitura/reset de state.company a partir do IndexedDB local) e
+        //  CloudSync (aplicação de dados vindos do Google Drive/OneDrive).
+        //
+        //  PROBLEMA QUE ISSO RESOLVE: LocalFirst._fetchAllData() e
+        //  CloudSync._applyCloudData() mexiam em state.company/config de forma
+        //  concorrente e sem nenhuma trava entre si. Se um pull do Drive
+        //  atualizasse state.company em memória mas ainda não tivesse
+        //  terminado de gravar no IndexedDB (rewriteAll é assíncrono), e no
+        //  meio dessa janela algo disparasse LocalFirst.sync() (troca de
+        //  seção, BroadcastChannel, voltar o foco na aba), o _fetchAllData
+        //  lia o IndexedDB AINDA desatualizado, zerava state.company e
+        //  sobrescrevia o logo/nome que tinha acabado de vir da nuvem —
+        //  causando o sumiço intermitente relatado (empresa/logo não carrega
+        //  às vezes ao sincronizar). Como a janela de risco depende de
+        //  timing de rede, o bug era esporádico e difícil de reproduzir.
+        //
+        //  SOLUÇÃO: toda operação que lê OU aplica dados de empresa/config
+        //  (do IDB local ou da nuvem) passa a rodar dentro de _withSyncLock(),
+        //  que enfileira as chamadas — nunca duas rodam ao mesmo tempo.
+        // ══════════════════════════════════════════════════════════════════════
+        window._syncMutexChain = Promise.resolve();
+        window._syncMutexDepth = 0;
+        function _withSyncLock(taskName, fn) {
+            window._syncMutexDepth++;
+            if (window._syncMutexDepth > 1) {
+                console.log('[SyncMutex] ⏳ "' + taskName + '" aguardando na fila (' + (window._syncMutexDepth - 1) + ' à frente)');
+            }
+            const run = window._syncMutexChain.then(async () => {
+                try {
+                    return await fn();
+                } catch (e) {
+                    console.error('[SyncMutex] ⚠️ Erro em "' + taskName + '":', e && e.message);
+                    throw e;
+                } finally {
+                    window._syncMutexDepth--;
+                }
+            });
+            // Encadeia sempre, mesmo em erro, para não travar a fila permanentemente
+            window._syncMutexChain = run.catch(() => {});
+            return run;
+        }
+        window._withSyncLock = _withSyncLock;
+
+        // ══════════════════════════════════════════════════════════════════════
         //  LocalFirst — RxDB v17-compatible Local-First engine
         // ══════════════════════════════════════════════════════════════════════
         const LocalFirst = {
@@ -9571,9 +9616,19 @@ body.dark-mode,
                 // 2. Cloud pull → apenas DEPOIS de 2s, em background, para NÃO atrasar o boot
                 // Isso garante que o usuário sempre vê os dados locais primeiro,
                 // e o Google Drive/OneDrive apenas ATUALIZA se houver algo mais novo na nuvem.
+                // ✅ FIX SEGURANÇA-SYNC: este ponto dizia "Cloud pull" no comentário mas
+                // na prática chamava CloudSync.autoSync(), que executa um PUSH (agenda
+                // envio local → nuvem), não um pull. Corrigido para de fato PUXAR os
+                // dados da nuvem aqui (protegido pelo mutex compartilhado com
+                // LocalFirst.sync — ver _withSyncLock), garantindo que uma edição feita
+                // em outro dispositivo apareça já no boot, sem depender só do listener
+                // de 'load' separado mais abaixo.
                 setTimeout(() => {
                     try {
-                        if (window.CloudSync) CloudSync.autoSync();
+                        if (!window.CloudSync) return;
+                        const provider = window.CloudSync.provider;
+                        if (provider === 'gdrive')        window.CloudSync.gdrivePull(true).catch(()=>{});
+                        else if (provider === 'onedrive') window.CloudSync.onedrivePull(true).catch(()=>{});
                     } catch(e) {}
                 }, 2000); // 2s: garante que a UI já está completamente carregada antes do pull
             },
@@ -9722,7 +9777,10 @@ body.dark-mode,
                 if (this._syncing) return;
                 this._syncing = true;
                 try {
-                    await this._fetchAllData();
+                    // ✅ FIX SEGURANÇA-SYNC: fila única com CloudSync — impede que uma
+                    // leitura local (troca de seção, BroadcastChannel, foco na aba)
+                    // resete state.company/config no meio de um pull do Drive/OneDrive.
+                    await _withSyncLock('local:sync[' + (reason || '?') + ']', () => this._fetchAllData());
                     // FIX #2: re-renderiza todas as seções da UI após carregar os dados,
                     // não apenas o dashboard — corrige telas vazias após F5 ou troca de aba.
                     try { Dashboard.update(); } catch(e) {}
@@ -11008,7 +11066,10 @@ body.dark-mode,
                             );
                             if (preResp.ok) {
                                 const preRemote = await preResp.json();
-                                await _applyCloudData(preRemote, true);
+                                // ✅ FIX SEGURANÇA-SYNC: mesma fila do LocalFirst.sync — evita
+                                // que este pré-merge escreva company/config bem no meio de
+                                // uma leitura local concorrente.
+                                await _withSyncLock('cloud:gdrivePush-premerge', () => _applyCloudData(preRemote, true));
                             }
                         }
                     } catch(_mergeErr) {
@@ -11107,7 +11168,11 @@ body.dark-mode,
                         { headers: { Authorization: 'Bearer ' + _gdriveToken.access_token }, cache: 'no-store' }
                     );
                     const remote = await fileResp.json();
-                    await _applyCloudData(remote, silent);
+                    // ✅ FIX SEGURANÇA-SYNC: aplica os dados da nuvem dentro do mutex
+                    // compartilhado com LocalFirst.sync — garante que nenhuma leitura
+                    // local do IDB rode no meio da aplicação+persistência do pull,
+                    // que era a causa do logo/empresa sumindo às vezes após sincronizar.
+                    await _withSyncLock('cloud:gdrivePull', () => _applyCloudData(remote, silent));
                     _lastPullTime = Date.now();
                     _syncCount++;
                     const now = new Date().toLocaleTimeString('pt-BR');
@@ -11331,7 +11396,8 @@ body.dark-mode,
                         );
                         if (preResp.ok) {
                             const preRemote = await preResp.json();
-                            await _applyCloudData(preRemote, true);
+                            // ✅ FIX SEGURANÇA-SYNC: mesma fila do LocalFirst.sync (ver gdrivePull).
+                            await _withSyncLock('cloud:onedrivePush-premerge', () => _applyCloudData(preRemote, true));
                         }
                     } catch(_mergeErr) {
                         console.warn('[CloudSync] merge pré-push (OneDrive) falhou — seguindo só com dados locais:', _mergeErr.message);
@@ -11379,7 +11445,8 @@ body.dark-mode,
                     // ✅ FIX SYNC CRÍTICO: ver comentário equivalente em gdrivePull() —
                     // removida a checagem de "_ts não mudou, pular", que podia deixar
                     // o app sem detectar uma mudança real por vários ciclos de poll.
-                    await _applyCloudData(remote, silent);
+                    // ✅ FIX SEGURANÇA-SYNC: mesma fila do LocalFirst.sync (ver gdrivePull).
+                    await _withSyncLock('cloud:onedrivePull', () => _applyCloudData(remote, silent));
                     if (silent) _showSyncIndicator('Sincronizado ' + new Date().toLocaleTimeString('pt-BR'));
                 } catch(e) {
                     if (!silent) Toast.show('❌ Erro ao baixar do OneDrive: ' + e.message, 'danger');
