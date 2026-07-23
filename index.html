@@ -16208,6 +16208,23 @@ tbody tr td{border:1.5px solid #000;padding:2mm;text-align:center;font-weight:70
                     (presc.od.cyl && presc.od.cyl !== '0.00') ||
                     (presc.oe.cyl && presc.oe.cyl !== '0.00');
 
+                // ✅ FIX SYNC RECEITUÁRIO: só reenvia o receituário para a nuvem se os
+                // dados dele realmente mudaram em relação ao que já estava salvo.
+                // Antes: qualquer salvamento do cliente (mesmo só telefone/endereço,
+                // sem tocar no receituário) reenviava o receituário carregado no
+                // formulário com um _updatedAt NOVO. Se esse formulário tivesse sido
+                // aberto antes de uma atualização mais recente do receituário chegar
+                // de outro dispositivo, esse reenvio "ressuscitava" a versão antiga
+                // com timestamp mais novo — e ela vencia a comparação de merge,
+                // apagando a atualização real feita em outro aparelho. Agora só
+                // disparamos o push quando o conteúdo do receituário de fato mudou.
+                const _prescCampos = p => p ? JSON.stringify({
+                    date: p.date, optometrist: p.optometrist, od: p.od, oe: p.oe,
+                    dp: p.dp, height: p.height, notes: p.notes
+                }) : null;
+                const prescAnterior = state.prescriptions.find(p => p.clientId === client.id);
+                const prescMudou = _prescCampos(presc) !== _prescCampos(prescAnterior);
+
                 if (hasRealPrescData) {
                     state.prescriptions = state.prescriptions.filter(p => p.clientId !== client.id);
                     state.prescriptions.push(presc);
@@ -16216,7 +16233,7 @@ tbody tr td{border:1.5px solid #000;padding:2mm;text-align:center;font-weight:70
                 
                 App.saveData();
                 SupaSync.upsertCliente(client);
-                if (hasRealPrescData) {
+                if (hasRealPrescData && prescMudou) {
                     SupaSync.upsertPrescricao(presc);
                 }
                 this.clearForm();
