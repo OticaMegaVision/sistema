@@ -11064,19 +11064,22 @@ body.dark-mode,
                         if (silent) _showSyncIndicator('Sem arquivo no Drive');
                         return;
                     }
-                    // ── Verifica se o arquivo remoto é mais novo que o último pull ─
-                    const remoteTs = await _gdriveGetModifiedTime(fileId);
-                    const lastPull = localStorage.getItem(_lsPullTsKey());
-                    if (silent && remoteTs && lastPull) {
-                        const remoteDate = new Date(remoteTs).getTime();
-                        const lastDate   = new Date(lastPull).getTime();
-                        if (remoteDate <= lastDate) {
-                            // Sem mudanças remotas
-                            _pulling = false;
-                            _showSyncIndicator('✓ Atualizado ' + new Date().toLocaleTimeString('pt-BR'));
-                            return;
-                        }
-                    }
+                    // ✅ FIX SYNC CRÍTICO: removidas as duas checagens de "arquivo não
+                    // mudou, pular" que existiam aqui (uma comparando o modifiedTime
+                    // do Google Drive, outra comparando o campo _ts de dentro do
+                    // arquivo). As duas comparavam contra o timestamp do ÚLTIMO pull
+                    // bem-sucedido — mas o modifiedTime que o Google Drive reporta pode
+                    // demorar alguns segundos para refletir uma escrita recente (efeito
+                    // de consistência eventual da API), e isso fazia o app concluir
+                    // "nada mudou" e pular a atualização por vários ciclos seguidos,
+                    // às vezes minutos, mesmo com uma mudança real esperando pra ser
+                    // baixada (foi exatamente esse o sintoma relatado: Chrome conectado,
+                    // fazendo pull a cada 5s, mas não pegando despesas novas do Edge).
+                    // Agora todo pull baixa e tenta aplicar o arquivo; o merge dentro de
+                    // _applyCloudData já é seguro/idempotente quando não há nada de novo
+                    // (compara item a item por _updatedAt), então o único custo é uma
+                    // requisição HTTP extra a cada 5-15s — aceitável pelo ganho de
+                    // confiabilidade no sync "em tempo real".
                     // ── Baixa o conteúdo ──────────────────────────────────────
                     if (!silent) Toast.show('☁️ Baixando dados do Google Drive...', 'info', 1500);
                     if (silent) _updateWidget('pull', '↓ Baixando...');
@@ -11085,14 +11088,6 @@ body.dark-mode,
                         { headers: { Authorization: 'Bearer ' + _gdriveToken.access_token } }
                     );
                     const remote = await fileResp.json();
-                    // ── Verifica se o remoto é mais novo que o local via _ts ──
-                    if (silent && remote._ts && lastPull) {
-                        if (new Date(remote._ts).getTime() <= new Date(lastPull).getTime()) {
-                            _pulling = false;
-                            _showSyncIndicator('✓ Atualizado ' + new Date().toLocaleTimeString('pt-BR'));
-                            return;
-                        }
-                    }
                     await _applyCloudData(remote, silent);
                     _lastPullTime = Date.now();
                     _syncCount++;
@@ -11362,13 +11357,9 @@ body.dark-mode,
                         _pulling = false; return;
                     }
                     const remote = await r.json();
-                    // Verifica se o remoto é mais novo (por loja)
-                    if (silent && remote._ts) {
-                        const lastPull = localStorage.getItem(_lsPullTsKey());
-                        if (lastPull && new Date(remote._ts).getTime() <= new Date(lastPull).getTime()) {
-                            _pulling = false; return;
-                        }
-                    }
+                    // ✅ FIX SYNC CRÍTICO: ver comentário equivalente em gdrivePull() —
+                    // removida a checagem de "_ts não mudou, pular", que podia deixar
+                    // o app sem detectar uma mudança real por vários ciclos de poll.
                     await _applyCloudData(remote, silent);
                     if (silent) _showSyncIndicator('Sincronizado ' + new Date().toLocaleTimeString('pt-BR'));
                 } catch(e) {
