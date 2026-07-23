@@ -9794,12 +9794,26 @@ body.dark-mode,
             //  gerar novo timestamp no Drive, evitando o loop pull→push→pull)
             async pushConfig(skipCloudSync = false) {
                 const storeId = window._currentStore || 'barueri';
-                // ✅ FIX "meta volta pro valor anterior": marca que houve uma edição
-                // local de empresa/config AGORA, nesta loja. _fetchAllData() usa isso
-                // para não sobrescrever a edição com uma leitura do IndexedDB que
-                // ainda pode não refletir esta gravação (ver comentário completo lá).
-                this._lastLocalConfigEdit = Date.now();
-                this._lastLocalConfigEditStore = storeId;
+                // ✅ FIX SYNC CRÍTICO (empresa/logo nunca mais atualizava): esta função
+                // é chamada em dois cenários bem diferentes:
+                //  1) o usuário genuinamente editou dados da empresa/config e clicou
+                //     em Salvar (skipCloudSync=false);
+                //  2) rewriteAll(true) chama pushConfig(true) automaticamente depois de
+                //     TODO pull da nuvem, só para persistir o resultado do merge no
+                //     IndexedDB local — sem que o usuário tenha editado nada.
+                // Antes, os dois casos marcavam "_lastLocalConfigEdit = agora", e o
+                // merge em _applyCloudData usa esse carimbo para decidir se o remoto
+                // pode sobrescrever local (edição local recente sempre "ganha", para
+                // não perder uma edição ainda não enviada). Como TODO pull re-executava
+                // esse carimbo (caso 2), a partir do segundo ciclo de sync em diante o
+                // dispositivo achava, para sempre, que "acabou de editar agora mesmo" —
+                // e passava a IGNORAR permanentemente qualquer company/config vindo de
+                // outros dispositivos (inclusive o logo). Corrigido para só marcar o
+                // carimbo quando for uma edição real (skipCloudSync === false).
+                if (!skipCloudSync) {
+                    this._lastLocalConfigEdit = Date.now();
+                    this._lastLocalConfigEditStore = storeId;
+                }
                 const now = new Date().toISOString();
                 // FIX #3: salva company, config e lastOsCounter juntos para
                 // garantir que TUDO seja restaurado ao dar F5 ou trocar de loja.
