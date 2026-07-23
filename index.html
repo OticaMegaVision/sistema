@@ -1540,24 +1540,17 @@
             font-size: 1rem;
         }
 
-        <!-- ✅ FIX cores de ação nas tabelas: Editar usava a mesma cor de Ver
-             (azul info) por causa de uma segunda declaração .btn-view mais
-             abaixo com !important sobrescrevendo o verde original — e PDF
-             usava exatamente o mesmo vermelho do Excluir. Resultado: nas
-             tabelas de Clientes/Produtos/Serviços/Fornecedores dava para
-             confundir os botões só pela cor. Agora cada ação tem uma cor
-             própria, com Editar usando o laranja da marca (ação mais usada). -->
-        .btn-edit { background: rgba(255,107,0,0.12); color: var(--primary); }
-        .btn-edit:hover { background: var(--primary); color: white; }
+        .btn-edit { background: rgba(23,162,184,0.1); color: var(--info); }
+        .btn-edit:hover { background: var(--info); color: white; }
 
         .btn-delete { background: rgba(220,53,69,0.1); color: var(--danger); }
         .btn-delete:hover { background: var(--danger); color: white; }
 
-        .btn-view { background: rgba(23,162,184,0.12); color: var(--info); }
-        .btn-view:hover { background: var(--info); color: white; }
+        .btn-view { background: rgba(40,167,69,0.1); color: var(--success); }
+        .btn-view:hover { background: var(--success); color: white; }
 
-        .btn-pdf-icon { background: rgba(255,170,0,0.15); color: #b36b00; }
-        .btn-pdf-icon:hover { background: #b36b00; color: white; }
+        .btn-pdf-icon { background: rgba(220,53,69,0.1); color: #dc3545; }
+        .btn-pdf-icon:hover { background: #dc3545; color: white; }
 
         .btn-profissional {
             border-radius: 30px;
@@ -2108,6 +2101,7 @@
             cursor: pointer;
         }
         .prod-thumb-empty i { color: var(--gray, #6c757d); font-size: .95rem; }
+        .btn-view { background: rgba(23,162,184,.12) !important; color: #17a2b8 !important; }
 
         /* ===== PRODUTOS - UPLOAD DE IMAGEM ===== */
         .image-preview {
@@ -5593,23 +5587,6 @@ body.dark-mode,
             <section id="sales" class="section" aria-labelledby="pageTitle">
                 <div class="form-container no-print">
                     <h2 class="section-title">NOVA ORDEM DE SERVIÇO</h2>
-
-                    <!-- ✅ Barra de etapas (visual/orientativa — não interfere em nenhuma
-                         lógica existente, apenas ajuda a visualizar o fluxo da OS) -->
-                    <div style="display:flex;gap:6px;margin:0 0 18px;background:#fff;border-radius:14px;padding:8px;box-shadow:var(--shadow-card, 0 2px 16px rgba(0,0,0,.08));">
-                        <div style="flex:1;text-align:center;padding:10px 4px;border-radius:10px;font-size:0.72rem;font-weight:700;background:var(--grad-primary, linear-gradient(135deg,#ff6b00,#ffaa00));color:#fff;box-shadow:var(--shadow-orange, 0 4px 20px rgba(255,107,0,.25));">
-                            <span style="display:block;font-size:0.62rem;opacity:0.85;font-weight:600;letter-spacing:0.5px;margin-bottom:2px;">01</span>Dados da OS
-                        </div>
-                        <div style="flex:1;text-align:center;padding:10px 4px;border-radius:10px;font-size:0.72rem;font-weight:700;color:#c9a86b;">
-                            <span style="display:block;font-size:0.62rem;opacity:0.85;font-weight:600;letter-spacing:0.5px;margin-bottom:2px;">02</span>Cliente
-                        </div>
-                        <div style="flex:1;text-align:center;padding:10px 4px;border-radius:10px;font-size:0.72rem;font-weight:700;color:#c9a86b;">
-                            <span style="display:block;font-size:0.62rem;opacity:0.85;font-weight:600;letter-spacing:0.5px;margin-bottom:2px;">03</span>Itens
-                        </div>
-                        <div style="flex:1;text-align:center;padding:10px 4px;border-radius:10px;font-size:0.72rem;font-weight:700;color:#c9a86b;">
-                            <span style="display:block;font-size:0.62rem;opacity:0.85;font-weight:600;letter-spacing:0.5px;margin-bottom:2px;">04</span>Pagamento
-                        </div>
-                    </div>
                     
                     <!-- DADOS DA OS -->
                     <div class="cliente-card">
@@ -5934,27 +5911,27 @@ body.dark-mode,
 
                             <!-- Painel Armação -->
                             <div id="itemTabArmacao" style="display:none;animation:fadeIn 0.2s ease;">
-                                <div style="background:#f9f9f9;border:1.5px solid #ffcbb0;border-radius:12px;padding:12px;display:flex;flex-direction:column;gap:10px;">
+                                <div style="background:#f9f9f9;border:1.5px solid #c8e6c9;border-radius:12px;padding:12px;display:flex;flex-direction:column;gap:10px;">
                                     <div style="display:flex;align-items:center;gap:8px;margin-bottom:2px;">
-                                        <div style="width:28px;height:28px;background:#ffe4d1;border-radius:8px;display:flex;align-items:center;justify-content:center;">
-                                            <i class="fas fa-glasses" style="color:#e85500;font-size:12px;"></i>
+                                        <div style="width:28px;height:28px;background:#e8f5e9;border-radius:8px;display:flex;align-items:center;justify-content:center;">
+                                            <i class="fas fa-glasses" style="color:#2e7d32;font-size:12px;"></i>
                                         </div>
-                                        <span style="font-weight:700;font-size:0.82rem;color:#e85500;">Selecionar Armação</span>
+                                        <span style="font-weight:700;font-size:0.82rem;color:#2e7d32;">Selecionar Armação</span>
                                     </div>
-                                    <select id="armacaoSelect" class="form-control" style="border-radius:8px;border-color:#ffb385;background:#fff;font-size:0.85rem;">
+                                    <select id="armacaoSelect" class="form-control" style="border-radius:8px;border-color:#a5d6a7;background:#fff;font-size:0.85rem;">
                                         <option value="">🔍 Escolha uma armação...</option>
                                     </select>
                                     <div style="display:flex;gap:10px;align-items:center;">
                                         <div style="flex:1;">
                                             <label style="font-size:11px;color:#888;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;">Quantidade</label>
-                                            <div style="display:flex;align-items:center;gap:0;border:1.5px solid #ffb385;border-radius:8px;overflow:hidden;background:#fff;width:fit-content;">
-                                                <button type="button" onclick="Sales.changeQty('armacaoQty',-1)" style="width:34px;height:34px;border:none;background:#ffe4d1;color:#e85500;font-size:16px;font-weight:700;cursor:pointer;">−</button>
+                                            <div style="display:flex;align-items:center;gap:0;border:1.5px solid #a5d6a7;border-radius:8px;overflow:hidden;background:#fff;width:fit-content;">
+                                                <button type="button" onclick="Sales.changeQty('armacaoQty',-1)" style="width:34px;height:34px;border:none;background:#e8f5e9;color:#2e7d32;font-size:16px;font-weight:700;cursor:pointer;">−</button>
                                                 <input type="number" id="armacaoQty" value="1" min="1" style="width:44px;height:34px;border:none;text-align:center;font-size:0.9rem;font-weight:700;color:#333;outline:none;">
-                                                <button type="button" onclick="Sales.changeQty('armacaoQty',1)" style="width:34px;height:34px;border:none;background:#ffe4d1;color:#e85500;font-size:16px;font-weight:700;cursor:pointer;">+</button>
+                                                <button type="button" onclick="Sales.changeQty('armacaoQty',1)" style="width:34px;height:34px;border:none;background:#e8f5e9;color:#2e7d32;font-size:16px;font-weight:700;cursor:pointer;">+</button>
                                             </div>
                                         </div>
                                         <button type="button" onclick="Sales.addArmacao()"
-                                            style="flex:1;padding:10px;border-radius:10px;border:none;background:linear-gradient(135deg,#ff7a30,#e85500);color:#fff;font-weight:700;font-size:0.83rem;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px;box-shadow:0 3px 10px rgba(232,85,0,0.25);">
+                                            style="flex:1;padding:10px;border-radius:10px;border:none;background:linear-gradient(135deg,#43a047,#2e7d32);color:#fff;font-weight:700;font-size:0.83rem;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px;box-shadow:0 3px 10px rgba(46,125,50,0.25);">
                                             <i class="fas fa-plus-circle"></i> Adicionar Armação
                                         </button>
                                     </div>
@@ -5963,27 +5940,27 @@ body.dark-mode,
 
                             <!-- Painel Serviço -->
                             <div id="itemTabServico" style="display:none;animation:fadeIn 0.2s ease;">
-                                <div style="background:#f9f9f9;border:1.5px solid #ffd699;border-radius:12px;padding:12px;display:flex;flex-direction:column;gap:10px;">
+                                <div style="background:#f9f9f9;border:1.5px solid #b3e5fc;border-radius:12px;padding:12px;display:flex;flex-direction:column;gap:10px;">
                                     <div style="display:flex;align-items:center;gap:8px;margin-bottom:2px;">
-                                        <div style="width:28px;height:28px;background:#fff3d9;border-radius:8px;display:flex;align-items:center;justify-content:center;">
-                                            <i class="fas fa-tools" style="color:#ff8f00;font-size:12px;"></i>
+                                        <div style="width:28px;height:28px;background:#e1f5fe;border-radius:8px;display:flex;align-items:center;justify-content:center;">
+                                            <i class="fas fa-tools" style="color:#0277bd;font-size:12px;"></i>
                                         </div>
-                                        <span style="font-weight:700;font-size:0.82rem;color:#ff8f00;">Selecionar Serviço</span>
+                                        <span style="font-weight:700;font-size:0.82rem;color:#0277bd;">Selecionar Serviço</span>
                                     </div>
-                                    <select id="servicoSelect" class="form-control" style="border-radius:8px;border-color:#ffc266;background:#fff;font-size:0.85rem;">
+                                    <select id="servicoSelect" class="form-control" style="border-radius:8px;border-color:#81d4fa;background:#fff;font-size:0.85rem;">
                                         <option value="">🔍 Escolha um serviço...</option>
                                     </select>
                                     <div style="display:flex;gap:10px;align-items:center;">
                                         <div style="flex:1;">
                                             <label style="font-size:11px;color:#888;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;">Quantidade</label>
-                                            <div style="display:flex;align-items:center;gap:0;border:1.5px solid #ffc266;border-radius:8px;overflow:hidden;background:#fff;width:fit-content;">
-                                                <button type="button" onclick="Sales.changeQty('servicoQty',-1)" style="width:34px;height:34px;border:none;background:#fff3d9;color:#ff8f00;font-size:16px;font-weight:700;cursor:pointer;">−</button>
+                                            <div style="display:flex;align-items:center;gap:0;border:1.5px solid #81d4fa;border-radius:8px;overflow:hidden;background:#fff;width:fit-content;">
+                                                <button type="button" onclick="Sales.changeQty('servicoQty',-1)" style="width:34px;height:34px;border:none;background:#e1f5fe;color:#0277bd;font-size:16px;font-weight:700;cursor:pointer;">−</button>
                                                 <input type="number" id="servicoQty" value="1" min="1" style="width:44px;height:34px;border:none;text-align:center;font-size:0.9rem;font-weight:700;color:#333;outline:none;">
-                                                <button type="button" onclick="Sales.changeQty('servicoQty',1)" style="width:34px;height:34px;border:none;background:#fff3d9;color:#ff8f00;font-size:16px;font-weight:700;cursor:pointer;">+</button>
+                                                <button type="button" onclick="Sales.changeQty('servicoQty',1)" style="width:34px;height:34px;border:none;background:#e1f5fe;color:#0277bd;font-size:16px;font-weight:700;cursor:pointer;">+</button>
                                             </div>
                                         </div>
                                         <button type="button" onclick="Sales.addServico()"
-                                            style="flex:1;padding:10px;border-radius:10px;border:none;background:linear-gradient(135deg,#ffa726,#ff8f00);color:#fff;font-weight:700;font-size:0.83rem;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px;box-shadow:0 3px 10px rgba(255,143,0,0.25);">
+                                            style="flex:1;padding:10px;border-radius:10px;border:none;background:linear-gradient(135deg,#039be5,#0277bd);color:#fff;font-weight:700;font-size:0.83rem;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px;box-shadow:0 3px 10px rgba(2,119,189,0.25);">
                                             <i class="fas fa-plus-circle"></i> Adicionar Serviço
                                         </button>
                                     </div>
@@ -5992,27 +5969,27 @@ body.dark-mode,
 
                             <!-- Painel Tratamento -->
                             <div id="itemTabTratamento" style="display:none;animation:fadeIn 0.2s ease;">
-                                <div style="background:#f9f9f9;border:1.5px solid #f0c780;border-radius:12px;padding:12px;display:flex;flex-direction:column;gap:10px;">
+                                <div style="background:#f9f9f9;border:1.5px solid #ce93d8;border-radius:12px;padding:12px;display:flex;flex-direction:column;gap:10px;">
                                     <div style="display:flex;align-items:center;gap:8px;margin-bottom:2px;">
-                                        <div style="width:28px;height:28px;background:#fdf0d9;border-radius:8px;display:flex;align-items:center;justify-content:center;">
-                                            <i class="fas fa-flask" style="color:#b36b00;font-size:12px;"></i>
+                                        <div style="width:28px;height:28px;background:#f3e5f5;border-radius:8px;display:flex;align-items:center;justify-content:center;">
+                                            <i class="fas fa-flask" style="color:#7b1fa2;font-size:12px;"></i>
                                         </div>
-                                        <span style="font-weight:700;font-size:0.82rem;color:#b36b00;">Selecionar Tratamento</span>
+                                        <span style="font-weight:700;font-size:0.82rem;color:#7b1fa2;">Selecionar Tratamento</span>
                                     </div>
-                                    <select id="tratamentoSelect" class="form-control" style="border-radius:8px;border-color:#e0af5c;background:#fff;font-size:0.85rem;">
+                                    <select id="tratamentoSelect" class="form-control" style="border-radius:8px;border-color:#ce93d8;background:#fff;font-size:0.85rem;">
                                         <option value="">🔍 Escolha um tratamento...</option>
                                     </select>
                                     <div style="display:flex;gap:10px;align-items:center;">
                                         <div style="flex:1;">
                                             <label style="font-size:11px;color:#888;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;">Quantidade</label>
-                                            <div style="display:flex;align-items:center;gap:0;border:1.5px solid #e0af5c;border-radius:8px;overflow:hidden;background:#fff;width:fit-content;">
-                                                <button type="button" onclick="Sales.changeQty('tratamentoQty',-1)" style="width:34px;height:34px;border:none;background:#fdf0d9;color:#b36b00;font-size:16px;font-weight:700;cursor:pointer;">−</button>
+                                            <div style="display:flex;align-items:center;gap:0;border:1.5px solid #ce93d8;border-radius:8px;overflow:hidden;background:#fff;width:fit-content;">
+                                                <button type="button" onclick="Sales.changeQty('tratamentoQty',-1)" style="width:34px;height:34px;border:none;background:#f3e5f5;color:#7b1fa2;font-size:16px;font-weight:700;cursor:pointer;">−</button>
                                                 <input type="number" id="tratamentoQty" value="1" min="1" style="width:44px;height:34px;border:none;text-align:center;font-size:0.9rem;font-weight:700;color:#333;outline:none;">
-                                                <button type="button" onclick="Sales.changeQty('tratamentoQty',1)" style="width:34px;height:34px;border:none;background:#fdf0d9;color:#b36b00;font-size:16px;font-weight:700;cursor:pointer;">+</button>
+                                                <button type="button" onclick="Sales.changeQty('tratamentoQty',1)" style="width:34px;height:34px;border:none;background:#f3e5f5;color:#7b1fa2;font-size:16px;font-weight:700;cursor:pointer;">+</button>
                                             </div>
                                         </div>
                                         <button type="button" onclick="Sales.addTratamento()"
-                                            style="flex:1;padding:10px;border-radius:10px;border:none;background:linear-gradient(135deg,#d68a00,#b36b00);color:#fff;font-weight:700;font-size:0.83rem;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px;box-shadow:0 3px 10px rgba(179,107,0,0.25);">
+                                            style="flex:1;padding:10px;border-radius:10px;border:none;background:linear-gradient(135deg,#ab47bc,#7b1fa2);color:#fff;font-weight:700;font-size:0.83rem;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px;box-shadow:0 3px 10px rgba(123,31,162,0.25);">
                                             <i class="fas fa-plus-circle"></i> Adicionar Tratamento
                                         </button>
                                     </div>
@@ -6022,7 +5999,7 @@ body.dark-mode,
                     </div>
 
                     <!-- TOTAIS -->
-                    <div class="cliente-card" style="border-top:3px solid var(--orange-1,#ff6b00);">
+                    <div class="cliente-card">
                         <h3>💰 TOTAIS</h3>
                         <div class="form-row">
                             <div class="form-group">
@@ -6039,7 +6016,7 @@ body.dark-mode,
                             </div>
                             <div class="form-group">
                                 <label>TOTAL</label>
-                                <div class="form-control" id="totalDisplay" style="font-weight:900;font-size:1.15rem;color:#fff;background:var(--grad-primary,linear-gradient(135deg,#ff6b00,#ffaa00));border:none;box-shadow:var(--shadow-orange,0 4px 20px rgba(255,107,0,.25));" aria-live="polite">R$ 0,00</div>
+                                <div class="form-control" id="totalDisplay" style="font-weight: bold; color: var(--primary);" aria-live="polite">R$ 0,00</div>
                             </div>
                         </div>
                     </div>
@@ -6615,7 +6592,7 @@ body.dark-mode,
                         <button class="btn btn-info btn-sm" onclick="Clients.exportToExcel()"><i class="fas fa-file-excel"></i> Exportar Excel</button>
                         <button class="btn btn-success btn-sm" onclick="document.getElementById('importClientsFile').click()"><i class="fas fa-upload"></i> Importar</button>
                         <input type="file" id="importClientsFile" accept=".xlsx,.csv" class="d-none" onchange="Clients.importFromFile(event)">
-                        <button class="btn btn-danger btn-sm" onclick="Clients.removeDuplicates()" title="Detectar e remover clientes duplicados (mesmo nome ou mesmo CPF)"><i class="fas fa-broom"></i> Remover Duplicatas</button>
+                        <button class="btn btn-sm" style="background:#dc3545;color:white;border:none;" onclick="Clients.removeDuplicates()" title="Detectar e remover clientes duplicados (mesmo nome ou mesmo CPF)"><i class="fas fa-broom"></i> Remover Duplicatas</button>
                     </div>
                 </div>
 
@@ -7799,16 +7776,6 @@ body.dark-mode,
                     <div class="form-container">
                         <h3 style="color: var(--primary); margin-bottom: 1.5rem;">Configurações de Notificações</h3>
 
-                        <!-- ✅ NOVO: status real da permissão de notificação do navegador —
-                             sem isso, os alertas abaixo eram apenas preferências salvas,
-                             sem nenhum aviso de fato sendo disparado para o usuário. -->
-                        <div id="notifPermBox" style="border-radius:10px;padding:12px 14px;margin-bottom:1.25rem;font-size:0.85rem;display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;">
-                            <span id="notifPermText">Verificando permissão do navegador...</span>
-                            <button type="button" id="notifPermBtn" class="btn btn-sm btn-primary" style="display:none;" onclick="NotificationEngine.requestPermission().then(()=>Config.updateNotifPermUI())">
-                                <i class="fas fa-bell"></i> Ativar notificações do navegador
-                            </button>
-                        </div>
-
                         <div style="margin-bottom: 1.5rem;">
                             <h4>Alertas de Estoque</h4>
                             <div style="display: grid; gap: 0.75rem; margin-top: 0.5rem;">
@@ -7850,9 +7817,6 @@ body.dark-mode,
 
                         <div class="btn-group" style="margin-top: 1.5rem;">
                             <button type="button" class="btn btn-success" onclick="Config.saveNotificacoes()">Salvar Notificações</button>
-                            <button type="button" class="btn btn-secondary" onclick="NotificationEngine.check(true)">
-                                <i class="fas fa-sync"></i> Verificar agora
-                            </button>
                         </div>
                     </div>
                 </div>
@@ -9581,91 +9545,36 @@ body.dark-mode,
             // ── Fetch todos os dados do IDB ───────────────────────────────────
             async _fetchAllData() {
                 const storeId = window._currentStore || 'barueri';
-                // ✅ FIX "meta do mês volta pro valor anterior / mistura com outra loja":
-                // dois problemas distintos, mesma causa raiz — o bloco abaixo fazia
-                // Object.assign(state.company, cfg.company) DIRETO NO MESMO OBJETO,
-                // sem nunca resetá-lo antes. Isso causava:
-                //  1) MISTURA ENTRE LOJAS: ao trocar de loja, campos que só existiam
-                //     na loja anterior (ex: uma meta definida lá) continuavam presos
-                //     em state.company, porque o merge só sobrescreve chaves que EXISTEM
-                //     no documento novo — nunca limpa as que sobraram da loja anterior.
-                //  2) VALOR VOLTA AO ANTERIOR: qualquer gatilho de sync() (abrir o
-                //     Dashboard, voltar o foco na aba, polling da nuvem) que rodasse
-                //     nos primeiros instantes depois de editar a meta podia ler do
-                //     IndexedDB uma cópia ainda não atualizada (a gravação do
-                //     pushConfig é assíncrona) e sobrescrever a edição recente.
-                // Fix: (a) reseta company/config/wppMensagens/lastOsCounter do zero
-                // antes de mesclar — nunca herda campo de loja anterior; (b) se uma
-                // edição local aconteceu há poucos segundos NESTA MESMA loja, confia
-                // no que já está em memória em vez de arriscar sobrescrever com uma
-                // leitura do IDB que pode ainda não refletir essa gravação.
-                // ✅ Janela ampliada de 4s → 10s: o caminho completo edição → push
-                // (debounce local de 1.5s + debounce de nuvem de 0.8s + tempo de
-                // upload em rede) pode facilmente ultrapassar 4s em conexões móveis
-                // mais lentas, reabrindo a mesma janela de risco que este guard
-                // existe para fechar.
-                const recentLocalEdit = this._lastLocalConfigEdit
-                    && (Date.now() - this._lastLocalConfigEdit < 10000)
-                    && this._lastLocalConfigEditStore === storeId;
-                if (!recentLocalEdit) {
-                    state.company       = {};
-                    state.config        = {};
-                    state.wppMensagens  = {};
-                    state.lastOsCounter = {};
-                    state.notificacoes  = {};
-                    state.backupConfig  = {};
-                }
                 try {
                     // FIX #5: removida query inútil 'ALL_PLACEHOLDER' que nunca retornava nada.
                     // Busca por coleção
                     const cols = Object.values(_COL_MAP).filter((v,i,a) => a.indexOf(v) === i);
                     for (const col of cols) {
-                        let items = await sbGetCollection(storeId, col);
+                        const items = await sbGetCollection(storeId, col);
                         const stateKey = Object.entries(_COL_MAP).find(([k,v]) => v === col)?.[0];
-                        // ✅ FIX MIGRAÇÃO CRM: coleções antigas (crmContatos/crmTarefas/crmNps)
-                        // podem conter o formato legado de doc único "bulk" com
-                        // { id:'bulk', _data:[...] } em vez de documentos individuais.
-                        // Detecta esse formato, "desembrulha" para itens individuais,
-                        // regrava cada um separadamente e remove o doc "bulk" antigo —
-                        // uma única vez, de forma transparente, sem perder dados já salvos.
-                        if (stateKey && stateKey.startsWith('crm') && items.length === 1 && items[0] && items[0].id === 'bulk' && Array.isArray(items[0]._data)) {
-                            const unwrapped = items[0]._data;
-                            console.log('[RxDB v17] 🔧 Migrando ' + col + ' do formato "bulk" legado (' + unwrapped.length + ' itens)...');
-                            try {
-                                await sbDeleteDoc(storeId, col, 'bulk');
-                                for (const it of unwrapped) {
-                                    if (it && it.id) await sbUpsertDoc(storeId, col, it.id, { ...it, _store: storeId, _updatedAt: it._updatedAt || new Date().toISOString() });
-                                }
-                            } catch(e) { console.error('[RxDB v17] Erro na migração de ' + col + ':', e.message); }
-                            items = unwrapped;
-                        }
                         // FIX: sempre atualiza o state, mesmo se vazio — garante que
                         // deleções via BroadcastChannel sejam refletidas corretamente.
                         if (stateKey) state[stateKey] = items;
                     }
-                    if (!recentLocalEdit) {
-                        // FIX #4: restaura state.company, config e lastOsCounter corretamente
-                        // sem usar Object.assign(state, cfg) que poluía o state com keys extras.
-                        const cfg = await sbGetDoc(storeId, 'config', 'main');
-                        if (cfg && typeof cfg === 'object') {
-                            if (cfg.config        && typeof cfg.config        === 'object') Object.assign(state.config        || (state.config        = {}), cfg.config);
-                            if (cfg.company       && typeof cfg.company       === 'object') Object.assign(state.company       || (state.company       = {}), cfg.company);
-                            if (cfg.lastOsCounter && typeof cfg.lastOsCounter === 'object') state.lastOsCounter = { ...(state.lastOsCounter || {}), ...cfg.lastOsCounter };
-                            // ✅ FIX BUG WHATSAPP: restaura mensagens personalizadas salvas
-                            if (cfg.wppMensagens  && typeof cfg.wppMensagens  === 'object') Object.assign(state.wppMensagens  || (state.wppMensagens  = {}), cfg.wppMensagens);
-                        }
-                        // Tenta também o doc 'empresa' para compatibilidade com switchTo
-                        const emp = await sbGetDoc(storeId, 'config', 'empresa');
-                        if (emp && typeof emp === 'object') {
-                            if (emp.company)       Object.assign(state.company       || (state.company       = {}), emp.company);
-                            if (emp.notificacoes)  Object.assign(state.notificacoes  || (state.notificacoes  = {}), emp.notificacoes);
-                            if (emp.backupConfig)  Object.assign(state.backupConfig  || (state.backupConfig  = {}), emp.backupConfig);
-                            if (emp.lastOsCounter) state.lastOsCounter = { ...(state.lastOsCounter || {}), ...emp.lastOsCounter };
-                            // ✅ FIX BUG WHATSAPP: restaura também a partir do doc 'empresa'
-                            if (emp.wppMensagens)  Object.assign(state.wppMensagens  || (state.wppMensagens  = {}), emp.wppMensagens);
-                        }
-                    } else {
-                        console.log('[RxDB v17] Edição local recente de config/empresa detectada — mantendo valor em memória (loja ' + storeId + ')');
+                    // FIX #4: restaura state.company, config e lastOsCounter corretamente
+                    // sem usar Object.assign(state, cfg) que poluía o state com keys extras.
+                    const cfg = await sbGetDoc(storeId, 'config', 'main');
+                    if (cfg && typeof cfg === 'object') {
+                        if (cfg.config        && typeof cfg.config        === 'object') Object.assign(state.config        || (state.config        = {}), cfg.config);
+                        if (cfg.company       && typeof cfg.company       === 'object') Object.assign(state.company       || (state.company       = {}), cfg.company);
+                        if (cfg.lastOsCounter && typeof cfg.lastOsCounter === 'object') state.lastOsCounter = { ...(state.lastOsCounter || {}), ...cfg.lastOsCounter };
+                        // ✅ FIX BUG WHATSAPP: restaura mensagens personalizadas salvas
+                        if (cfg.wppMensagens  && typeof cfg.wppMensagens  === 'object') Object.assign(state.wppMensagens  || (state.wppMensagens  = {}), cfg.wppMensagens);
+                    }
+                    // Tenta também o doc 'empresa' para compatibilidade com switchTo
+                    const emp = await sbGetDoc(storeId, 'config', 'empresa');
+                    if (emp && typeof emp === 'object') {
+                        if (emp.company)       Object.assign(state.company       || (state.company       = {}), emp.company);
+                        if (emp.notificacoes)  Object.assign(state.notificacoes  || (state.notificacoes  = {}), emp.notificacoes);
+                        if (emp.backupConfig)  Object.assign(state.backupConfig  || (state.backupConfig  = {}), emp.backupConfig);
+                        if (emp.lastOsCounter) state.lastOsCounter = { ...(state.lastOsCounter || {}), ...emp.lastOsCounter };
+                        // ✅ FIX BUG WHATSAPP: restaura também a partir do doc 'empresa'
+                        if (emp.wppMensagens)  Object.assign(state.wppMensagens  || (state.wppMensagens  = {}), emp.wppMensagens);
                     }
                     console.log('[RxDB v17] Dados carregados do IndexedDB para loja:', storeId);
                 } catch(e) {
@@ -9681,8 +9590,7 @@ body.dark-mode,
                 // WhatsApp etc). Agora sempre complementamos com ele — o que já foi
                 // carregado do IndexedDB tem prioridade; o backup só preenche o que
                 // faltar, nunca sobrescreve algo que já veio do IDB.
-                // (Pulado durante o guard de edição recente, pelo mesmo motivo acima.)
-                if (!recentLocalEdit) try {
+                try {
                     const cfgBackup = window.LocalStorageBackup && LocalStorageBackup.load(storeId);
                     if (cfgBackup) {
                         if (cfgBackup.company && typeof cfgBackup.company === 'object')
@@ -9794,26 +9702,6 @@ body.dark-mode,
             //  gerar novo timestamp no Drive, evitando o loop pull→push→pull)
             async pushConfig(skipCloudSync = false) {
                 const storeId = window._currentStore || 'barueri';
-                // ✅ FIX SYNC CRÍTICO (empresa/logo nunca mais atualizava): esta função
-                // é chamada em dois cenários bem diferentes:
-                //  1) o usuário genuinamente editou dados da empresa/config e clicou
-                //     em Salvar (skipCloudSync=false);
-                //  2) rewriteAll(true) chama pushConfig(true) automaticamente depois de
-                //     TODO pull da nuvem, só para persistir o resultado do merge no
-                //     IndexedDB local — sem que o usuário tenha editado nada.
-                // Antes, os dois casos marcavam "_lastLocalConfigEdit = agora", e o
-                // merge em _applyCloudData usa esse carimbo para decidir se o remoto
-                // pode sobrescrever local (edição local recente sempre "ganha", para
-                // não perder uma edição ainda não enviada). Como TODO pull re-executava
-                // esse carimbo (caso 2), a partir do segundo ciclo de sync em diante o
-                // dispositivo achava, para sempre, que "acabou de editar agora mesmo" —
-                // e passava a IGNORAR permanentemente qualquer company/config vindo de
-                // outros dispositivos (inclusive o logo). Corrigido para só marcar o
-                // carimbo quando for uma edição real (skipCloudSync === false).
-                if (!skipCloudSync) {
-                    this._lastLocalConfigEdit = Date.now();
-                    this._lastLocalConfigEditStore = storeId;
-                }
                 const now = new Date().toISOString();
                 // FIX #3: salva company, config e lastOsCounter juntos para
                 // garantir que TUDO seja restaurado ao dar F5 ou trocar de loja.
@@ -9867,11 +9755,7 @@ body.dark-mode,
                 this._pauseRealtime();
                 try {
                     for (const [stateKey, col] of Object.entries(_COL_MAP)) {
-                        // ✅ FIX: CRM (crmContatos/crmTarefas/crmNps) não era mais pulado
-                        // aqui — antes, isso era necessário por causa do formato "bulk"
-                        // legado, mas agora que cada contato/tarefa/NPS é salvo como
-                        // documento individual (mesmo formato de clients/sales/products),
-                        // o rewriteAll pode gravá-los normalmente também.
+                        if (stateKey.startsWith('crm')) continue;
                         const items = (state[stateKey] || []).filter(i => i && i.id);
                         if (!items.length) continue;
                         for (let i = 0; i < items.length; i += 50) {
@@ -10401,14 +10285,9 @@ body.dark-mode,
             function _fileName()  { return 'OticaVisionPro_sync_' + (window._currentStore || 'barueri') + '.json'; }
             function _lsFileIdKey(provider) { return 'cs_' + provider + '_file_id_' + (window._currentStore || 'barueri'); }
             function _lsPullTsKey()         { return 'cs_last_pull_ts_' + (window._currentStore || 'barueri'); }
-            // REAL-TIME SYNC: polling adaptativo (5s ativo / 45s background)
-            // ✅ FIX: a UI (aba Backup) anuncia "5s ⚡ REAL-TIME" mas o código
-            // estava configurado para 15s — corrigido para bater com o texto
-            // mostrado ao usuário e reduzir o atraso de propagação entre
-            // dispositivos (ex: dar baixa em Contas a Pagar no celular e ver
-            // atualizar no PC sem precisar dar F5).
-            const POLL_ACTIVE_MS          = 5000;   // ✅ CORRIGIDO: 15s → 5s (bate com o texto "sync a cada 5s" da UI)
-            const POLL_BACKGROUND_MS      = 15000;  // ✅ REDUZIDO: 45s → 15s em background (aba oculta) — ainda evita gasto excessivo de bateria/dados, mas sincroniza bem mais rápido
+            // REAL-TIME SYNC: polling adaptativo (30s ativo / 120s background)
+            const POLL_ACTIVE_MS          = 15000;  // ✅ CORRIGIDO: 30s → 15s (sync mais rápido entre dispositivos)
+            const POLL_BACKGROUND_MS      = 45000;  // ✅ CORRIGIDO: 120s → 45s em background
             const POLL_INTERVAL_MS        = POLL_ACTIVE_MS;
             const PUSH_DEBOUNCE_MS        = 800;     // push 0.8s após última mudança
 
@@ -10489,21 +10368,6 @@ body.dark-mode,
             //  de popup do navegador. Ver _refreshGDriveAccessToken() mais abaixo,
             //  perto de connectGDrive().)
             let _autoRefreshing = false;
-            // ✅ FIX SYNC OneDrive: flag equivalente para renovação silenciosa do token OneDrive
-            let _autoRefreshingOD = false;
-
-            // ── PKCE helpers (usado no novo fluxo Authorization Code + PKCE do OneDrive) ──
-            function _base64url(buffer) {
-                let str = '';
-                const bytes = new Uint8Array(buffer);
-                for (let i = 0; i < bytes.length; i++) str += String.fromCharCode(bytes[i]);
-                return btoa(str).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
-            }
-            async function _pkceChallenge(verifier) {
-                const enc = new TextEncoder().encode(verifier);
-                const digest = await crypto.subtle.digest('SHA-256', enc);
-                return _base64url(digest);
-            }
 
             // ── Persiste / restaura tokens ───────────────────────────────────
             function _saveTokens() {
@@ -10631,23 +10495,7 @@ body.dark-mode,
                 // Agora: para cada item, mantemos a versão com _updatedAt mais recente.
                 const cols = ['clients','products','sales','expenses','prescriptions','suppliers','services','crmContatos','crmTarefas','crmNps'];
                 cols.forEach(k => {
-                  // ✅ FIX SYNC CRÍTICO: cada coleção agora é isolada em seu próprio
-                  // try/catch. Antes, se o merge de UMA coleção (ex: vendas) lançasse
-                  // uma exceção por causa de algum item com dado inconsistente, o
-                  // forEach inteiro parava ali — e TODAS as coleções seguintes na
-                  // lista (despesas, receitas, fornecedores, serviços, CRM) ficavam
-                  // silenciosamente sem sincronizar, sem nenhum erro visível pro
-                  // usuário. Agora um problema numa coleção nunca contamina as outras.
-                  try {
                     if (!Array.isArray(remote[k])) return;
-
-                    // ✅ FIX MIGRAÇÃO CRM: um snapshot do Drive/OneDrive salvo por uma
-                    // versão antiga do app pode trazer crmContatos/crmTarefas/crmNps
-                    // no formato legado de doc único ("bulk" + "_data"). Desembrulha
-                    // antes do merge para não tratar o "bulk" como se fosse um item real.
-                    if (k.startsWith('crm') && remote[k].length === 1 && remote[k][0] && remote[k][0].id === 'bulk' && Array.isArray(remote[k][0]._data)) {
-                        remote[k] = remote[k][0]._data;
-                    }
 
                     // Mapa dos itens locais por ID para lookup rápido
                     const localMap = {};
@@ -10683,61 +10531,14 @@ body.dark-mode,
                         }
                     });
 
-                    // ✅ FIX SYNC CRÍTICO: remove itens que existem SÓ localmente mas
-                    // foram excluídos em OUTRO dispositivo. Antes, "merged" começava
-                    // com uma cópia de TODOS os itens locais e o loop acima só
-                    // adicionava/atualizava o que vinha no remoto — nunca removia nada.
-                    // Resultado: um item ausente do remoto (porque foi excluído em
-                    // outro aparelho) permanecia para sempre neste dispositivo, mesmo
-                    // com o tombstone da exclusão já tendo chegado (processado acima,
-                    // antes deste merge). Agora, qualquer item local com tombstone mais
-                    // recente que sua própria última edição é removido do resultado.
-                    Object.keys(merged).forEach(id => {
-                        if (_isDeletedLocally(storeId, k, id, merged[id]._updatedAt || merged[id].updatedAt || null)) {
-                            delete merged[id];
-                        }
-                    });
-
                     state[k] = Object.values(merged);
-                  } catch(mergeErr) {
-                    console.error('[CloudSync] ⚠️ Merge de "' + k + '" falhou — coleções seguintes NÃO foram afetadas:', mergeErr);
-                  }
                 });
                 // FIX SYNC: aplica company com deep merge para garantir que logo e
                 // todos os campos sejam copiados (não apenas os que existem localmente)
-                //
-                // ✅ FIX "META VOLTA AO VALOR ANTERIOR": antes, company/config eram
-                // sobrescritos ÀS CEGAS pelo remoto, sem comparar qual é mais recente
-                // (diferente de clients/sales/products, que já comparam _updatedAt
-                // item-a-item). Isso quebrava de duas formas:
-                //  1) gdrivePush/onedrivePush chamam _applyCloudData(preRemote) como
-                //     "pre-merge" ANTES de subir os dados. Se o usuário tivesse acabado
-                //     de editar a meta, esse pre-merge baixava o arquivo antigo (a nova
-                //     meta ainda não tinha sido enviada) e sobrescrevia state.company em
-                //     memória com o valor velho — e o upload que vinha em seguida
-                //     re-enviava esse valor velho para a nuvem, apagando a edição local
-                //     e impedindo que outros dispositivos a recebessem.
-                //  2) O polling (a cada 15s) podia puxar um snapshot antigo do Drive
-                //     enquanto um push mais recente ainda estava em andamento, causando
-                //     o mesmo efeito de "reverter" a edição feita há poucos segundos.
-                // Fix: só aplicamos o remoto se ele for MAIS NOVO que a última edição
-                // local de config/empresa desta loja. Se a edição local for mais recente
-                // que o snapshot remoto, mantemos o valor local intacto.
-                const localConfigEditTs = (window.LocalFirst && LocalFirst._lastLocalConfigEditStore === storeId)
-                    ? (LocalFirst._lastLocalConfigEdit || 0) : 0;
-                const remoteTsMs = remoteTs ? new Date(remoteTs).getTime() : 0;
-                const localConfigIsNewer = localConfigEditTs > 0 && localConfigEditTs > remoteTsMs;
-
-                if (localConfigIsNewer) {
-                    console.log('[CloudSync] company/config: edição local recente (' + storeId + ') é mais nova que o snapshot remoto — mantendo valores locais (meta, dados da empresa etc).');
-                } else {
-                    if (remote.company && typeof remote.company === 'object') {
-                        state.company = Object.assign(state.company || {}, remote.company);
-                    }
-                    if (remote.config && typeof remote.config === 'object') {
-                        Object.assign(state.config || (state.config = {}), remote.config);
-                    }
+                if (remote.company && typeof remote.company === 'object') {
+                    state.company = Object.assign(state.company || {}, remote.company);
                 }
+                if (remote.config        && typeof remote.config        === 'object') Object.assign(state.config        || (state.config        = {}), remote.config);
                 // ✅ FIX SYNC: restaura mensagens de WhatsApp personalizadas de outro
                 // dispositivo. O local sempre "ganha" em caso de mesma chave (para não
                 // apagar uma edição recente que ainda não subiu pra nuvem) — a nuvem só
@@ -10786,19 +10587,6 @@ body.dark-mode,
                             const localDate  = new Date(localConta._updatedAt  || 0).getTime();
                             if (remoteDate > localDate) mergedContas[remoteConta.id] = remoteConta;
                             // Se local for mais recente (ou empatar), mantém local
-                        }
-                    });
-
-                    // ✅ FIX SYNC CRÍTICO: mesma correção aplicada ao merge genérico
-                    // acima — remove contas que existem só localmente mas já foram
-                    // excluídas em outro dispositivo (tombstone recebido). Sem isso,
-                    // uma conta criada e excluída rapidamente no celular continuava
-                    // aparecendo no PC para sempre, porque o merge só adicionava/
-                    // atualizava contas presentes no remoto, nunca removia as que
-                    // sumiram de lá.
-                    Object.keys(mergedContas).forEach(id => {
-                        if (_isDeletedLocally(storeId, 'contas_financeiras', id, mergedContas[id]._updatedAt || null)) {
-                            delete mergedContas[id];
                         }
                     });
 
@@ -10991,30 +10779,6 @@ body.dark-mode,
                 _pushing = true;
                 if (silent) _updateWidget('push', '↑ Enviando...');
                 try {
-                    // ✅ FIX RACE-CONDITION (causa da "venda que some" entre aparelhos):
-                    // antes de enviar, baixa e mescla o que já está no Drive. Sem isso,
-                    // se o OUTRO dispositivo enviou uma venda há poucos segundos e este
-                    // aparelho ainda não deu pull, o upload abaixo sobrescreveria o
-                    // arquivo inteiro e a venda do outro dispositivo seria perdida (até
-                    // um pull que talvez nunca aconteça antes do próximo push local).
-                    // _applyCloudData faz merge item-a-item por _updatedAt, então isso
-                    // nunca reverte uma mudança local mais recente.
-                    try {
-                        const fileIdPre = await _gdriveGetOrCreateFileId();
-                        if (fileIdPre) {
-                            const preResp = await fetch(
-                                'https://www.googleapis.com/drive/v3/files/' + fileIdPre + '?alt=media',
-                                { headers: { Authorization: 'Bearer ' + _gdriveToken.access_token }, cache: 'no-store' }
-                            );
-                            if (preResp.ok) {
-                                const preRemote = await preResp.json();
-                                await _applyCloudData(preRemote, true);
-                            }
-                        }
-                    } catch(_mergeErr) {
-                        console.warn('[CloudSync] merge pré-push (Drive) falhou — seguindo só com dados locais:', _mergeErr.message);
-                    }
-
                     const data = JSON.stringify(_collectAllData(), null, 2);
                     const fileId = await _gdriveGetOrCreateFileId();
                     if (fileId) {
@@ -11075,38 +10839,35 @@ body.dark-mode,
                         if (silent) _showSyncIndicator('Sem arquivo no Drive');
                         return;
                     }
-                    // ✅ FIX SYNC CRÍTICO: removidas as duas checagens de "arquivo não
-                    // mudou, pular" que existiam aqui (uma comparando o modifiedTime
-                    // do Google Drive, outra comparando o campo _ts de dentro do
-                    // arquivo). As duas comparavam contra o timestamp do ÚLTIMO pull
-                    // bem-sucedido — mas o modifiedTime que o Google Drive reporta pode
-                    // demorar alguns segundos para refletir uma escrita recente (efeito
-                    // de consistência eventual da API), e isso fazia o app concluir
-                    // "nada mudou" e pular a atualização por vários ciclos seguidos,
-                    // às vezes minutos, mesmo com uma mudança real esperando pra ser
-                    // baixada (foi exatamente esse o sintoma relatado: Chrome conectado,
-                    // fazendo pull a cada 5s, mas não pegando despesas novas do Edge).
-                    // Agora todo pull baixa e tenta aplicar o arquivo; o merge dentro de
-                    // _applyCloudData já é seguro/idempotente quando não há nada de novo
-                    // (compara item a item por _updatedAt), então o único custo é uma
-                    // requisição HTTP extra a cada 5-15s — aceitável pelo ganho de
-                    // confiabilidade no sync "em tempo real".
+                    // ── Verifica se o arquivo remoto é mais novo que o último pull ─
+                    const remoteTs = await _gdriveGetModifiedTime(fileId);
+                    const lastPull = localStorage.getItem(_lsPullTsKey());
+                    if (silent && remoteTs && lastPull) {
+                        const remoteDate = new Date(remoteTs).getTime();
+                        const lastDate   = new Date(lastPull).getTime();
+                        if (remoteDate <= lastDate) {
+                            // Sem mudanças remotas
+                            _pulling = false;
+                            _showSyncIndicator('✓ Atualizado ' + new Date().toLocaleTimeString('pt-BR'));
+                            return;
+                        }
+                    }
                     // ── Baixa o conteúdo ──────────────────────────────────────
                     if (!silent) Toast.show('☁️ Baixando dados do Google Drive...', 'info', 1500);
                     if (silent) _updateWidget('pull', '↓ Baixando...');
-                    // ✅ FIX SYNC CRÍTICO: cache: 'no-store' força o navegador a
-                    // buscar o arquivo direto da rede a cada chamada. Sem isso, como
-                    // a URL é sempre a mesma e é chamada repetidamente pelo polling
-                    // (a cada 5-15s), o navegador pode servir uma resposta antiga do
-                    // seu próprio cache HTTP em vez de baixar a versão atual — o que
-                    // bate exatamente com o sintoma relatado: só um F5 completo (que
-                    // o navegador trata de forma mais agressiva quanto a cache) trazia
-                    // a mudança feita no outro navegador.
                     const fileResp = await fetch(
                         'https://www.googleapis.com/drive/v3/files/' + fileId + '?alt=media',
-                        { headers: { Authorization: 'Bearer ' + _gdriveToken.access_token }, cache: 'no-store' }
+                        { headers: { Authorization: 'Bearer ' + _gdriveToken.access_token } }
                     );
                     const remote = await fileResp.json();
+                    // ── Verifica se o remoto é mais novo que o local via _ts ──
+                    if (silent && remote._ts && lastPull) {
+                        if (new Date(remote._ts).getTime() <= new Date(lastPull).getTime()) {
+                            _pulling = false;
+                            _showSyncIndicator('✓ Atualizado ' + new Date().toLocaleTimeString('pt-BR'));
+                            return;
+                        }
+                    }
                     await _applyCloudData(remote, silent);
                     _lastPullTime = Date.now();
                     _syncCount++;
@@ -11136,132 +10897,23 @@ body.dark-mode,
             //  ONEDRIVE
             // ════════════════════════════════════════════════════════════════
 
-            // ✅ FIX SYNC CRÍTICO — OneDrive: o fluxo antigo era "implicit" (response_type=token),
-            // que a Microsoft NUNCA devolve com refresh_token. Resultado: o access_token expirava
-            // em ~1h e o dispositivo parava de sincronizar silenciosamente até o usuário notar o
-            // banner e reconectar manualmente — a causa mais provável de "um aparelho não vê mais
-            // as vendas do outro" depois de um tempo de uso. Agora usamos Authorization Code + PKCE
-            // (fluxo de cliente público, sem client_secret) com scope "offline_access", que devolve
-            // um refresh_token e permite renovar o access_token silenciosamente (igual ao Google Drive).
             async function connectOneDrive() {
                 const clientId = (document.getElementById('onedriveClientId')?.value?.trim()) || ONEDRIVE_DEFAULT_CLIENT;
                 if (!clientId) { Toast.show('⚠️ Informe o Client ID do Azure para conectar.', 'warning', 5000); return; }
-                try { localStorage.setItem('cs_od_client_id', clientId); } catch(e) {}
                 const state_val = _randomStr(16);
-                const verifier  = _randomStr(64);
-                sessionStorage.setItem('od_state',    state_val);
-                sessionStorage.setItem('od_client',   clientId);
-                sessionStorage.setItem('od_verifier', verifier);
-                const challenge = await _pkceChallenge(verifier);
+                sessionStorage.setItem('od_state',  state_val);
+                sessionStorage.setItem('od_client', clientId);
                 const params = new URLSearchParams({
-                    client_id:             clientId,
-                    redirect_uri:          location.origin + location.pathname,
-                    response_type:         'code',
-                    response_mode:         'query',
-                    scope:                 'https://graph.microsoft.com/Files.ReadWrite offline_access',
-                    state:                 state_val,
-                    code_challenge:        challenge,
-                    code_challenge_method: 'S256'
+                    client_id:     clientId,
+                    redirect_uri:  location.origin + location.pathname,
+                    response_type: 'token',
+                    scope:         'https://graph.microsoft.com/Files.ReadWrite',
+                    state:         state_val,
+                    nonce:         _randomStr(16)
                 });
                 window.location.href = 'https://login.microsoftonline.com/consumers/oauth2/v2.0/authorize?' + params;
             }
 
-            // ── Troca o "code" (PKCE) por access_token + refresh_token ────────
-            // Diferente do Google, o endpoint de token da Microsoft aceita CORS para
-            // apps registrados como "Single-page application" no Azure, então a troca
-            // pode ser feita direto do navegador, sem precisar de Edge Function.
-            async function _exchangeOneDriveCode(code, clientIdUsed) {
-                try {
-                    const verifier = sessionStorage.getItem('od_verifier') || '';
-                    const body = new URLSearchParams({
-                        client_id:     clientIdUsed,
-                        scope:         'https://graph.microsoft.com/Files.ReadWrite offline_access',
-                        code:          code,
-                        redirect_uri:  location.origin + location.pathname,
-                        grant_type:    'authorization_code',
-                        code_verifier: verifier
-                    });
-                    const resp = await fetch('https://login.microsoftonline.com/consumers/oauth2/v2.0/token', {
-                        method:  'POST',
-                        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-                        body:    body.toString()
-                    });
-                    const data = await resp.json();
-                    if (!resp.ok || !data.access_token) {
-                        console.warn('[CloudSync] ⚠️ Falha ao trocar code OneDrive por token:', data);
-                        Toast.show('⚠️ Falha ao conectar OneDrive. Tente novamente.', 'danger', 4000);
-                        return false;
-                    }
-                    _onedriveToken = {
-                        access_token:  data.access_token,
-                        refresh_token: data.refresh_token || null,
-                        expires_at:    Date.now() + (parseInt(data.expires_in || '3600', 10) * 1000),
-                        client_id:     clientIdUsed || ''
-                    };
-                    _activeProvider = 'onedrive';
-                    _saveTokens();
-                    sessionStorage.removeItem('od_state');
-                    sessionStorage.removeItem('od_client');
-                    sessionStorage.removeItem('od_verifier');
-                    _updateUI();
-                    Toast.show('✅ OneDrive conectado! Sincronizando...', 'success', 3000);
-                    setTimeout(() => { onedrivePull(true).catch(()=>{}); }, 800);
-                    _startPolling();
-                    return true;
-                } catch (e) {
-                    console.warn('[CloudSync] ⚠️ Erro de rede ao trocar code OneDrive:', e);
-                    Toast.show('⚠️ Erro de rede ao conectar OneDrive.', 'danger', 4000);
-                    return false;
-                }
-            }
-
-            // ── Renova o access_token do OneDrive usando o refresh_token ──────
-            // (silencioso, sem popup — evita que a sincronização pare depois de ~1h)
-            async function _refreshOneDriveAccessToken() {
-                if (_autoRefreshingOD) return false;
-                if (!_onedriveToken || !_onedriveToken.refresh_token) {
-                    _showReconnectBanner();
-                    return false;
-                }
-                _autoRefreshingOD = true;
-                try {
-                    const body = new URLSearchParams({
-                        client_id:     _onedriveToken.client_id || localStorage.getItem('cs_od_client_id') || '',
-                        scope:         'https://graph.microsoft.com/Files.ReadWrite offline_access',
-                        refresh_token: _onedriveToken.refresh_token,
-                        grant_type:    'refresh_token'
-                    });
-                    const resp = await fetch('https://login.microsoftonline.com/consumers/oauth2/v2.0/token', {
-                        method:  'POST',
-                        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-                        body:    body.toString()
-                    });
-                    const data = await resp.json();
-                    if (!resp.ok || !data.access_token) {
-                        console.warn('[CloudSync] ⚠️ Falha ao renovar token OneDrive via refresh_token:', data);
-                        _showReconnectBanner();
-                        return false;
-                    }
-                    _onedriveToken = {
-                        ..._onedriveToken,
-                        access_token:  data.access_token,
-                        refresh_token: data.refresh_token || _onedriveToken.refresh_token,
-                        expires_at:    Date.now() + (parseInt(data.expires_in || '3600', 10) * 1000)
-                    };
-                    _saveTokens();
-                    const mins = Math.round((data.expires_in || 3600) / 60);
-                    console.log('[CloudSync] ✅ Token OneDrive renovado silenciosamente — válido por ~' + mins + ' min');
-                    return true;
-                } catch (e) {
-                    console.warn('[CloudSync] ⚠️ Erro de rede ao renovar token OneDrive:', e);
-                    return false;
-                } finally {
-                    _autoRefreshingOD = false;
-                }
-            }
-
-            // Mantido apenas por compatibilidade caso algum navegador ainda tenha
-            // um callback implícito antigo pendente (ex: aba aberta antes da atualização).
             function _handleOneDriveImplicitCallback(hashParams) {
                 const accessToken = hashParams.get('access_token');
                 const state_val   = hashParams.get('state');
@@ -11322,21 +10974,6 @@ body.dark-mode,
                 if (_pushing) return;
                 _pushing = true;
                 try {
-                    // ✅ FIX RACE-CONDITION (mesmo problema do Google Drive, ver comentário
-                    // equivalente em gdrivePush): mescla o remoto antes de sobrescrever.
-                    try {
-                        const preResp = await fetch(
-                            'https://graph.microsoft.com/v1.0/me/drive/root:/' + encodeURIComponent(_fileName()) + ':/content',
-                            { headers: { Authorization: 'Bearer ' + _onedriveToken.access_token }, cache: 'no-store' }
-                        );
-                        if (preResp.ok) {
-                            const preRemote = await preResp.json();
-                            await _applyCloudData(preRemote, true);
-                        }
-                    } catch(_mergeErr) {
-                        console.warn('[CloudSync] merge pré-push (OneDrive) falhou — seguindo só com dados locais:', _mergeErr.message);
-                    }
-
                     const data = JSON.stringify(_collectAllData(), null, 2);
                     const r = await fetch(
                         'https://graph.microsoft.com/v1.0/me/drive/root:/' + encodeURIComponent(_fileName()) + ':/content',
@@ -11369,16 +11006,20 @@ body.dark-mode,
                     if (!silent) Toast.show('☁️ Baixando dados do OneDrive...', 'info', 1500);
                     const r = await fetch(
                         'https://graph.microsoft.com/v1.0/me/drive/root:/' + encodeURIComponent(_fileName()) + ':/content',
-                        { headers: { Authorization: 'Bearer ' + _onedriveToken.access_token }, cache: 'no-store' }
+                        { headers: { Authorization: 'Bearer ' + _onedriveToken.access_token } }
                     );
                     if (!r.ok) {
                         if (!silent) Toast.show('⚠️ Nenhum arquivo encontrado no OneDrive.', 'warning');
                         _pulling = false; return;
                     }
                     const remote = await r.json();
-                    // ✅ FIX SYNC CRÍTICO: ver comentário equivalente em gdrivePull() —
-                    // removida a checagem de "_ts não mudou, pular", que podia deixar
-                    // o app sem detectar uma mudança real por vários ciclos de poll.
+                    // Verifica se o remoto é mais novo (por loja)
+                    if (silent && remote._ts) {
+                        const lastPull = localStorage.getItem(_lsPullTsKey());
+                        if (lastPull && new Date(remote._ts).getTime() <= new Date(lastPull).getTime()) {
+                            _pulling = false; return;
+                        }
+                    }
                     await _applyCloudData(remote, silent);
                     if (silent) _showSyncIndicator('Sincronizado ' + new Date().toLocaleTimeString('pt-BR'));
                 } catch(e) {
@@ -11423,16 +11064,8 @@ body.dark-mode,
             function _silentPull() {
                 // FIX DELETE-SYNC: não faz pull enquanto há push pendente.
                 // Evita a race condition: delete → poll puxa dado antigo → restaura item.
-                //
-                // ✅ FIX RACE "META VOLTA AO ANTERIOR": antes só checava _pushTimer
-                // (o timer do debounce), mas ele é zerado assim que o debounce dispara
-                // — ANTES do upload (gdrivePush/onedrivePush) realmente terminar. Nessa
-                // janela (rede lenta, alguns segundos), um poll podia disparar, ver
-                // _pushTimer === null e prosseguir, puxando um snapshot do Drive que
-                // ainda não tinha a mudança recém-feita. Agora também checamos _pushing,
-                // que fica true durante todo o upload (não só durante o debounce).
-                if (_pushTimer !== null || _pushing) {
-                    console.log('[CloudSync] ⏸ Pull adiado — push pendente ou em andamento');
+                if (_pushTimer !== null) {
+                    console.log('[CloudSync] ⏸ Pull adiado — push pendente em andamento');
                     return;
                 }
                 try {
@@ -11563,41 +11196,31 @@ body.dark-mode,
 
             // ── Trata callback OAuth2 na URL ──────────────────────────────────
             function _handleOAuthCallback() {
-                // ── Google Drive E OneDrive agora usam Authorization Code flow →
-                //    ambos voltam como query string (?code=...&state=...). Como os
-                //    dois usam o mesmo formato, identificamos QUAL provedor iniciou
-                //    o fluxo comparando o "state" recebido com o que foi salvo antes
-                //    do redirect (gdrive_state vs od_state) — evita processar o
-                //    código do provedor errado. ──────────────────────────────────
+                // ── Google Drive: Authorization Code flow → volta como query string
+                //    (?code=...&state=...), não como hash. Trata isso primeiro. ────
                 const searchParams = new URLSearchParams(location.search);
-                const code  = searchParams.get('code');
-                const state_ = searchParams.get('state');
-                const error = searchParams.get('error');
-                if (code || error) {
+                const gCode  = searchParams.get('code');
+                const gState = searchParams.get('state');
+                const gError = searchParams.get('error');
+                if (gCode || gError) {
                     history.replaceState({}, '', location.pathname);
-                    if (error) {
-                        console.warn('[CloudSync] ⚠️ OAuth retornou erro:', error);
-                        Toast.show('⚠️ Conexão cancelada ou negada.', 'warning', 4000);
+                    if (gError) {
+                        console.warn('[CloudSync] ⚠️ Google OAuth retornou erro:', gError);
+                        Toast.show('⚠️ Conexão com Google Drive cancelada ou negada.', 'warning', 4000);
                         return;
                     }
-                    if (sessionStorage.getItem('gdrive_state') === state_) {
-                        const clientIdUsed = sessionStorage.getItem('gdrive_client') || '';
-                        sessionStorage.removeItem('gdrive_state');
-                        sessionStorage.removeItem('gdrive_client');
-                        _exchangeGDriveCode(code, clientIdUsed);
+                    if (sessionStorage.getItem('gdrive_state') !== gState) {
+                        Toast.show('⚠️ Falha de segurança no callback Google (state inválido).', 'danger');
                         return;
                     }
-                    if (sessionStorage.getItem('od_state') === state_) {
-                        const clientIdUsed = sessionStorage.getItem('od_client') || '';
-                        _exchangeOneDriveCode(code, clientIdUsed);
-                        return;
-                    }
-                    Toast.show('⚠️ Falha de segurança no callback OAuth (state inválido).', 'danger');
+                    const clientIdUsed = sessionStorage.getItem('gdrive_client') || '';
+                    sessionStorage.removeItem('gdrive_state');
+                    sessionStorage.removeItem('gdrive_client');
+                    _exchangeGDriveCode(gCode, clientIdUsed);
                     return;
                 }
 
-                // ── Compatibilidade: alguma aba antiga ainda pode voltar pelo
-                //    fluxo implícito (hash) se estava aberta durante a atualização. ──
+                // ── OneDrive: continua no fluxo implícito (hash) ────────────────
                 const rawHash = location.hash.substring(1);
                 if (!rawHash) return;
                 const hashParams = new URLSearchParams(rawHash);
@@ -11627,19 +11250,16 @@ body.dark-mode,
                 const tok = _activeProvider === 'gdrive' ? _gdriveToken : _onedriveToken;
                 if (!tok) return;
                 if (_isExpired(tok)) {
-                    // Token expirado: auto-refresh silencioso via refresh_token (ambos os provedores agora)
+                    // Token expirado: auto-refresh (GDrive, via refresh_token) ou banner (OneDrive)
                     if (_activeProvider === 'gdrive' && !_autoRefreshing) {
                         _refreshGDriveAccessToken();
-                    } else if (_activeProvider === 'onedrive' && !_autoRefreshingOD) {
-                        _refreshOneDriveAccessToken();
+                    } else if (_activeProvider !== 'gdrive') {
+                        _showReconnectBanner();
                     }
                 } else if (_activeProvider === 'gdrive' && _isNearExpiry(tok) && !_autoRefreshing) {
                     // Token próximo de expirar (< 10 min): renova preventivamente
                     console.log('[CloudSync] ⏰ Token Google Drive expira em < 10 min — renovação preventiva...');
                     _refreshGDriveAccessToken();
-                } else if (_activeProvider === 'onedrive' && _isNearExpiry(tok) && !_autoRefreshingOD) {
-                    console.log('[CloudSync] ⏰ Token OneDrive expira em < 10 min — renovação preventiva...');
-                    _refreshOneDriveAccessToken();
                 }
             }
             function _showReconnectBanner() {
@@ -12848,147 +12468,6 @@ body.dark-mode,
             },
         };
         window.ContasManager = ContasManager;
-
-        // ══════════════════════════════════════════════════════════════════════
-        //  NotificationEngine — ✅ NOVO: implementação real dos alertas
-        //  configurados em Configurações → Notificações.
-        //  Antes, os toggles (estoque baixo, OS pronta, OS atrasada, conta a
-        //  vencer/vencida) apenas salvavam a preferência — nada de fato lia
-        //  esses valores para avisar o usuário. Este módulo faz a verificação
-        //  periódica de verdade e dispara:
-        //   1) uma notificação do navegador (Notification API), se permitida;
-        //   2) um toast dentro do app, sempre (funciona mesmo sem permissão).
-        //  Cada alerta é disparado só UMA VEZ por item (controle via
-        //  localStorage), para não repetir a mesma notificação a cada checagem.
-        // ══════════════════════════════════════════════════════════════════════
-        const NotificationEngine = {
-            _checking: false,
-            _timer: null,
-            _CHECK_INTERVAL_MS: 5 * 60 * 1000, // verifica a cada 5 minutos
-
-            async requestPermission() {
-                if (!('Notification' in window)) return 'unsupported';
-                if (Notification.permission === 'granted' || Notification.permission === 'denied') {
-                    return Notification.permission;
-                }
-                try { return await Notification.requestPermission(); }
-                catch(e) { return 'denied'; }
-            },
-
-            _seenKey() { return 'notif_seen_' + (window._currentStore || 'barueri'); },
-            _loadSeen() {
-                try {
-                    const raw = localStorage.getItem(this._seenKey());
-                    return raw ? new Set(JSON.parse(raw)) : new Set();
-                } catch(e) { return new Set(); }
-            },
-            _saveSeen(set) {
-                try {
-                    // Mantém limitado às últimas 500 chaves para não crescer para sempre
-                    localStorage.setItem(this._seenKey(), JSON.stringify(Array.from(set).slice(-500)));
-                } catch(e) {}
-            },
-
-            // Dispara um alerta (uma vez por "id") — notificação do navegador
-            // (se houver permissão) + toast dentro do app (sempre).
-            _fire(id, seen, title, body) {
-                if (seen.has(id)) return false;
-                seen.add(id);
-                try {
-                    if ('Notification' in window && Notification.permission === 'granted') {
-                        new Notification(title, { body, tag: id });
-                    }
-                } catch(e) {}
-                try { Toast.show(title + ' — ' + body, 'warning', 6000); } catch(e) {}
-                return true;
-            },
-
-            // force=true (botão "Verificar agora"): ignora o registro de "já visto"
-            // desta sessão, útil para o usuário forçar uma nova checagem manual.
-            async check(force) {
-                if (this._checking) return;
-                this._checking = true;
-                try {
-                    const cfg = state.notificacoes || {};
-                    const seen = force ? new Set() : this._loadSeen();
-                    let changed = false;
-
-                    // ── Estoque ──────────────────────────────────────────────
-                    if (cfg.outOfStock !== false || cfg.lowStock !== false) {
-                        (state.products || []).forEach(p => {
-                            if (!p || !p.id) return;
-                            const qty = p.qty ?? p.stock ?? 0;
-                            const min = p.minQty ?? 5;
-                            if (cfg.outOfStock !== false && qty === 0) {
-                                if (this._fire('stock_out_' + p.id, seen, '🔴 Produto esgotado', p.name || 'Produto')) changed = true;
-                            } else if (cfg.lowStock !== false && qty > 0 && qty <= min) {
-                                if (this._fire('stock_low_' + p.id, seen, '🟡 Estoque baixo', (p.name || 'Produto') + ' — restam ' + qty)) changed = true;
-                            }
-                        });
-                    }
-
-                    // ── Ordens de Serviço ────────────────────────────────────
-                    if (cfg.osReady !== false) {
-                        (state.sales || []).forEach(s => {
-                            if (!s || !s.id) return;
-                            if (s.status === 'pronto' || s.status === 'ready') {
-                                if (this._fire('os_ready_' + s.id, seen, '📦 OS pronta para retirada', 'OS ' + (s.number || s.id))) changed = true;
-                            }
-                        });
-                    }
-                    if (cfg.osDelay !== false) {
-                        const days = cfg.osDelayDays || 7;
-                        const now = Date.now();
-                        const ENTREGUES = ['entregue', 'delivered', 'concluido', 'finalizado', 'closed', 'cancelado'];
-                        (state.sales || []).forEach(s => {
-                            if (!s || !s.id || !s.deliveryForecast || ENTREGUES.includes(s.status)) return;
-                            const due = new Date(s.deliveryForecast + 'T12:00:00').getTime();
-                            if (isNaN(due)) return;
-                            const diasAtraso = Math.floor((now - due) / 86400000);
-                            if (diasAtraso >= days) {
-                                if (this._fire('os_delay_' + s.id, seen, '⏰ OS atrasada', 'OS ' + (s.number || s.id) + ' — ' + diasAtraso + ' dia(s) de atraso')) changed = true;
-                            }
-                        });
-                    }
-
-                    // ── Financeiro (Contas a Pagar/Receber) ─────────────────
-                    if ((cfg.paymentDue !== false || cfg.paymentOverdue !== false) && window.ContasManager) {
-                        try {
-                            const contas = await ContasManager.getAll();
-                            const hoje = new Date().toISOString().slice(0, 10);
-                            (contas || []).forEach(c => {
-                                if (!c || !c.id || c.pago || !c.vencimento) return;
-                                const label = (c.tipo === 'receber' ? '💰 Conta a receber' : '💸 Conta a pagar') + (c.vencimento < hoje ? ' vencida' : ' vence hoje');
-                                if (c.vencimento < hoje && cfg.paymentOverdue !== false) {
-                                    if (this._fire('conta_overdue_' + c.id, seen, '🔴 ' + label, c.descricao || 'Conta')) changed = true;
-                                } else if (c.vencimento === hoje && cfg.paymentDue !== false) {
-                                    if (this._fire('conta_due_' + c.id, seen, '🟡 ' + label, c.descricao || 'Conta')) changed = true;
-                                }
-                            });
-                        } catch(e) {}
-                    }
-
-                    if (changed && !force) this._saveSeen(seen);
-                } finally {
-                    this._checking = false;
-                }
-            },
-
-            start() {
-                // Primeira checagem pouco depois do boot (dá tempo dos dados carregarem)
-                setTimeout(() => this.check().catch(()=>{}), 8000);
-                // Checagens periódicas
-                clearInterval(this._timer);
-                this._timer = setInterval(() => this.check().catch(()=>{}), this._CHECK_INTERVAL_MS);
-                // Reforça a checagem quando o usuário volta para a aba
-                document.addEventListener('visibilitychange', () => {
-                    if (document.visibilityState === 'visible') setTimeout(() => this.check().catch(()=>{}), 2000);
-                });
-            }
-        };
-        window.NotificationEngine = NotificationEngine;
-        window.addEventListener('load', () => NotificationEngine.start());
-
         const WppConfirm = {
             _url: '', _msg: '', _phone: '',
 
@@ -15829,7 +15308,7 @@ tbody tr td{border:1.5px solid #000;padding:2mm;text-align:center;font-weight:70
                 `;
             },
 
-            async editGoal() {
+            editGoal() {
                 const current = state.company.salesGoal || 0;
                 const input = prompt('Qual a meta de vendas deste mês? (R$)', current > 0 ? String(current) : '');
                 if (input === null) return;
@@ -15839,7 +15318,7 @@ tbody tr td{border:1.5px solid #000;padding:2mm;text-align:center;font-weight:70
                     return;
                 }
                 state.company.salesGoal = parsed;
-                await App.saveData();
+                App.saveData();
                 this.updateCards();
                 Toast.show('✅ Meta atualizada!', 'success', 2500);
             },
@@ -16208,23 +15687,6 @@ tbody tr td{border:1.5px solid #000;padding:2mm;text-align:center;font-weight:70
                     (presc.od.cyl && presc.od.cyl !== '0.00') ||
                     (presc.oe.cyl && presc.oe.cyl !== '0.00');
 
-                // ✅ FIX SYNC RECEITUÁRIO: só reenvia o receituário para a nuvem se os
-                // dados dele realmente mudaram em relação ao que já estava salvo.
-                // Antes: qualquer salvamento do cliente (mesmo só telefone/endereço,
-                // sem tocar no receituário) reenviava o receituário carregado no
-                // formulário com um _updatedAt NOVO. Se esse formulário tivesse sido
-                // aberto antes de uma atualização mais recente do receituário chegar
-                // de outro dispositivo, esse reenvio "ressuscitava" a versão antiga
-                // com timestamp mais novo — e ela vencia a comparação de merge,
-                // apagando a atualização real feita em outro aparelho. Agora só
-                // disparamos o push quando o conteúdo do receituário de fato mudou.
-                const _prescCampos = p => p ? JSON.stringify({
-                    date: p.date, optometrist: p.optometrist, od: p.od, oe: p.oe,
-                    dp: p.dp, height: p.height, notes: p.notes
-                }) : null;
-                const prescAnterior = state.prescriptions.find(p => p.clientId === client.id);
-                const prescMudou = _prescCampos(presc) !== _prescCampos(prescAnterior);
-
                 if (hasRealPrescData) {
                     state.prescriptions = state.prescriptions.filter(p => p.clientId !== client.id);
                     state.prescriptions.push(presc);
@@ -16233,7 +15695,7 @@ tbody tr td{border:1.5px solid #000;padding:2mm;text-align:center;font-weight:70
                 
                 App.saveData();
                 SupaSync.upsertCliente(client);
-                if (hasRealPrescData && prescMudou) {
+                if (hasRealPrescData) {
                     SupaSync.upsertPrescricao(presc);
                 }
                 this.clearForm();
@@ -17407,26 +16869,12 @@ tbody tr td{border:1.5px solid #000;padding:2mm;text-align:center;font-weight:70
             _KEY_TAREFAS:  'crmTarefas',
 
             // ── Persistência ──────────────────────────────────────────────
-            // ✅ FIX SYNC CRÍTICO (CRM): antes, contatos/tarefas/NPS eram salvos
-            // como UM ÚNICO documento "bulk" contendo o array inteiro dentro de
-            // "_data". Isso quebrava de duas formas:
-            //  1) sbGetCollection() lê documentos individuais da coleção — ao
-            //     recarregar (F5, troca de loja, pull da nuvem), state.crmContatos
-            //     virava um array de 1 item ([{id:'bulk', _data:[...]}]) em vez da
-            //     lista real de contatos, corrompendo os dados locais.
-            //  2) O merge de sincronização (_applyCloudData) compara item-a-item
-            //     por "id" — com tudo dentro de um único "bulk", o dispositivo que
-            //     sincronizasse por último sobrescrevia TODO o histórico do outro
-            //     dispositivo, mesmo que fossem contatos diferentes.
-            // Agora cada contato/tarefa/NPS é salvo como documento individual
-            // (mesmo padrão usado por clientes, vendas, produtos etc.), permitindo
-            // merge item-a-item real e sync incremental entre dispositivos.
             _save() {
                 App.saveData();
                 if (window.LocalFirst) {
-                    (state.crmContatos || []).forEach(item => { if (item && item.id) LocalFirst.pushItem('crmContatos', item); });
-                    (state.crmTarefas  || []).forEach(item => { if (item && item.id) LocalFirst.pushItem('crmTarefas',  item); });
-                    (state.crmNps      || []).forEach(item => { if (item && item.id) LocalFirst.pushItem('crmNps',      item); });
+                    LocalFirst.pushItem('crmContatos', { id: 'bulk', _data: state.crmContatos });
+                    LocalFirst.pushItem('crmTarefas',  { id: 'bulk', _data: state.crmTarefas  });
+                    LocalFirst.pushItem('crmNps',      { id: 'bulk', _data: state.crmNps      });
                 }
             },
 
@@ -17632,11 +17080,7 @@ tbody tr td{border:1.5px solid #000;padding:2mm;text-align:center;font-weight:70
 
             excluirContato(id) {
                 Modal.showConfirm('Excluir este contato?', () => {
-                    // ✅ FIX SYNC: usa LocalFirst.deleteItem (apaga o doc individual no
-                    // IndexedDB + registra tombstone + dispara push), em vez de só
-                    // registrar o tombstone manualmente — necessário agora que cada
-                    // contato é um documento próprio (ver comentário em _save()).
-                    try { if (window.LocalFirst) LocalFirst.deleteItem('crmContatos', id); } catch(_e) {}
+                    try { if (window.CloudSync) CloudSync._recordDeletion(window._currentStore || 'barueri', 'crmContatos', id); } catch(_e) {}
                     state.crmContatos = (state.crmContatos || []).filter(c => c.id !== id);
                     this._save();
                     this.renderContatos();
@@ -17756,8 +17200,7 @@ tbody tr td{border:1.5px solid #000;padding:2mm;text-align:center;font-weight:70
 
             excluirTarefa(id) {
                 Modal.showConfirm('Excluir esta tarefa?', () => {
-                    // ✅ FIX SYNC: ver comentário equivalente em excluirContato()
-                    try { if (window.LocalFirst) LocalFirst.deleteItem('crmTarefas', id); } catch(_e) {}
+                    try { if (window.CloudSync) CloudSync._recordDeletion(window._currentStore || 'barueri', 'crmTarefas', id); } catch(_e) {}
                     state.crmTarefas = (state.crmTarefas || []).filter(t => t.id !== id);
                     this._save();
                     this.renderTarefas();
@@ -17992,8 +17435,7 @@ tbody tr td{border:1.5px solid #000;padding:2mm;text-align:center;font-weight:70
 
             excluirNps(id) {
                 Modal.showConfirm('Excluir esta avaliação?', () => {
-                    // ✅ FIX SYNC: ver comentário equivalente em excluirContato()
-                    try { if (window.LocalFirst) LocalFirst.deleteItem('crmNps', id); } catch(_e) {}
+                    try { if (window.CloudSync) CloudSync._recordDeletion(window._currentStore || 'barueri', 'crmNps', id); } catch(_e) {}
                     state.crmNps = (state.crmNps || []).filter(x => x.id !== id);
                     this._save();
                     this.renderNps();
@@ -18649,11 +18091,6 @@ tbody tr td{border:1.5px solid #000;padding:2mm;text-align:center;font-weight:70
                     Config._clearDirty(); // permite que load() carregue dados frescos ao abrir a aba
                     Config.load();
                 }
-
-                // ✅ NOVO: atualiza o status de permissão de notificação do navegador
-                if (tabName === 'notificacoes' && window.NotificationEngine) {
-                    Config.updateNotifPermUI();
-                }
             },
 
             // ── LOJAS PRÉ-DEFINIDAS ─────────────────────────────────────────
@@ -18927,36 +18364,6 @@ tbody tr td{border:1.5px solid #000;padding:2mm;text-align:center;font-weight:70
                 }
             },
 
-            // ✅ NOVO: reflete o status real de permissão de notificação do
-            // navegador (Notification.permission) na aba Configurações → Notificações,
-            // e mostra o botão de ativação quando ainda não foi concedida.
-            updateNotifPermUI() {
-                const box = document.getElementById('notifPermBox');
-                const txt = document.getElementById('notifPermText');
-                const btn = document.getElementById('notifPermBtn');
-                if (!box || !txt || !btn) return;
-                if (!('Notification' in window)) {
-                    box.style.background = '#f8f9fa'; box.style.border = '1px solid #dee2e6';
-                    txt.textContent = '⚠️ Este navegador não suporta notificações do sistema. Os alertas ainda aparecem dentro do app.';
-                    btn.style.display = 'none';
-                    return;
-                }
-                const perm = Notification.permission;
-                if (perm === 'granted') {
-                    box.style.background = '#d4edda'; box.style.border = '1px solid #28a745';
-                    txt.textContent = '✅ Notificações do navegador ativadas — os alertas abaixo vão aparecer mesmo com o app em segundo plano.';
-                    btn.style.display = 'none';
-                } else if (perm === 'denied') {
-                    box.style.background = '#f8d7da'; box.style.border = '1px solid #dc3545';
-                    txt.textContent = '🚫 Notificações bloqueadas nas permissões do navegador. Ative manualmente nas configurações do site para receber alertas fora do app.';
-                    btn.style.display = 'none';
-                } else {
-                    box.style.background = '#fff3cd'; box.style.border = '1px solid #ffc107';
-                    txt.textContent = '🔔 Notificações do navegador ainda não ativadas — os alertas abaixo só vão aparecer dentro do app até você ativar.';
-                    btn.style.display = 'inline-block';
-                }
-            },
-
             saveNotificacoes() {
                 state.notificacoes = {
                     lowStock: document.getElementById('configNotifyLowStock').checked,
@@ -18974,19 +18381,6 @@ tbody tr td{border:1.5px solid #000;padding:2mm;text-align:center;font-weight:70
                 App.saveData(true);
                 SupaSync.upsertConfig().catch(() => {});
                 Toast.show('Configurações de notificações salvas!');
-                // ✅ NOVO: se algum alerta foi ligado, pede permissão do navegador
-                // (clique em "Salvar" já é um gesto do usuário, então o navegador
-                // permite abrir o prompt de permissão aqui) e roda uma verificação
-                // imediata para refletir a mudança sem esperar o próximo ciclo.
-                if (window.NotificationEngine) {
-                    const anyOn = state.notificacoes.lowStock || state.notificacoes.outOfStock ||
-                        state.notificacoes.osReady || state.notificacoes.osDelay ||
-                        state.notificacoes.paymentDue || state.notificacoes.paymentOverdue;
-                    if (anyOn && 'Notification' in window && Notification.permission === 'default') {
-                        NotificationEngine.requestPermission().then(() => this.updateNotifPermUI());
-                    }
-                    NotificationEngine.check().catch(()=>{});
-                }
             },
 
             uploadLogo(event) {
@@ -20137,10 +19531,8 @@ ${container.innerHTML}
                 if (hint) hint.style.display = 'none';
 
                 const typeIcon = { lente:'fa-eye', armacao:'fa-glasses', servico:'fa-tools', tratamento:'fa-flask', default:'fa-tag' };
-                // ✅ Paleta unificada (mesmas cores das abas de item acima) — mantém
-                // a lista de itens da OS consistente com o painel de adição.
-                const typeColor = { lente:'#ff6b00', armacao:'#e85500', servico:'#ff8f00', tratamento:'#b36b00', default:'#888' };
-                const typeBg   = { lente:'#fff3e0', armacao:'#ffe4d1', servico:'#fff3d9', tratamento:'#fdf0d9', default:'#f5f5f5' };
+                const typeColor = { lente:'#ff6b00', armacao:'#2e7d32', servico:'#0277bd', tratamento:'#7b1fa2', default:'#888' };
+                const typeBg   = { lente:'#fff3e0', armacao:'#e8f5e9', servico:'#e1f5fe', tratamento:'#f3e5f5', default:'#f5f5f5' };
 
                 let html = `<div style="padding:8px 0 4px;">`;
                 state.currentSale.items.forEach((item, i) => {
@@ -20180,10 +19572,7 @@ ${container.innerHTML}
             showItemTab(tab) {
                 const tabs   = { lente:'itemTabLente', armacao:'itemTabArmacao', servico:'itemTabServico', tratamento:'itemTabTratamento' };
                 const btns   = { lente:'tabBtnLente',  armacao:'tabBtnArmacao',  servico:'tabBtnServico', tratamento:'tabBtnTratamento' };
-                // ✅ Paleta unificada (laranja/âmbar/dourado) para casar com a
-                // identidade visual da marca — antes cada aba tinha uma cor
-                // solta (verde/azul/roxo) que destoava do resto do sistema.
-                const colors = { lente:['#ff6b00','#e65100'], armacao:['#ff7a30','#e85500'], servico:['#ffa726','#ff8f00'], tratamento:['#d68a00','#b36b00'] };
+                const colors = { lente:['#ff6b00','#ff6b00'], armacao:['#43a047','#2e7d32'], servico:['#039be5','#0277bd'], tratamento:['#ab47bc','#7b1fa2'] };
                 Object.keys(tabs).forEach(key => {
                     const panel = document.getElementById(tabs[key]);
                     const btn   = document.getElementById(btns[key]);
