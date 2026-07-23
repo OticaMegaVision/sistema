@@ -10631,6 +10631,14 @@ body.dark-mode,
                 // Agora: para cada item, mantemos a versão com _updatedAt mais recente.
                 const cols = ['clients','products','sales','expenses','prescriptions','suppliers','services','crmContatos','crmTarefas','crmNps'];
                 cols.forEach(k => {
+                  // ✅ FIX SYNC CRÍTICO: cada coleção agora é isolada em seu próprio
+                  // try/catch. Antes, se o merge de UMA coleção (ex: vendas) lançasse
+                  // uma exceção por causa de algum item com dado inconsistente, o
+                  // forEach inteiro parava ali — e TODAS as coleções seguintes na
+                  // lista (despesas, receitas, fornecedores, serviços, CRM) ficavam
+                  // silenciosamente sem sincronizar, sem nenhum erro visível pro
+                  // usuário. Agora um problema numa coleção nunca contamina as outras.
+                  try {
                     if (!Array.isArray(remote[k])) return;
 
                     // ✅ FIX MIGRAÇÃO CRM: um snapshot do Drive/OneDrive salvo por uma
@@ -10691,6 +10699,9 @@ body.dark-mode,
                     });
 
                     state[k] = Object.values(merged);
+                  } catch(mergeErr) {
+                    console.error('[CloudSync] ⚠️ Merge de "' + k + '" falhou — coleções seguintes NÃO foram afetadas:', mergeErr);
+                  }
                 });
                 // FIX SYNC: aplica company com deep merge para garantir que logo e
                 // todos os campos sejam copiados (não apenas os que existem localmente)
@@ -10993,7 +11004,7 @@ body.dark-mode,
                         if (fileIdPre) {
                             const preResp = await fetch(
                                 'https://www.googleapis.com/drive/v3/files/' + fileIdPre + '?alt=media',
-                                { headers: { Authorization: 'Bearer ' + _gdriveToken.access_token } }
+                                { headers: { Authorization: 'Bearer ' + _gdriveToken.access_token }, cache: 'no-store' }
                             );
                             if (preResp.ok) {
                                 const preRemote = await preResp.json();
@@ -11083,9 +11094,17 @@ body.dark-mode,
                     // ── Baixa o conteúdo ──────────────────────────────────────
                     if (!silent) Toast.show('☁️ Baixando dados do Google Drive...', 'info', 1500);
                     if (silent) _updateWidget('pull', '↓ Baixando...');
+                    // ✅ FIX SYNC CRÍTICO: cache: 'no-store' força o navegador a
+                    // buscar o arquivo direto da rede a cada chamada. Sem isso, como
+                    // a URL é sempre a mesma e é chamada repetidamente pelo polling
+                    // (a cada 5-15s), o navegador pode servir uma resposta antiga do
+                    // seu próprio cache HTTP em vez de baixar a versão atual — o que
+                    // bate exatamente com o sintoma relatado: só um F5 completo (que
+                    // o navegador trata de forma mais agressiva quanto a cache) trazia
+                    // a mudança feita no outro navegador.
                     const fileResp = await fetch(
                         'https://www.googleapis.com/drive/v3/files/' + fileId + '?alt=media',
-                        { headers: { Authorization: 'Bearer ' + _gdriveToken.access_token } }
+                        { headers: { Authorization: 'Bearer ' + _gdriveToken.access_token }, cache: 'no-store' }
                     );
                     const remote = await fileResp.json();
                     await _applyCloudData(remote, silent);
@@ -11308,7 +11327,7 @@ body.dark-mode,
                     try {
                         const preResp = await fetch(
                             'https://graph.microsoft.com/v1.0/me/drive/root:/' + encodeURIComponent(_fileName()) + ':/content',
-                            { headers: { Authorization: 'Bearer ' + _onedriveToken.access_token } }
+                            { headers: { Authorization: 'Bearer ' + _onedriveToken.access_token }, cache: 'no-store' }
                         );
                         if (preResp.ok) {
                             const preRemote = await preResp.json();
@@ -11350,7 +11369,7 @@ body.dark-mode,
                     if (!silent) Toast.show('☁️ Baixando dados do OneDrive...', 'info', 1500);
                     const r = await fetch(
                         'https://graph.microsoft.com/v1.0/me/drive/root:/' + encodeURIComponent(_fileName()) + ':/content',
-                        { headers: { Authorization: 'Bearer ' + _onedriveToken.access_token } }
+                        { headers: { Authorization: 'Bearer ' + _onedriveToken.access_token }, cache: 'no-store' }
                     );
                     if (!r.ok) {
                         if (!silent) Toast.show('⚠️ Nenhum arquivo encontrado no OneDrive.', 'warning');
