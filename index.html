@@ -25010,6 +25010,7 @@ window.StoreManager = StoreManager;
 <script>
 // ==================== OPTICAL ILLUSION — SIDEBAR & MAIN ====================
 (function() {
+  var _lastSidebarW = null, _lastSidebarH = null;
   function drawSidebarIllusion() {
     var canvas = document.getElementById('sidebarIllusionCanvas');
     if (!canvas) return;
@@ -25017,6 +25018,11 @@ window.StoreManager = StoreManager;
     var W = sidebar ? sidebar.offsetWidth : 120;
     var H = sidebar ? sidebar.offsetHeight : window.innerHeight;
     if (!W || !H) return;
+    // Pula o redesenho (custoso: ~24 anéis + grade + linhas senoidais) se o
+    // tamanho não mudou de verdade — evita trabalho redundante em resizes
+    // disparados sem alteração real de dimensão.
+    if (W === _lastSidebarW && H === _lastSidebarH) return;
+    _lastSidebarW = W; _lastSidebarH = H;
     var dpr = window.devicePixelRatio || 1;
     canvas.width = W * dpr; canvas.height = H * dpr;
     canvas.style.width = W + 'px'; canvas.style.height = H + 'px';
@@ -25127,7 +25133,10 @@ window.StoreManager = StoreManager;
 
   function initIllusions() {
     drawSidebarIllusion();
-    drawMainIllusion();
+    // drawMainIllusion() removida: #mainIllusionCanvas tem "display:none!important"
+    // no CSS (nunca aparece na tela), então esse cálculo pesado (grade isométrica +
+    // 16 elipses + 4 gradientes radiais sobre a altura inteira do main-content)
+    // rodava a cada load/resize sem nenhum efeito visual — puro desperdício de CPU.
   }
 
   // Redesenha ao redimensionar
@@ -25265,194 +25274,6 @@ window.StoreManager = StoreManager;
     }
   });
 })();
-</script>
-<script>
-// ==================== OPTICAL ILLUSION BACKGROUNDS ====================
-(function() {
-
-    function drawSidebarIllusion() {
-        var canvas = document.getElementById('sidebarOpticalCanvas');
-        if (!canvas) return;
-        var sidebar = document.getElementById('sidebar');
-        var W = sidebar ? sidebar.offsetWidth : 120;
-        var H = window.innerHeight;
-        var dpr = window.devicePixelRatio || 1;
-        canvas.width = W * dpr;
-        canvas.height = H * dpr;
-        canvas.style.width = W + 'px';
-        canvas.style.height = H + 'px';
-        var ctx = canvas.getContext('2d');
-        ctx.scale(dpr, dpr);
-
-        // Orange gradient base
-        var grd = ctx.createLinearGradient(0, 0, 0, H);
-        grd.addColorStop(0, '#ff8c00');
-        grd.addColorStop(0.45, '#ff6b00');
-        grd.addColorStop(1, '#cc4800');
-        ctx.fillStyle = grd;
-        ctx.fillRect(0, 0, W, H);
-
-        // Optical illusion 1: radiating concentric arcs from top-center
-        var cx = W / 2, cy = -20;
-        var maxR = Math.sqrt(W * W + (H + 20) * (H + 20)) + 40;
-        var rings = 22;
-        for (var i = 0; i < rings; i++) {
-            var r = (maxR / rings) * (i + 0.5);
-            ctx.beginPath();
-            ctx.arc(cx, cy, r, 0, Math.PI * 2);
-            var alpha = (i % 2 === 0) ? 0.13 : 0.06;
-            ctx.strokeStyle = i % 2 === 0
-                ? 'rgba(255,220,80,' + alpha + ')'
-                : 'rgba(255,255,255,' + alpha + ')';
-            ctx.lineWidth = (maxR / rings) * 0.6;
-            ctx.stroke();
-        }
-
-        // Optical illusion 2: crossed diagonal lines (depth/warp)
-        ctx.lineWidth = 0.7;
-        var step = 18;
-        for (var x = -H; x < W + H; x += step) {
-            ctx.beginPath();
-            ctx.moveTo(x, 0);
-            ctx.lineTo(x + H, H);
-            ctx.strokeStyle = 'rgba(255,200,60,0.09)';
-            ctx.stroke();
-            ctx.beginPath();
-            ctx.moveTo(x, 0);
-            ctx.lineTo(x - H, H);
-            ctx.strokeStyle = 'rgba(180,50,0,0.09)';
-            ctx.stroke();
-        }
-
-        // Optical illusion 3: vertical sine-wave lines (shimmer effect)
-        for (var col = 0; col < W; col += 12) {
-            ctx.beginPath();
-            for (var y = 0; y <= H; y += 2) {
-                var xOff = col + Math.sin(y * 0.045 + col * 0.3) * 4;
-                if (y === 0) ctx.moveTo(xOff, y);
-                else ctx.lineTo(xOff, y);
-            }
-            ctx.strokeStyle = 'rgba(255,240,100,0.06)';
-            ctx.lineWidth = 0.6;
-            ctx.stroke();
-        }
-
-        // Subtle radial glow dots (floating-sphere depth illusion)
-        [[0.5,0.08],[0.5,0.35],[0.2,0.6],[0.8,0.65],[0.5,0.88]].forEach(function(p) {
-            var lx = p[0] * W, ly = p[1] * H;
-            var rg = ctx.createRadialGradient(lx, ly, 0, lx, ly, 30);
-            rg.addColorStop(0, 'rgba(255,220,80,0.16)');
-            rg.addColorStop(0.5, 'rgba(255,140,0,0.06)');
-            rg.addColorStop(1, 'transparent');
-            ctx.beginPath();
-            ctx.arc(lx, ly, 30, 0, Math.PI * 2);
-            ctx.fillStyle = rg;
-            ctx.fill();
-        });
-    }
-
-    function drawMainIllusion() {
-        var canvas = document.getElementById('mainOpticalCanvas');
-        if (!canvas) return;
-        var main = document.querySelector('.main-content');
-        var W = main ? main.offsetWidth : window.innerWidth - 120;
-        var H = Math.max(main ? main.scrollHeight : window.innerHeight, window.innerHeight);
-        var dpr = window.devicePixelRatio || 1;
-        canvas.width = W * dpr;
-        canvas.height = H * dpr;
-        canvas.style.width = W + 'px';
-        canvas.style.height = H + 'px';
-        var ctx = canvas.getContext('2d');
-        ctx.scale(dpr, dpr);
-
-        // Light gray base (same as body background)
-        var isDark = document.documentElement.classList.contains('dark-mode') ||
-                     document.body.classList && document.body.classList.contains('dark-mode') ||
-                     document.querySelector('.dark-mode') !== null;
-        ctx.fillStyle = isDark ? '#111111' : '#f4f5f7';
-        ctx.fillRect(0, 0, W, H);
-
-        // Optical illusion 1: isometric grid (3D floor cube illusion)
-        ctx.lineWidth = 0.5;
-        var sq = 28;
-        for (var x = -H; x < W + H; x += sq) {
-            ctx.beginPath();
-            ctx.moveTo(x, 0);
-            ctx.lineTo(x + H, H);
-            ctx.strokeStyle = isDark ? 'rgba(80,85,95,0.4)' : 'rgba(180,185,195,0.35)';
-            ctx.stroke();
-        }
-        for (var x2 = -H; x2 < W + H; x2 += sq) {
-            ctx.beginPath();
-            ctx.moveTo(x2, 0);
-            ctx.lineTo(x2 - H, H);
-            ctx.strokeStyle = isDark ? 'rgba(70,75,85,0.35)' : 'rgba(160,165,175,0.3)';
-            ctx.stroke();
-        }
-        for (var y = 0; y < H; y += sq) {
-            ctx.beginPath();
-            ctx.moveTo(0, y);
-            ctx.lineTo(W, y);
-            ctx.strokeStyle = isDark ? 'rgba(90,95,105,0.25)' : 'rgba(195,200,210,0.25)';
-            ctx.stroke();
-        }
-
-        // Optical illusion 2: concentric ellipses from center (depth warp)
-        var cx = W / 2, cy = H / 2;
-        for (var i = 0; i < 16; i++) {
-            var rx = (W * 0.12) * (i + 1);
-            var ry = (H * 0.07) * (i + 1);
-            ctx.beginPath();
-            ctx.ellipse(cx, cy, rx, ry, 0, 0, Math.PI * 2);
-            var a = (i % 2 === 0) ? 0.06 : 0.035;
-            ctx.strokeStyle = isDark ? 'rgba(100,105,120,' + a + ')' : 'rgba(160,165,180,' + a + ')';
-            ctx.lineWidth = 0.8;
-            ctx.stroke();
-        }
-
-        // Optical illusion 3: subtle orange radial shimmer from corners
-        [[0,0],[W,0],[0,H],[W,H]].forEach(function(pt) {
-            var rg = ctx.createRadialGradient(pt[0], pt[1], 0, pt[0], pt[1], W * 0.55);
-            rg.addColorStop(0, isDark ? 'rgba(255,107,0,0.055)' : 'rgba(255,107,0,0.04)');
-            rg.addColorStop(0.5, isDark ? 'rgba(255,107,0,0.025)' : 'rgba(255,107,0,0.02)');
-            rg.addColorStop(1, 'transparent');
-            ctx.fillStyle = rg;
-            ctx.fillRect(0, 0, W, H);
-        });
-    }
-
-    function drawAll() {
-        // ✅ CORRIGIDO: usa requestIdleCallback para não bloquear o render principal
-        const run = () => { drawSidebarIllusion(); drawMainIllusion(); };
-        if (typeof requestIdleCallback !== 'undefined') {
-            requestIdleCallback(run, { timeout: 2000 });
-        } else {
-            setTimeout(run, 300);
-        }
-    }
-
-    window.addEventListener('load', drawAll);
-    window.addEventListener('resize', drawAll);
-
-    // Redraw when dark mode is toggled
-    var _origTheme = null;
-    function patchThemeToggle() {
-        var btn = document.getElementById('themeToggle');
-        if (btn && !btn._illusionPatched) {
-            btn._illusionPatched = true;
-            btn.addEventListener('click', function() {
-                setTimeout(drawAll, 80);
-            });
-        }
-    }
-    window.addEventListener('load', function() {
-        patchThemeToggle();
-        setTimeout(patchThemeToggle, 1000);
-        setTimeout(drawAll, 200);
-    });
-
-})();
-// ==================== /OPTICAL ILLUSION BACKGROUNDS ====================
 </script>
 </body>
 </html>
