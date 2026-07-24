@@ -11033,7 +11033,18 @@ body.dark-mode,
                 // SEM toasts e SEM cloud push-back, quebrando o ciclo pull→push→pull
                 await LocalFirst.rewriteAll(true);
                 // Atualiza backup localStorage após pull do Drive (dados mais recentes)
-                try { if (window.LocalStorageBackup) LocalStorageBackup.save(); } catch(_e) {}
+                // ✅ FIX BACKUP LOCAL MULTI-LOJA: antes chamava LocalStorageBackup.save()
+                // SEM o storeId. Como save() sem argumento usa window._currentStore no
+                // momento da chamada — e esta função é assíncrona (várias awaits acima) —
+                // se o usuário trocasse de loja ENQUANTO um pull da loja anterior ainda
+                // estava em andamento, o backup local era salvo na chave da loja NOVA
+                // (window._currentStore atual) mas com os dados da loja ANTERIOR (que
+                // acabaram de ser mesclados em `state` por este pull). Isso é exatamente
+                // o "backup local sincronizando a loja errada". Ao passar `storeId`
+                // (capturado no topo desta função, antes de qualquer troca), o guard
+                // interno de LocalStorageBackup.save() volta a funcionar de verdade:
+                // se storeId != window._currentStore, o salvamento é bloqueado.
+                try { if (window.LocalStorageBackup) LocalStorageBackup.save(storeId); } catch(_e) {}
                 // Re-renderiza toda a UI
                 try { Dashboard.update(); }             catch(e) {}
                 try { Config.load?.(); }                catch(e) {}
