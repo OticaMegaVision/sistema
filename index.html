@@ -10623,7 +10623,7 @@ body.dark-mode,
             const POLL_ACTIVE_MS          = 5000;   // ✅ CORRIGIDO: 15s → 5s (bate com o texto "sync a cada 5s" da UI)
             const POLL_BACKGROUND_MS      = 15000;  // ✅ REDUZIDO: 45s → 15s em background (aba oculta) — ainda evita gasto excessivo de bateria/dados, mas sincroniza bem mais rápido
             const POLL_INTERVAL_MS        = POLL_ACTIVE_MS;
-            const PUSH_DEBOUNCE_MS        = 800;     // push 0.8s após última mudança
+            const PUSH_DEBOUNCE_MS        = 500;     // ✅ REDUZIDO: 800ms → 500ms — push mais rápido após a última mudança, mantendo folga suficiente para não disparar 1 upload por tecla digitada
 
             let _gdriveToken    = null;
             let _onedriveToken  = null;
@@ -10964,8 +10964,22 @@ body.dark-mode,
                 if (remote.notificacoes && typeof remote.notificacoes === 'object') {
                     state.notificacoes = Object.assign({}, remote.notificacoes, state.notificacoes || {});
                 }
+                // ✅ FIX SYNC BACKUP AUTOMÁTICO MULTI-DISPOSITIVO: antes o valor LOCAL
+                // sempre "vencia" o remoto para qualquer chave já presente — e como
+                // backupConfig tem todas as chaves preenchidas desde a inicialização
+                // (autoEnabled/hour/keepDays), o valor vindo da nuvem NUNCA era
+                // aplicado de fato. Isso fazia com que ativar/mudar o backup
+                // automático num aparelho nunca refletisse nos outros. Agora usa a
+                // MESMA regra de segurança já aplicada a company/config acima
+                // (localConfigIsNewer): se houve edição local nos últimos 10s ainda
+                // não confirmada na nuvem, mantém o valor local; caso contrário,
+                // aplica o valor remoto (mais recente ou vindo de outro dispositivo).
                 if (remote.backupConfig && typeof remote.backupConfig === 'object') {
-                    state.backupConfig = Object.assign({}, remote.backupConfig, state.backupConfig || {});
+                    if (localConfigIsNewer) {
+                        // edição local recente — mantém valores em memória por enquanto
+                    } else {
+                        state.backupConfig = Object.assign({}, state.backupConfig || {}, remote.backupConfig);
+                    }
                 }
                 if (remote.lastOsCounter && typeof remote.lastOsCounter === 'object') state.lastOsCounter = { ...(state.lastOsCounter || {}), ...remote.lastOsCounter };
                 // ✅ FIX SYNC CRÍTICO: merge item-por-item nas contas financeiras
@@ -11058,6 +11072,10 @@ body.dark-mode,
                 try { Suppliers.renderTable?.(); }      catch(e) {}
                 try { Utils.updatePixKey?.(); }         catch(e) {}
                 try { ContasManager.renderAll?.(); }    catch(e) {}
+                // ✅ Atualiza o painel "Backup Automático Diário" se estiver aberto —
+                // sem isso, o valor de backupConfig sincronizado de outro dispositivo
+                // (fix acima) só apareceria na tela após reabrir a aba manualmente.
+                try { if (document.getElementById('tabBackup')?.style.display !== 'none') Config.renderBackupStatus?.(); } catch(e) {}
                 try { setTimeout(() => window.RxDBPanel?.refresh(), 500); } catch(e) {}
                 // Salva timestamp do último pull
                 localStorage.setItem(_lsPullTsKey(), remote._ts || new Date().toISOString());
