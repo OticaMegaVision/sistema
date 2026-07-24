@@ -2086,51 +2086,79 @@
             .prod-modal-body { padding: 18px 16px; }
         }
         /* Thumb clicável na tabela */
+        /* ✅ VISUAL APROVADO: foto do produto aparece inteira (sem corte/"zum"),
+           com fundo branco, moldura sutil e sombra leve — visual mais profissional. */
         .prod-thumb-btn {
             cursor: zoom-in;
-            border: none;
-            background: none;
+            border: 1px solid var(--light-gray, #e9ecef);
+            background: #fff;
             padding: 0;
-            border-radius: 8px;
+            border-radius: 10px;
             overflow: hidden;
-            transition: transform .15s, box-shadow .15s;
+            transition: transform .15s, box-shadow .15s, border-color .15s;
             display: inline-flex;
             align-items: center;
             justify-content: center;
             line-height: 0;
-            width: 44px; height: 44px;
+            width: 52px; height: 52px;
+            box-shadow: 0 1px 2px rgba(16,24,40,.05);
         }
-        .prod-thumb-btn:hover { transform: scale(1.12); box-shadow: 0 4px 18px rgba(0,0,0,.28); }
-        .prod-thumb-btn img { width: 44px; height: 44px; object-fit: cover; border-radius: 8px; display: block; }
+        .prod-thumb-btn:hover { transform: scale(1.08); box-shadow: 0 4px 16px rgba(255,107,0,.22); border-color: var(--primary); }
+        .prod-thumb-btn img { width: 100%; height: 100%; object-fit: contain; padding: 4px; display: block; }
         .prod-thumb-empty {
             background: var(--light-gray, #e9ecef);
-            border-radius: 8px;
+            border-radius: 10px;
             cursor: pointer;
         }
         .prod-thumb-empty i { color: var(--gray, #6c757d); font-size: .95rem; }
 
         /* ===== PRODUTOS - UPLOAD DE IMAGEM ===== */
+        /* ✅ VISUAL APROVADO: caixa maior, fundo branco, moldura + sombra, foto
+           inteira sem corte (object-fit:contain) — em vez do dashed antigo com
+           object-fit:cover que ampliava/cortava a imagem. */
         .image-preview {
-            width: 80px;
-            height: 80px;
-            border: 2px dashed var(--light-gray);
-            border-radius: 8px;
+            width: 104px;
+            height: 104px;
+            border: 1.5px solid var(--light-gray);
+            border-radius: 10px;
             display: flex;
             align-items: center;
             justify-content: center;
-            background: var(--light);
+            background: #fff;
+            box-shadow: 0 1px 3px rgba(16,24,40,.06);
             overflow: hidden;
             cursor: pointer;
+            transition: box-shadow .2s, border-color .2s;
         }
+        .image-preview:hover { border-color: var(--primary); box-shadow: 0 4px 14px rgba(255,107,0,.18); }
         .image-preview img {
+            width: 100%;
+            height: 100%;
             max-width: 100%;
             max-height: 100%;
-            object-fit: cover;
+            object-fit: contain;
+            padding: 6px;
         }
         .image-preview i {
             font-size: 2rem;
             color: var(--gray);
         }
+        .btn-remove-photo {
+            background: #fff;
+            color: #b42318;
+            border: 1.5px solid #f3d0cd;
+            padding: .5rem 1.05rem;
+            border-radius: 8px;
+            font-weight: 700;
+            font-size: .84rem;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: .4rem;
+            transition: background .15s, border-color .15s;
+        }
+        .btn-remove-photo:hover { background: #fdeeee; border-color: #e8a49e; }
+
 
         /* ===== CREDIÁRIO ===== */
         .resumo-crediario {
@@ -7271,7 +7299,7 @@ body.dark-mode,
                                         <i id="productImagePlaceholder" class="fas fa-camera"></i>
                                     </div>
                                     <input type="file" id="productImageInput" accept="image/*" class="d-none" onchange="Products.uploadImage(event)">
-                                    <button type="button" class="btn btn-secondary btn-sm" onclick="Products.removeImage()">Remover</button>
+                                    <button type="button" class="btn-remove-photo" onclick="Products.removeImage()">🗑 Remover foto</button>
                                 </div>
                             </div>
                         </div>
