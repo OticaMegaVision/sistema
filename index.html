@@ -4174,6 +4174,49 @@ body {
     letter-spacing: 0.5px !important;
     text-transform: uppercase !important;
 }
+/* ── Header de card com ícone em badge (redesign Vendas/Clientes) ── */
+.cliente-card h3.ic-head {
+    display: flex !important;
+    align-items: center !important;
+    gap: 10px !important;
+}
+.cliente-card h3.ic-head .ic-badge {
+    width: 28px !important; height: 28px !important;
+    border-radius: 8px !important;
+    background: linear-gradient(135deg, #ff6b00, #ffaa00) !important;
+    color: #fff !important;
+    display: flex !important; align-items: center !important; justify-content: center !important;
+    font-size: 0.78rem !important;
+    flex-shrink: 0 !important;
+}
+.dark-mode .cliente-card h3.ic-head .ic-badge { filter: brightness(0.9); }
+/* ── Barra de indicadores rápidos (tela de Clientes) ── */
+.cli-quick-stats {
+    display: flex; gap: 0.7rem; flex-wrap: wrap; margin-bottom: 1.4rem;
+}
+.cli-quick-stat {
+    background: #fff; border: 1px solid rgba(255,107,0,0.1); border-radius: 12px;
+    padding: 0.6rem 1rem; display: flex; align-items: center; gap: 0.6rem;
+    box-shadow: var(--shadow-card, 0 2px 16px rgba(0,0,0,.06)); min-width: 150px; flex: 1;
+}
+.cli-quick-stat .qs-icon {
+    width: 32px; height: 32px; border-radius: 9px; display: flex; align-items: center;
+    justify-content: center; font-size: 0.85rem; flex-shrink: 0;
+}
+.cli-quick-stat .qs-num { font-size: 1.05rem; font-weight: 900; color: var(--dark); line-height: 1; }
+.cli-quick-stat .qs-label { font-size: 0.68rem; color: var(--gray); font-weight: 600; }
+.dark-mode .cli-quick-stat { background: #1a1d27; border-color: rgba(255,255,255,0.08); }
+/* ── Resumo de pagamento em destaque (tela de Vendas) ── */
+.pay-summary-card {
+    background: linear-gradient(135deg, #fff 55%, #fff7ec); border: 1px solid rgba(255,107,0,0.15);
+    border-radius: 14px; padding: 1.1rem 1.2rem; box-shadow: var(--shadow-card, 0 2px 16px rgba(0,0,0,.06));
+}
+.dark-mode .pay-summary-card { background: linear-gradient(135deg, #1a1d27 55%, #241a10); }
+.pay-summary-card .ps-row { display: flex; justify-content: space-between; font-size: 0.85rem; padding: 0.35rem 0; color: var(--gray); }
+.pay-summary-card .ps-total {
+    font-size: 1.1rem; font-weight: 900; color: #ff6b00;
+    border-top: 1px dashed rgba(255,107,0,0.3); margin-top: 0.4rem; padding-top: 0.6rem;
+}
 .form-group label {
     font-size: 0.78rem !important;
     font-weight: 700 !important;
@@ -5641,7 +5684,7 @@ body.dark-mode,
                     
                     <!-- DADOS DA OS -->
                     <div class="cliente-card">
-                        <h3>📋 DADOS DA OS</h3>
+                        <h3 class="ic-head"><span class="ic-badge"><i class="fas fa-clipboard-list"></i></span>DADOS DA OS</h3>
                         <div class="form-row">
                             <div class="form-group">
                                 <label for="saleNumber">Nº OS</label>
@@ -5687,7 +5730,7 @@ body.dark-mode,
 
                     <!-- SELEÇÃO DE CLIENTE -->
                     <div class="cliente-card">
-                        <h3>👤 SELECIONAR CLIENTE</h3>
+                        <h3 class="ic-head"><span class="ic-badge"><i class="fas fa-user-check"></i></span>SELECIONAR CLIENTE</h3>
                         <div class="form-row">
                             <div class="form-group" style="flex: 2;">
                                 <label for="searchClientSale">Buscar Cliente</label>
@@ -6635,7 +6678,7 @@ body.dark-mode,
             <section id="clients" class="section" aria-labelledby="pageTitle">
                 <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:1rem;margin-bottom:1.5rem;">
                     <div>
-                        <h2 class="section-title" style="margin-bottom:0.25rem;border-bottom:none;">👥 Clientes</h2>
+                        <h2 class="section-title" style="margin-bottom:0.25rem;border-bottom:none;"><i class="fas fa-users" style="margin-right:6px;"></i>Clientes</h2>
                         <span style="font-size:0.85rem;color:var(--gray);">Cadastro e gerenciamento de clientes</span>
                     </div>
                     <!-- Botões de exportar/importar -->
@@ -6647,9 +6690,25 @@ body.dark-mode,
                     </div>
                 </div>
 
+                <!-- Indicadores rápidos -->
+                <div class="cli-quick-stats" id="cliQuickStats">
+                    <div class="cli-quick-stat">
+                        <div class="qs-icon" style="background:#fff3e8;color:#ff6b00;"><i class="fas fa-user-friends"></i></div>
+                        <div><div class="qs-num" id="cliStatTotal">–</div><div class="qs-label">Clientes cadastrados</div></div>
+                    </div>
+                    <div class="cli-quick-stat">
+                        <div class="qs-icon" style="background:#fbf3df;color:#d4a017;"><i class="fas fa-birthday-cake"></i></div>
+                        <div><div class="qs-num" id="cliStatBday">–</div><div class="qs-label">Aniversariantes no mês</div></div>
+                    </div>
+                    <div class="cli-quick-stat">
+                        <div class="qs-icon" style="background:#eaf8ef;color:#1f9d55;"><i class="fas fa-user-plus"></i></div>
+                        <div><div class="qs-num" id="cliStatNew">–</div><div class="qs-label">Novos nos últimos 30 dias</div></div>
+                    </div>
+                </div>
+
                 <!-- Dados Pessoais -->
                 <div class="cliente-card">
-                    <h3>📋 DADOS PESSOAIS</h3>
+                    <h3 class="ic-head"><span class="ic-badge"><i class="fas fa-id-card"></i></span>DADOS PESSOAIS</h3>
                     <form id="clientForm">
                         <div class="form-row">
                             <div class="form-group">
@@ -6690,7 +6749,7 @@ body.dark-mode,
 
                 <!-- Endereço -->
                 <div class="cliente-card">
-                    <h3>📍 ENDEREÇO</h3>
+                    <h3 class="ic-head"><span class="ic-badge"><i class="fas fa-map-marker-alt"></i></span>ENDEREÇO</h3>
                     <div class="form-row">
                         <div class="form-group">
                             <label for="clientCep">CEP</label>
@@ -15910,28 +15969,28 @@ tbody tr td{border:1.5px solid #000;padding:2mm;text-align:center;font-weight:70
                         <div class="kpi-progress-wrap"><div class="kpi-progress-bar" style="width:${totalSales>0?Math.min(100,Math.abs(Math.round(profit/totalSales*100))):0}%;background:${profit >= 0 ? '#22c55e' : '#dc3545'};"></div></div>
                         ${this._sparkline(state.sales, 'date', 'total', profit >= 0 ? '#22c55e' : '#dc3545')}
                     </div>
-                    <div class="card" style="--card-accent:#0ea5e9;">
+                    <div class="card" style="--card-accent:#d4a017;">
                         <div class="card-header">
                             <span class="card-title">OS em Aberto</span>
                             <div style="display:flex;align-items:center;gap:6px;">
-                                <div class="card-icon" style="background:#f0f9ff;color:#0ea5e9;"><i class="fas fa-file-alt"></i></div>
+                                <div class="card-icon" style="background:#fbf3df;color:#d4a017;"><i class="fas fa-file-alt"></i></div>
                                 <span class="kpi-trend-badge neu">${salesEntregues} entregues</span>
                             </div>
                         </div>
-                        <div class="card-value" style="color:#0ea5e9;">${salesPendentes}</div>
+                        <div class="card-value" style="color:#d4a017;">${salesPendentes}</div>
                         <div id="dash-sub-os" style="font-size:0.76rem;color:var(--gray);">${salesEntregues} entregue${salesEntregues !== 1 ? 's' : ''} no período</div>
-                        <div class="kpi-progress-wrap"><div class="kpi-progress-bar" style="width:${(salesPendentes+salesEntregues)>0?Math.round(salesEntregues/(salesPendentes+salesEntregues)*100):0}%;background:#0ea5e9;"></div></div>
-                        ${this._sparkline(state.sales, 'date', 'total', '#0ea5e9')}
+                        <div class="kpi-progress-wrap"><div class="kpi-progress-bar" style="width:${(salesPendentes+salesEntregues)>0?Math.round(salesEntregues/(salesPendentes+salesEntregues)*100):0}%;background:#d4a017;"></div></div>
+                        ${this._sparkline(state.sales, 'date', 'total', '#d4a017')}
                     </div>
-                    <div class="card" style="--card-accent:#10b981;grid-column:span 2;">
+                    <div class="card" style="--card-accent:#8b6b3d;grid-column:span 2;">
                         <div class="card-header">
                             <span class="card-title" style="font-size:0.8rem;font-weight:700;color:var(--dark);">${company.name || 'ÓticaVision Pro'}</span>
-                            <div class="card-icon" style="background:#f0fdf4;color:#10b981;"><i class="fas fa-store"></i></div>
+                            <div class="card-icon" style="background:#f4ede0;color:#8b6b3d;"><i class="fas fa-store"></i></div>
                         </div>
                         <div style="font-size:0.8rem;color:var(--gray);display:flex;flex-wrap:wrap;gap:0.5rem 1.5rem;">
                             <span class="dash-info-empresa"><i class="fas fa-map-marker-alt" style="color:#dc3545;margin-right:4px;width:14px;text-align:center;"></i>${companyAddress}</span>
                             ${company.phone ? `<span class="dash-info-empresa"><i class="fas fa-phone" style="color:#22c55e;margin-right:4px;width:14px;text-align:center;"></i>${company.phone}</span>` : ''}
-                            ${company.cnpj  ? `<span class="dash-info-empresa"><i class="fas fa-id-card" style="color:#0ea5e9;margin-right:4px;width:14px;text-align:center;"></i>CNPJ: ${company.cnpj}</span>` : ''}
+                            ${company.cnpj  ? `<span class="dash-info-empresa"><i class="fas fa-id-card" style="color:#8b6b3d;margin-right:4px;width:14px;text-align:center;"></i>CNPJ: ${company.cnpj}</span>` : ''}
                             ${company.pix   ? `<span class="dash-info-empresa"><i class="fas fa-qrcode" style="color:#8b5cf6;margin-right:4px;width:14px;text-align:center;"></i>PIX: ${company.pix}</span>` : ''}
                         </div>
                     </div>
@@ -16082,7 +16141,40 @@ tbody tr td{border:1.5px solid #000;padding:2mm;text-align:center;font-weight:70
 
         // ==================== CLIENTES ====================
         const Clients = {
+            updateQuickStats() {
+                try {
+                    const list = state.clients || [];
+                    const totalEl = document.getElementById('cliStatTotal');
+                    const bdayEl  = document.getElementById('cliStatBday');
+                    const newEl   = document.getElementById('cliStatNew');
+                    if (!totalEl && !bdayEl && !newEl) return;
+
+                    if (totalEl) totalEl.textContent = list.length;
+
+                    if (bdayEl) {
+                        const curMonth = new Date().getMonth();
+                        const bdayCount = list.filter(c => {
+                            if (!c.birthDate) return false;
+                            const d = new Date(c.birthDate + 'T12:00:00');
+                            return !isNaN(d) && d.getMonth() === curMonth;
+                        }).length;
+                        bdayEl.textContent = bdayCount;
+                    }
+
+                    if (newEl) {
+                        const cutoffTs = Date.now() - (30 * 24 * 60 * 60 * 1000);
+                        const newCount = list.filter(c => {
+                            const m = /^CLI-(\d+)-/.exec(c.id || '');
+                            if (!m) return false;
+                            return parseInt(m[1], 10) >= cutoffTs;
+                        }).length;
+                        newEl.textContent = newCount;
+                    }
+                } catch (e) { /* não bloqueia o restante da tela em caso de dado inesperado */ }
+            },
+
             renderTable() {
+                this.updateQuickStats();
                 // --- PERFORMANCE: estado de paginação ---
                 if (!this._page) this._page = 1;
                 this._pageSize = 50;
