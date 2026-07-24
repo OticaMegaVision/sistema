@@ -23032,13 +23032,53 @@ ${container.innerHTML}
                 }).join('');
 
                 // Itens
-                const itensRows = (sale.items||[]).map(item=>`
+                // ✅ Receituário na lente + foto/código na armação (aprovado em amostra):
+                // usa dados que já existem (produto vinculado ao item e receituário do
+                // cliente) — não cria coluna nova, não altera PDF/carnê, e nunca quebra
+                // a tela mesmo se o produto/receituário não existir (try/catch por item).
+                const _clientPresc = client ? (state.prescriptions||[]).filter(p => p.clientId === client.id).pop() : null;
+                const itensRows = (sale.items||[]).map(item=>{
+                    let extra = '';
+                    try {
+                        if (item.type === 'armacao') {
+                            const prod = state.products.find(p => p.id === item.productId);
+                            const img  = prod?.image;
+                            const code = item.code || prod?.code || '';
+                            if (img || code) {
+                                extra = `
+                                    <div style="display:flex;align-items:center;gap:8px;margin-top:6px;">
+                                        <div style="width:34px;height:34px;border:1px solid #e9ecef;border-radius:7px;background:#fff;display:flex;align-items:center;justify-content:center;overflow:hidden;flex-shrink:0;box-shadow:0 1px 2px rgba(16,24,40,.05);">
+                                            ${img ? `<img src="${img}" style="width:100%;height:100%;object-fit:contain;padding:2px;" alt="">` : `<i class="fas fa-glasses" style="color:#ccc;font-size:13px;"></i>`}
+                                        </div>
+                                        ${code ? `<span style="font-family:'Courier New',monospace;font-size:10.5px;color:#888;font-weight:700;">Cód: ${Utils.sanitizeHTML(code)}</span>` : ''}
+                                    </div>`;
+                            }
+                        } else if (item.type === 'lente') {
+                            if (_clientPresc) {
+                                const od = _clientPresc.od || {}, oe = _clientPresc.oe || {};
+                                extra = `
+                                    <div style="margin-top:6px;padding:7px 9px;background:#f2f7ff;border:1px solid #dbe7fb;border-radius:7px;font-size:10px;color:#2c4a72;line-height:1.55;">
+                                        <div style="font-weight:800;color:#2b5aa8;margin-bottom:3px;">👓 Receituário do cliente</div>
+                                        <div>OD: Esf ${od.sph||'—'} Cil ${od.cyl||'—'} Eixo ${od.axis||'—'}° Ad ${od.add||'—'}</div>
+                                        <div>OE: Esf ${oe.sph||'—'} Cil ${oe.cyl||'—'} Eixo ${oe.axis||'—'}° Ad ${oe.add||'—'}</div>
+                                        <div>DP: ${_clientPresc.dp||'—'}mm${_clientPresc.optometrist ? ' · '+Utils.sanitizeHTML(_clientPresc.optometrist) : ''}${_clientPresc.date ? ' — '+fd(_clientPresc.date) : ''}</div>
+                                    </div>`;
+                            } else {
+                                extra = `<div style="margin-top:6px;padding:6px 9px;background:#fff8e8;border:1px solid #ffe6ad;border-radius:7px;font-size:10px;color:#8a5a00;font-weight:600;">⚠️ Cliente sem receituário cadastrado</div>`;
+                            }
+                        }
+                    } catch(_extraErr) { extra = ''; }
+                    return `
                     <tr style="border-bottom:1px solid #f0f0f0;">
-                        <td style="padding:7px 10px;">${Utils.sanitizeHTML(item.name||'')}</td>
+                        <td style="padding:7px 10px;">
+                            <div>${Utils.sanitizeHTML(item.name||'')}</div>
+                            ${extra}
+                        </td>
                         <td style="padding:7px 10px;text-align:center;">${item.qty||1}</td>
                         <td style="padding:7px 10px;text-align:right;color:#666;">${Utils.formatCurrency(item.price||0)}</td>
                         <td style="padding:7px 10px;text-align:right;font-weight:700;color:#ff6b00;">${Utils.formatCurrency(item.subtotal||0)}</td>
-                    </tr>`).join('');
+                    </tr>`;
+                }).join('');
 
                 // Parcelas
                 const parcels = sale.paymentDetails?.parcels || [];
