@@ -2159,6 +2159,52 @@
         }
         .btn-remove-photo:hover { background: #fdeeee; border-color: #e8a49e; }
 
+        /* ===== NOTIFICAÇÕES & BACKUP — VISUAL PROFISSIONAL (aprovado em amostra) ===== */
+        .cfg-card {
+            background: #fff; border-radius: var(--r-lg, 14px);
+            box-shadow: 0 2px 10px rgba(16,24,40,.07), 0 8px 22px rgba(16,24,40,.05);
+            border: 1px solid rgba(0,0,0,.05); overflow: hidden; margin-bottom: 1.1rem;
+        }
+        .cfg-card-head { display: flex; align-items: center; gap: .6rem; padding: 1rem 1.3rem; border-bottom: 1px solid var(--light-gray); }
+        .cfg-card-head .ic { width: 34px; height: 34px; border-radius: 9px; display: flex; align-items: center; justify-content: center; font-size: .95rem; flex-shrink: 0; }
+        .cfg-card-head b { font-size: .92rem; }
+        .cfg-card-head .count { margin-left: auto; font-size: .68rem; font-weight: 700; color: var(--gray); background: var(--light); padding: 2px 9px; border-radius: 99px; white-space: nowrap; }
+
+        .cfg-opt-row { display: flex; align-items: center; justify-content: space-between; gap: 1rem; padding: .8rem 1.3rem; border-bottom: 1px solid #f4f4f4; flex-wrap: wrap; }
+        .cfg-opt-row:last-child { border-bottom: none; }
+        .cfg-opt-label { font-size: .85rem; font-weight: 600; }
+        .cfg-opt-desc { font-size: .74rem; color: var(--gray); margin-top: 1px; }
+        .cfg-opt-desc .mini-input { width: 46px; border: 1px solid var(--light-gray); border-radius: 6px; padding: 1px 4px; font-size: .8rem; text-align: center; margin: 0 2px; }
+
+        /* Toggle switch reutilizável — o checkbox real fica invisível por baixo */
+        .tgl { position: relative; display: inline-block; width: 42px; height: 24px; flex-shrink: 0; cursor: pointer; }
+        .tgl input { opacity: 0; width: 0; height: 0; position: absolute; }
+        .tgl .bg { position: absolute; inset: 0; background: var(--light-gray); border-radius: 24px; transition: .25s; pointer-events: none; }
+        .tgl input:checked + .bg { background: linear-gradient(135deg, var(--primary), var(--secondary)); }
+        .tgl .knob { position: absolute; top: 3px; left: 3px; width: 18px; height: 18px; background: #fff; border-radius: 50%; box-shadow: 0 1px 3px rgba(0,0,0,.25); transition: .25s; pointer-events: none; }
+        .tgl input:checked ~ .knob { left: 21px; }
+
+        /* Hero de permissão do navegador */
+        .perm-hero { padding: 1.3rem; display: flex; align-items: center; gap: 1rem; flex-wrap: wrap; border-radius: var(--r-lg, 14px); margin-bottom: 1.25rem; }
+        .perm-icon { width: 50px; height: 50px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 1.3rem; flex-shrink: 0; color: #fff; background: linear-gradient(135deg, var(--primary), var(--secondary)); }
+        .perm-text { flex: 1; min-width: 180px; }
+        .perm-title { font-weight: 800; font-size: .98rem; }
+        .perm-sub { font-size: .8rem; color: var(--gray); margin-top: 2px; line-height: 1.45; }
+        .perm-btn { background: linear-gradient(135deg, var(--primary), var(--secondary)); color: #fff; border: none; padding: .65rem 1.2rem; border-radius: 99px; font-weight: 800; font-size: .84rem; cursor: pointer; box-shadow: 0 4px 14px rgba(255,107,0,.3); display: inline-flex; align-items: center; gap: .5rem; white-space: nowrap; }
+
+        /* Faixa de status do backup */
+        .status-strip { display: grid; grid-template-columns: 1fr 1fr; gap: .9rem; margin-bottom: 1.1rem; }
+        @media (max-width: 560px) { .status-strip { grid-template-columns: 1fr; } }
+        .status-box { border-radius: var(--r-lg, 14px); padding: 1.1rem 1.2rem; display: flex; align-items: center; gap: .8rem; box-shadow: 0 2px 10px rgba(16,24,40,.07); color: #fff; }
+        .status-box .t1 { font-weight: 800; font-size: .86rem; }
+        .status-box .t2 { font-size: .72rem; opacity: .8; margin-top: 2px; }
+
+        .danger-card { background: linear-gradient(135deg,#2a1010,#1a0a0a); border-radius: var(--r-lg, 14px); padding: 1.2rem 1.3rem; margin-bottom: 1.1rem; border: 1.5px solid rgba(220,53,69,.35); }
+        .danger-head { display: flex; align-items: center; gap: .7rem; margin-bottom: .9rem; }
+        .danger-ic { width: 36px; height: 36px; border-radius: 50%; background: rgba(220,53,69,.18); display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+        .danger-t1 { color: #f8d7da; font-weight: 800; font-size: .88rem; }
+        .danger-t2 { color: #e2a5ab; font-size: .74rem; margin-top: 1px; }
+
 
         /* ===== CREDIÁRIO ===== */
         .resumo-crediario {
@@ -7889,47 +7935,65 @@ body.dark-mode,
                         <!-- ✅ NOVO: status real da permissão de notificação do navegador —
                              sem isso, os alertas abaixo eram apenas preferências salvas,
                              sem nenhum aviso de fato sendo disparado para o usuário. -->
-                        <div id="notifPermBox" style="border-radius:10px;padding:12px 14px;margin-bottom:1.25rem;font-size:0.85rem;display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;">
-                            <span id="notifPermText">Verificando permissão do navegador...</span>
-                            <button type="button" id="notifPermBtn" class="btn btn-sm btn-primary" style="display:none;" onclick="NotificationEngine.requestPermission().then(()=>Config.updateNotifPermUI())">
-                                <i class="fas fa-bell"></i> Ativar notificações do navegador
+                        <div id="notifPermBox" class="perm-hero">
+                            <div class="perm-icon" id="notifPermIcon"><i class="fas fa-bell"></i></div>
+                            <div class="perm-text">
+                                <div class="perm-title">Notificações do navegador</div>
+                                <div class="perm-sub" id="notifPermText">Verificando permissão do navegador...</div>
+                            </div>
+                            <button type="button" id="notifPermBtn" class="perm-btn" style="display:none;" onclick="NotificationEngine.requestPermission().then(()=>Config.updateNotifPermUI())">
+                                <i class="fas fa-bell"></i> Ativar agora
                             </button>
                         </div>
 
-                        <div style="margin-bottom: 1.5rem;">
-                            <h4>Alertas de Estoque</h4>
-                            <div style="display: grid; gap: 0.75rem; margin-top: 0.5rem;">
-                                <label class="flex items-center gap-2"><input type="checkbox" id="configNotifyLowStock" checked> Notificar quando estoque estiver baixo</label>
-                                <label class="flex items-center gap-2"><input type="checkbox" id="configNotifyOutOfStock" checked> Notificar quando produto esgotar</label>
+                        <div class="cfg-card">
+                            <div class="cfg-card-head"><div class="ic" style="background:#ffe8d6;color:#c65600;">📦</div><b>Alertas de Estoque</b></div>
+                            <div class="cfg-opt-row">
+                                <div><div class="cfg-opt-label">Estoque baixo</div><div class="cfg-opt-desc">Avisa quando um produto atinge o mínimo cadastrado</div></div>
+                                <label class="tgl"><input type="checkbox" id="configNotifyLowStock" checked><span class="bg"></span><span class="knob"></span></label>
+                            </div>
+                            <div class="cfg-opt-row">
+                                <div><div class="cfg-opt-label">Produto esgotado</div><div class="cfg-opt-desc">Avisa quando o estoque chega a zero</div></div>
+                                <label class="tgl"><input type="checkbox" id="configNotifyOutOfStock" checked><span class="bg"></span><span class="knob"></span></label>
                             </div>
                         </div>
 
-                        <div style="margin-bottom: 1.5rem;">
-                            <h4>Ordens de Serviço</h4>
-                            <div style="display: grid; gap: 0.75rem; margin-top: 0.5rem;">
-                                <label class="flex items-center gap-2"><input type="checkbox" id="configNotifyOsReady" checked> Notificar quando OS ficar pronta</label>
-                                <label class="flex items-center gap-2"><input type="checkbox" id="configNotifyOsDelay" checked> Notificar OS atrasadas</label>
-                                <div class="form-group" style="margin-left: 1.5rem;">
-                                    <label for="configOsDelayDays">Dias para considerar atraso:</label>
-                                    <input type="number" id="configOsDelayDays" class="form-control" value="7" min="1" style="width: 100px;">
+                        <div class="cfg-card">
+                            <div class="cfg-card-head"><div class="ic" style="background:#e0e7ff;color:#4338ca;">🔧</div><b>Ordens de Serviço</b></div>
+                            <div class="cfg-opt-row">
+                                <div><div class="cfg-opt-label">OS pronta</div><div class="cfg-opt-desc">Quando o status muda para "Pronto p/ retirada"</div></div>
+                                <label class="tgl"><input type="checkbox" id="configNotifyOsReady" checked><span class="bg"></span><span class="knob"></span></label>
+                            </div>
+                            <div class="cfg-opt-row">
+                                <div>
+                                    <div class="cfg-opt-label">OS atrasada</div>
+                                    <div class="cfg-opt-desc">Considerar atraso após <input type="number" id="configOsDelayDays" class="mini-input" value="7" min="1"> dias</div>
                                 </div>
+                                <label class="tgl"><input type="checkbox" id="configNotifyOsDelay" checked><span class="bg"></span><span class="knob"></span></label>
                             </div>
                         </div>
 
-                        <div style="margin-bottom: 1.5rem;">
-                            <h4>Financeiro</h4>
-                            <div style="display: grid; gap: 0.75rem; margin-top: 0.5rem;">
-                                <label class="flex items-center gap-2"><input type="checkbox" id="configNotifyPaymentDue" checked> Notificar contas a vencer</label>
-                                <label class="flex items-center gap-2"><input type="checkbox" id="configNotifyPaymentOverdue" checked> Notificar contas vencidas</label>
+                        <div class="cfg-card">
+                            <div class="cfg-card-head"><div class="ic" style="background:#fde8e8;color:#c0392b;">💰</div><b>Financeiro</b></div>
+                            <div class="cfg-opt-row">
+                                <div><div class="cfg-opt-label">Contas a vencer</div><div class="cfg-opt-desc">Aviso alguns dias antes do vencimento</div></div>
+                                <label class="tgl"><input type="checkbox" id="configNotifyPaymentDue" checked><span class="bg"></span><span class="knob"></span></label>
+                            </div>
+                            <div class="cfg-opt-row">
+                                <div><div class="cfg-opt-label">Contas vencidas</div><div class="cfg-opt-desc">Aviso quando uma conta passa do vencimento</div></div>
+                                <label class="tgl"><input type="checkbox" id="configNotifyPaymentOverdue" checked><span class="bg"></span><span class="knob"></span></label>
                             </div>
                         </div>
 
-                        <div style="margin-bottom: 1.5rem;">
-                            <h4>WhatsApp</h4>
-                            <div style="display: grid; gap: 0.75rem; margin-top: 0.5rem;">
-                                <label class="flex items-center gap-2"><input type="checkbox" id="configWhatsappNotify"> Enviar notificações via WhatsApp</label>
-                                <div class="form-group" style="margin-left: 1.5rem;">
-                                    <label for="configWhatsappNumber">Número do WhatsApp (com DDD):</label>
+                        <div class="cfg-card">
+                            <div class="cfg-card-head"><div class="ic" style="background:#dcfce7;color:#128c4e;">💬</div><b>WhatsApp</b></div>
+                            <div class="cfg-opt-row">
+                                <div><div class="cfg-opt-label">Enviar notificações via WhatsApp</div><div class="cfg-opt-desc">Encaminha os mesmos alertas para um número informado</div></div>
+                                <label class="tgl"><input type="checkbox" id="configWhatsappNotify"><span class="bg"></span><span class="knob"></span></label>
+                            </div>
+                            <div class="cfg-opt-row">
+                                <div style="flex:1;">
+                                    <label for="configWhatsappNumber" class="cfg-opt-label" style="display:block;margin-bottom:.4rem;">Número do WhatsApp (com DDD)</label>
                                     <input type="text" id="configWhatsappNumber" class="form-control" oninput="App.maskPhone(this)">
                                 </div>
                             </div>
@@ -7960,69 +8024,45 @@ body.dark-mode,
                             <input type="file" id="importBackupConfig" class="d-none" accept=".json" onchange="App.importBackup(event)">
                         </div>
 
-                        <!-- SYNC LOCAL — RxDB v17 -->
-                        <div style="background: linear-gradient(135deg, #1e1e2e, #2a2a3e); border-radius: 12px; padding: 1.25rem; margin-bottom: 1.5rem; display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:1rem;">
-                            <div style="display:flex; align-items:center; gap:0.75rem;">
-                                <div id="syncBtnStatusDot" style="width:12px;height:12px;border-radius:50%;background:#a6e3a1;box-shadow:0 0 6px #a6e3a1;flex-shrink:0;"></div>
-                                <div>
-                                    <div style="color:white;font-weight:700;font-size:0.95rem;">💾 RxDB v17 Local-First + ☁️ Google Drive / OneDrive</div>
-                                    <div id="syncBtnStatusText" style="color:#a6adc8;font-size:0.78rem;margin-top:2px;">Último sync: <span id="syncBtnLastTime">—</span></div>
-                                </div>
-                            </div>
-                            <div style="display:flex;gap:0.5rem;flex-wrap:wrap;">
-                                <button class="btn btn-sm" style="background:#3ecf8e;color:#000;font-weight:700;" onclick="LocalFirst.sync('manual'); const t=new Date().toLocaleTimeString('pt-BR'); document.getElementById('syncBtnLastTime').textContent=t;">
-                                    <i class="fas fa-sync"></i> Recarregar dados
-                                </button>
-                                <button class="btn btn-sm" style="background:#ff6b00;color:#fff;font-weight:700;" onclick="LocalFirst.rewriteAll()">
-                                    <i class="fas fa-database"></i> Re-gravar IndexedDB
-                                </button>
-                            </div>
-                        </div>
-
-                        <!-- ZERAR DADOS LOCAIS -->
-                        <div style="background:linear-gradient(135deg,#1a0a0a,#2a1010);border-radius:12px;padding:1.25rem;margin-bottom:1.5rem;border:1.5px solid rgba(220,53,69,0.4);">
-                            <div style="display:flex;align-items:center;gap:0.75rem;margin-bottom:0.85rem;">
-                                <div style="width:38px;height:38px;border-radius:50%;background:rgba(220,53,69,0.2);display:flex;align-items:center;justify-content:center;font-size:1.1rem;flex-shrink:0;">🗑️</div>
-                                <div>
-                                    <div style="color:#f8d7da;font-weight:700;font-size:0.95rem;">Zerar Dados Locais</div>
-                                    <div style="color:#f1aeb5;font-size:0.76rem;margin-top:1px;">Remove todos os documentos da loja ativa do IndexedDB — permite começar do zero</div>
-                                </div>
-                            </div>
-                            <div style="display:flex;gap:0.6rem;flex-wrap:wrap;">
-                                <button class="btn btn-sm" style="background:#dc3545;color:#fff;font-weight:700;font-size:0.8rem;" onclick="App.wipeSingleStoreLocal()">
-                                    <i class="fas fa-trash-alt"></i> Zerar loja atual (<span id="wipeLojaNome">—</span>) localmente
-                                </button>
-                                <button class="btn btn-sm" style="background:#6c1c1c;color:#f8d7da;font-weight:700;font-size:0.8rem;border:1px solid rgba(220,53,69,0.5);" onclick="App.wipeAllStoresLocal()">
-                                    <i class="fas fa-database"></i> Zerar TODAS as lojas localmente
-                                </button>
-                            </div>
-                        </div>
-
-                        <!-- STATUS DO BACKUP AUTOMÁTICO -->
-                        <div id="backupStatusCard" style="background: var(--light); border-radius: 12px; padding: 1.25rem; margin-bottom: 1.5rem; border-left: 4px solid var(--gray);">
-                            <div style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:0.75rem;">
+                        <!-- FAIXA DE STATUS: sync com a nuvem + backup automático -->
+                        <div class="status-strip">
+                            <div style="background: linear-gradient(135deg, #1e1e2e, #2a2a3e); border-radius: var(--r-lg,14px); padding: 1.25rem; display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:1rem; box-shadow:0 2px 10px rgba(16,24,40,.07);">
                                 <div style="display:flex; align-items:center; gap:0.75rem;">
-                                    <div id="backupStatusIcon" style="width:42px;height:42px;border-radius:50%;background:#e9ecef;display:flex;align-items:center;justify-content:center;font-size:1.2rem;">⏸️</div>
+                                    <div id="syncBtnStatusDot" style="width:12px;height:12px;border-radius:50%;background:#a6e3a1;box-shadow:0 0 6px #a6e3a1;flex-shrink:0;"></div>
                                     <div>
-                                        <div id="backupStatusTitle" style="font-weight:700; font-size:0.95rem; color:var(--dark);">Backup automático desativado</div>
-                                        <div id="backupStatusSub" style="font-size:0.8rem; color:var(--gray); margin-top:2px;">Ative para proteger seus dados diariamente</div>
+                                        <div style="color:white;font-weight:700;font-size:0.86rem;">💾 RxDB + ☁️ Drive/OneDrive</div>
+                                        <div id="syncBtnStatusText" style="color:#a6adc8;font-size:0.74rem;margin-top:2px;">Último sync: <span id="syncBtnLastTime">—</span></div>
                                     </div>
                                 </div>
-                                <div id="backupStatusBadge" style="padding:4px 14px;border-radius:20px;font-size:0.78rem;font-weight:700;background:#e9ecef;color:var(--gray);">INATIVO</div>
+                                <div style="display:flex;gap:0.5rem;flex-wrap:wrap;">
+                                    <button class="btn btn-sm" style="background:#3ecf8e;color:#000;font-weight:700;" onclick="LocalFirst.sync('manual'); const t=new Date().toLocaleTimeString('pt-BR'); document.getElementById('syncBtnLastTime').textContent=t;">
+                                        <i class="fas fa-sync"></i> Recarregar
+                                    </button>
+                                    <button class="btn btn-sm" style="background:#ff6b00;color:#fff;font-weight:700;" onclick="LocalFirst.rewriteAll()">
+                                        <i class="fas fa-database"></i> Re-gravar
+                                    </button>
+                                </div>
+                            </div>
+
+                            <!-- STATUS DO BACKUP AUTOMÁTICO -->
+                            <div id="backupStatusCard" class="status-box" style="background: linear-gradient(135deg, var(--gray), #5a6268);">
+                                <div id="backupStatusIcon" style="width:40px;height:40px;border-radius:50%;background:rgba(255,255,255,.2);display:flex;align-items:center;justify-content:center;font-size:1.15rem;flex-shrink:0;">⏸️</div>
+                                <div style="flex:1;min-width:0;">
+                                    <div id="backupStatusTitle" class="t1">Backup automático desativado</div>
+                                    <div id="backupStatusSub" class="t2">Ative para proteger seus dados diariamente</div>
+                                </div>
+                                <div id="backupStatusBadge" style="padding:3px 12px;border-radius:20px;font-size:0.68rem;font-weight:800;background:rgba(255,255,255,.2);color:#fff;white-space:nowrap;">INATIVO</div>
                             </div>
                         </div>
 
                         <!-- CONFIGURAÇÃO DO BACKUP DIÁRIO -->
-                        <div style="background: var(--light); padding: 1.5rem; border-radius: 12px; margin-bottom: 1.5rem; border: 1px solid rgba(0,0,0,0.06);">
-                            <h4 style="color: var(--primary); margin-bottom: 1.25rem; display:flex; align-items:center; gap:0.5rem;">
-                                <i class="fas fa-clock"></i> Backup Automático Diário
-                            </h4>
-
-                            <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap:1.25rem; margin-bottom:1.25rem;">
+                        <div class="cfg-card">
+                            <div class="cfg-card-head"><div class="ic" style="background:#fff3e0;color:#c65600;"><i class="fas fa-clock"></i></div><b>Backup Automático Diário</b></div>
+                            <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap:1.25rem; padding: 1.2rem 1.3rem;">
 
                                 <!-- Toggle ativar -->
-                                <div class="form-group">
-                                    <label style="font-weight:600; margin-bottom:0.5rem; display:block;">Status</label>
+                                <div class="form-group" style="margin:0;">
+                                    <label style="font-weight:600; margin-bottom:0.5rem; display:block; font-size:.85rem;">Status</label>
                                     <div style="display:flex; align-items:center; gap:0.75rem;">
                                         <label class="toggle-switch" style="position:relative;display:inline-block;width:52px;height:28px;cursor:pointer;">
                                             <input type="checkbox" id="configBackupAutoEnabled"
@@ -8038,8 +8078,8 @@ body.dark-mode,
                                 </div>
 
                                 <!-- Horário -->
-                                <div class="form-group">
-                                    <label for="configBackupHour" style="font-weight:600; margin-bottom:0.5rem; display:block;">
+                                <div class="form-group" style="margin:0;">
+                                    <label for="configBackupHour" style="font-weight:600; margin-bottom:0.5rem; display:block; font-size:.85rem;">
                                         Horário do backup
                                     </label>
                                     <select id="configBackupHour" class="form-control" onchange="Config.saveBackupConfig()">
@@ -8061,8 +8101,8 @@ body.dark-mode,
                                 </div>
 
                                 <!-- Retenção -->
-                                <div class="form-group">
-                                    <label for="configBackupKeepDays" style="font-weight:600; margin-bottom:0.5rem; display:block;">
+                                <div class="form-group" style="margin:0;">
+                                    <label for="configBackupKeepDays" style="font-weight:600; margin-bottom:0.5rem; display:block; font-size:.85rem;">
                                         Manter histórico
                                     </label>
                                     <select id="configBackupKeepDays" class="form-control" onchange="Config.saveBackupConfig()">
@@ -8077,34 +8117,50 @@ body.dark-mode,
                             </div>
 
                             <!-- Info cards -->
-                            <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap:0.75rem; margin-top:0.5rem;">
-                                <div style="background:white; border-radius:8px; padding:0.85rem; text-align:center; border:1px solid rgba(0,0,0,0.07);">
-                                    <div style="font-size:0.75rem; color:var(--gray); margin-bottom:2px;">Último backup diário</div>
-                                    <div id="backupInfoUltimo" style="font-weight:700; font-size:0.85rem; color:var(--dark);">Nunca</div>
+                            <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap:0.75rem; padding: 0 1.3rem 1.2rem;">
+                                <div style="background:var(--light); border-radius:9px; padding:0.85rem; text-align:center; border:1px solid rgba(0,0,0,0.05);">
+                                    <div style="font-size:0.68rem; color:var(--gray);">Último backup diário</div>
+                                    <div id="backupInfoUltimo" style="font-weight:800; font-size:0.85rem; color:var(--dark); margin-top:2px;">Nunca</div>
                                 </div>
-                                <div style="background:white; border-radius:8px; padding:0.85rem; text-align:center; border:1px solid rgba(0,0,0,0.07);">
-                                    <div style="font-size:0.75rem; color:var(--gray); margin-bottom:2px;">Próximo backup</div>
-                                    <div id="backupInfoProximo" style="font-weight:700; font-size:0.85rem; color:var(--dark);">—</div>
+                                <div style="background:var(--light); border-radius:9px; padding:0.85rem; text-align:center; border:1px solid rgba(0,0,0,0.05);">
+                                    <div style="font-size:0.68rem; color:var(--gray);">Próximo backup</div>
+                                    <div id="backupInfoProximo" style="font-weight:800; font-size:0.85rem; color:var(--dark); margin-top:2px;">—</div>
                                 </div>
-                                <div style="background:white; border-radius:8px; padding:0.85rem; text-align:center; border:1px solid rgba(0,0,0,0.07);">
-                                    <div style="font-size:0.75rem; color:var(--gray); margin-bottom:2px;">Backups no histórico</div>
-                                    <div id="backupInfoContagem" style="font-weight:700; font-size:0.85rem; color:var(--dark);">0</div>
+                                <div style="background:var(--light); border-radius:9px; padding:0.85rem; text-align:center; border:1px solid rgba(0,0,0,0.05);">
+                                    <div style="font-size:0.68rem; color:var(--gray);">Backups no histórico</div>
+                                    <div id="backupInfoContagem" style="font-weight:800; font-size:0.85rem; color:var(--dark); margin-top:2px;">0</div>
                                 </div>
                             </div>
                         </div>
 
                         <!-- HISTÓRICO DE BACKUPS -->
-                        <div style="background: var(--light); padding: 1.5rem; border-radius: 12px; margin-bottom: 1.5rem; border: 1px solid rgba(0,0,0,0.06);">
-                            <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:1rem; flex-wrap:wrap; gap:0.5rem;">
-                                <h4 style="color: var(--primary); margin:0; display:flex; align-items:center; gap:0.5rem;">
-                                    <i class="fas fa-history"></i> Histórico de Backups
-                                </h4>
-                                <button class="btn btn-sm btn-outline-secondary" onclick="Config.renderBackupStatus()" style="font-size:0.8rem;">
-                                    <i class="fas fa-sync-alt"></i> Atualizar
-                                </button>
+                        <div class="cfg-card">
+                            <div class="cfg-card-head">
+                                <div class="ic" style="background:#e0e7ff;color:#4338ca;"><i class="fas fa-history"></i></div>
+                                <b>Histórico de Backups</b>
+                                <span class="count" style="cursor:pointer;" onclick="Config.renderBackupStatus()"><i class="fas fa-sync-alt"></i> Atualizar</span>
                             </div>
-                            <div id="backupHistoricoList" style="max-height:200px; overflow-y:auto;">
+                            <div id="backupHistoricoList" style="max-height:220px; overflow-y:auto; padding: .4rem 1.3rem 1rem;">
                                 <p style="color:var(--gray); font-size:0.88rem; text-align:center; padding:1rem 0;">Nenhum backup registrado ainda</p>
+                            </div>
+                        </div>
+
+                        <!-- ZERAR DADOS LOCAIS -->
+                        <div class="danger-card">
+                            <div class="danger-head">
+                                <div class="danger-ic">🗑️</div>
+                                <div>
+                                    <div class="danger-t1">Zerar Dados Locais</div>
+                                    <div class="danger-t2">Remove todos os documentos da loja ativa do IndexedDB — permite começar do zero</div>
+                                </div>
+                            </div>
+                            <div style="display:flex;gap:0.6rem;flex-wrap:wrap;">
+                                <button class="btn btn-sm" style="background:#dc3545;color:#fff;font-weight:700;font-size:0.8rem;" onclick="App.wipeSingleStoreLocal()">
+                                    <i class="fas fa-trash-alt"></i> Zerar loja atual (<span id="wipeLojaNome">—</span>) localmente
+                                </button>
+                                <button class="btn btn-sm" style="background:#6c1c1c;color:#f8d7da;font-weight:700;font-size:0.8rem;border:1px solid rgba(220,53,69,0.5);" onclick="App.wipeAllStoresLocal()">
+                                    <i class="fas fa-database"></i> Zerar TODAS as lojas localmente
+                                </button>
                             </div>
                         </div>
 
@@ -19076,19 +19132,19 @@ tbody tr td{border:1.5px solid #000;padding:2mm;text-align:center;font-weight:70
 
                 // Status card
                 if (cfg.autoEnabled) {
-                    if (card)  card.style.borderLeftColor = '#28a745';
-                    if (icon)  icon.innerHTML = '✅'; icon.style.background = '#d4edda';
+                    if (card)  card.style.background = 'linear-gradient(135deg, #0a7a3d, #16a34a)';
+                    if (icon)  { icon.innerHTML = '✅'; icon.style.background = 'rgba(255,255,255,.22)'; }
                     if (title) title.textContent = 'Backup automático ativo — todo dia às ' + String(cfg.hour).padStart(2,'0') + ':00';
                     if (sub)   sub.textContent = cfg.lastAutoBackup
                         ? 'Último: ' + new Date(cfg.lastAutoBackup).toLocaleString('pt-BR')
                         : 'Aguardando primeiro backup';
-                    if (badge) { badge.textContent = 'ATIVO'; badge.style.background = '#d4edda'; badge.style.color = '#28a745'; }
+                    if (badge) { badge.textContent = 'ATIVO'; badge.style.background = 'rgba(255,255,255,.25)'; badge.style.color = '#fff'; }
                 } else {
-                    if (card)  card.style.borderLeftColor = '#6c757d';
-                    if (icon)  { icon.innerHTML = '⏸️'; icon.style.background = '#e9ecef'; }
+                    if (card)  card.style.background = 'linear-gradient(135deg, var(--gray), #5a6268)';
+                    if (icon)  { icon.innerHTML = '⏸️'; icon.style.background = 'rgba(255,255,255,.2)'; }
                     if (title) title.textContent = 'Backup automático desativado';
                     if (sub)   sub.textContent = 'Ative para proteger seus dados diariamente';
-                    if (badge) { badge.textContent = 'INATIVO'; badge.style.background = '#e9ecef'; badge.style.color = '#6c757d'; }
+                    if (badge) { badge.textContent = 'INATIVO'; badge.style.background = 'rgba(255,255,255,.2)'; badge.style.color = '#fff'; }
                 }
 
                 // Info cards
@@ -19145,11 +19201,13 @@ tbody tr td{border:1.5px solid #000;padding:2mm;text-align:center;font-weight:70
                 const box = document.getElementById('notifPermBox');
                 const txt = document.getElementById('notifPermText');
                 const btn = document.getElementById('notifPermBtn');
+                const icon = document.getElementById('notifPermIcon');
                 if (!box || !txt || !btn) return;
                 if (!('Notification' in window)) {
                     box.style.background = '#f8f9fa'; box.style.border = '1px solid #dee2e6';
                     txt.textContent = '⚠️ Este navegador não suporta notificações do sistema. Os alertas ainda aparecem dentro do app.';
                     btn.style.display = 'none';
+                    if (icon) { icon.innerHTML = '<i class="fas fa-exclamation-triangle"></i>'; icon.style.background = '#6c757d'; }
                     return;
                 }
                 const perm = Notification.permission;
@@ -19157,14 +19215,17 @@ tbody tr td{border:1.5px solid #000;padding:2mm;text-align:center;font-weight:70
                     box.style.background = '#d4edda'; box.style.border = '1px solid #28a745';
                     txt.textContent = '✅ Notificações do navegador ativadas — os alertas abaixo vão aparecer mesmo com o app em segundo plano.';
                     btn.style.display = 'none';
+                    if (icon) { icon.innerHTML = '<i class="fas fa-check"></i>'; icon.style.background = '#28a745'; }
                 } else if (perm === 'denied') {
                     box.style.background = '#f8d7da'; box.style.border = '1px solid #dc3545';
                     txt.textContent = '🚫 Notificações bloqueadas nas permissões do navegador. Ative manualmente nas configurações do site para receber alertas fora do app.';
                     btn.style.display = 'none';
+                    if (icon) { icon.innerHTML = '<i class="fas fa-ban"></i>'; icon.style.background = '#dc3545'; }
                 } else {
                     box.style.background = '#fff3cd'; box.style.border = '1px solid #ffc107';
                     txt.textContent = '🔔 Notificações do navegador ainda não ativadas — os alertas abaixo só vão aparecer dentro do app até você ativar.';
                     btn.style.display = 'inline-block';
+                    if (icon) { icon.innerHTML = '<i class="fas fa-bell"></i>'; icon.style.background = 'linear-gradient(135deg,var(--primary),var(--secondary))'; }
                 }
             },
 
