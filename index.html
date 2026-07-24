@@ -9900,7 +9900,19 @@ body.dark-mode,
                 const hasAnyIDBData = MAIN_TABLES.some(k => (state[k] || []).length > 0);
                 if (!hasAnyIDBData) {
                     const backup = window.LocalStorageBackup && LocalStorageBackup.load(storeId);
-                    if (backup) {
+                    // ✅ FIX LOOP "IDB vazio": só entra no caminho de restauração se o
+                    // backup do localStorage TAMBÉM tiver dados de verdade. Antes, uma
+                    // loja genuinamente nova (sem vendas/clientes ainda, ex: Caucaia
+                    // recém-criada) tinha IDB vazio E backup vazio — mesmo assim o código
+                    // entrava aqui, disparava o warning, e agendava um rewriteAll(true)
+                    // que não escrevia nada (rewriteAll pula coleções vazias). Como
+                    // qualquer sync() subsequente (trocar de seção, abrir dashboard,
+                    // polling) rodava _fetchAllData de novo, o IDB continuava "vazio" e
+                    // o mesmo ciclo se repetia indefinidamente — poluindo o console e
+                    // fazendo trabalho inútil (regravação + tentativa de pull do Drive)
+                    // a cada disparo de sync, em vez de rodar só uma vez de verdade.
+                    const hasBackupData = backup && MAIN_TABLES.some(k => Array.isArray(backup[k]) && backup[k].length > 0);
+                    if (hasBackupData) {
                         console.warn('[LocalFirst] ⚠️ IDB vazio — restaurando do backup localStorage (', backup._ts, ')');
                         MAIN_TABLES.forEach(k => {
                             if (Array.isArray(backup[k]) && backup[k].length > 0) state[k] = backup[k];
