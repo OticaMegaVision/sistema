@@ -11164,6 +11164,30 @@ body.dark-mode,
             }
 
             // ── Obtém ou cria o fileId no Drive (por loja) ──────────────────
+            // ✅ FIX SINCRONIZAÇÃO ENTRE NAVEGADORES/DISPOSITIVOS: o Google Drive
+            // NÃO impede a existência de dois arquivos com o mesmo nome. Se dois
+            // dispositivos conectassem o Drive (ou trocassem de loja, que invalida
+            // o cache do fileId) perto o suficiente um do outro, os dois podiam
+            // rodar esta busca ao mesmo tempo, ambos verem "nenhum arquivo
+            // encontrado" e cada um CRIAR o seu próprio arquivo com o mesmo nome
+            // (ver gdrivePush mais abaixo). A partir daí, cada dispositivo ficava
+            // com um fileId diferente em cache — e passava a ler/escrever para
+            // sempre no seu próprio arquivo, nunca vendo as mudanças do outro.
+            // Era exatamente esse o sintoma: dois navegadores conectados ao mesmo
+            // tempo, cada um "travado" num valor diferente (ex: meta do mês),
+            // sem nunca convergir — porque na prática cada um sincronizava
+            // consigo mesmo, com dois arquivos-fantasma no Drive.
+            //
+            // Fix: se a busca por nome encontrar MAIS DE UM arquivo, a escolha
+            // deixa de ser "o primeiro que a API retornar" (ordem não garantida,
+            // podia divergir entre chamadas/dispositivos) e passa a ser sempre
+            // "o arquivo com modifiedTime mais recente" — critério determinístico
+            // que qualquer dispositivo, em qualquer navegador, calcula da mesma
+            // forma. Isso faz todos os dispositivos convergirem para o MESMO
+            // arquivo já na próxima sincronização, sem esperar o usuário notar.
+            // Os arquivos duplicados mais antigos são movidos para a lixeira do
+            // Drive (recuperáveis, nunca apagados de vez) para não confundir
+            // buscas futuras nem o próprio usuário olhando o Drive manualmente.
             async function _gdriveGetOrCreateFileId() {
                 const cachedId = _getGDriveFileId();
                 if (cachedId) return cachedId;
@@ -11174,11 +11198,37 @@ body.dark-mode,
                     { headers: { Authorization: 'Bearer ' + _gdriveToken.access_token } }
                 );
                 const found = await searchResp.json();
-                if (found.files?.[0]?.id) {
-                    _setGDriveFileId(found.files[0].id);
-                    return found.files[0].id;
+                const files = Array.isArray(found.files) ? found.files : [];
+                if (files.length === 0) return null; // Não existe — será criado no push
+
+                if (files.length === 1) {
+                    _setGDriveFileId(files[0].id);
+                    return files[0].id;
                 }
-                return null; // Não existe — será criado no push
+
+                // ⚠️ Mais de um arquivo com o mesmo nome — escolhe o mais recente
+                // de forma determinística (mesmo critério em qualquer dispositivo).
+                const sorted = files.slice().sort((a, b) => {
+                    const ta = a.modifiedTime ? new Date(a.modifiedTime).getTime() : 0;
+                    const tb = b.modifiedTime ? new Date(b.modifiedTime).getTime() : 0;
+                    return tb - ta; // mais recente primeiro
+                });
+                const winner = sorted[0];
+                console.warn('[CloudSync] ⚠️ ' + files.length + ' arquivos duplicados encontrados no Drive para "' +
+                    _fileName() + '" — usando o mais recente (' + winner.modifiedTime + ') e movendo os outros para a lixeira.');
+                // Move duplicatas antigas para a lixeira (best-effort, não bloqueia o fluxo principal)
+                sorted.slice(1).forEach(dup => {
+                    fetch('https://www.googleapis.com/drive/v3/files/' + dup.id, {
+                        method: 'PATCH',
+                        headers: {
+                            Authorization: 'Bearer ' + _gdriveToken.access_token,
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({ trashed: true })
+                    }).catch(() => {});
+                });
+                _setGDriveFileId(winner.id);
+                return winner.id;
             }
 
             // ── Obtém modifiedTime do arquivo no Drive ────────────────────────
@@ -11954,6 +12004,20 @@ body.dark-mode,
                 autoSync() { _schedulePush(); },
                 cancelPendingPush() { _cancelPendingPush(); },
                 forcePull() { return _activeProvider === 'gdrive' ? gdrivePull(false) : onedrivePull(false); },
+                // ✅ FIX: StoreManager.switchTo() tentava invalidar o cache do fileId
+                // do Drive ao trocar de loja usando `_gdriveFileIdCache`, uma
+                // propriedade que nunca existiu neste objeto — a chamada sempre foi
+                // um no-op silencioso (protegido por `?.`). Expõe aqui um método real
+                // que limpa o cache em memória E o localStorage para a loja informada,
+                // forçando a próxima sincronização a rebuscar (e, com o fix de
+                // duplicatas acima, deduplicar) o arquivo correto no Drive.
+                clearFileIdCache(storeId) {
+                    if (!storeId) return;
+                    delete _gdriveFileIds[storeId];
+                    delete _odFileIds[storeId];
+                    try { localStorage.removeItem('cs_gdrive_file_id_' + storeId); } catch(_e) {}
+                    try { localStorage.removeItem('cs_onedrive_file_id_' + storeId); } catch(_e) {}
+                },
                 _recordDeletion(storeId, col, id) { _recordDeletion(storeId, col, id); },
                 // ── Exposição pública do coletor de dados (para OPFS + exportação) ──
                 _collectAllDataPublic() { return _collectAllData(); },
@@ -25237,7 +25301,11 @@ const StoreManager = {
         IDB._cache['contas_financeiras_' + lojaId] = null;
         // FIX MULTI-LOJA: limpa file ID em memória da nova loja para forçar
         // re-busca do arquivo correto no Drive após troca de loja
-        try { if (window.CloudSync) { delete window.CloudSync._gdriveFileIdCache?.[lojaId]; } } catch(_e) {}
+        // ✅ FIX: chamava uma propriedade inexistente (`_gdriveFileIdCache`), que
+        // nunca limpava nada de verdade — corrigido para o método real exposto
+        // pelo CloudSync (ver `clearFileIdCache` — mesmo fix que resolve os
+        // arquivos duplicados/divergentes entre navegadores).
+        try { if (window.CloudSync) CloudSync.clearFileIdCache(lojaId); } catch(_e) {}
 
         // 4. Reseta state imediatamente (UI fica em branco por < 1s)
         // ✅ FIX MISTURA DE LOJAS CRÍTICO: config/notificacoes/backupConfig não
