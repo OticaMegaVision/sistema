@@ -9659,6 +9659,18 @@ body.dark-mode,
             }
             const run = window._syncMutexChain.then(async () => {
                 try {
+                    // ✅ WEBLOCKS ENTRE ABAS: a fila acima (_syncMutexChain) é uma
+                    // Promise em memória — só serializa chamadas DENTRO da MESMA aba.
+                    // Se o usuário abrir o sistema em duas abas (ou dois monitores),
+                    // cada aba tem sua própria fila e as duas podiam, em teoria,
+                    // gravar o mesmo documento ao mesmo tempo. navigator.locks é uma
+                    // trava do navegador (não da página), então serializa entre TODAS
+                    // as abas da mesma origem. Se o navegador não suportar (raro hoje
+                    // em dia), cai no fallback e mantém exatamente o comportamento
+                    // anterior — dentro da mesma aba continua 100% protegido.
+                    if (navigator.locks && typeof navigator.locks.request === 'function') {
+                        return await navigator.locks.request('optica-sync-' + (window._currentStore || 'barueri'), () => fn());
+                    }
                     return await fn();
                 } catch (e) {
                     console.error('[SyncMutex] ⚠️ Erro em "' + taskName + '":', e && e.message);
@@ -10087,8 +10099,8 @@ body.dark-mode,
                         // o rewriteAll pode gravá-los normalmente também.
                         const items = (state[stateKey] || []).filter(i => i && i.id);
                         if (!items.length) continue;
-                        for (let i = 0; i < items.length; i += 50) {
-                            const chunk = items.slice(i, i + 50);
+                        for (let i = 0; i < items.length; i += 100) {  // ✅ lote aumentado de 50 → 100 (docs pequenos, reduz nº de chamadas)
+                            const chunk = items.slice(i, i + 100);
                             const rows = chunk.map(item => ({
                                 doc_id:     String(item.id),
                                 store_id:   storeId,
@@ -10738,6 +10750,52 @@ body.dark-mode,
             }
 
             // ── Coleta TODOS os dados (incluindo company, logo e config) ─────
+            // ══════════════════════════════════════════════════════════════════
+            //  COMPRESSÃO NO UPLOAD PARA A NUVEM (Drive/OneDrive)
+            // ══════════════════════════════════════════════════════════════════
+            //  Antes o payload subia como JSON puro. Agora comprime com gzip
+            //  (reaproveitando exatamente a mesma rotina que o OPFS já usa para
+            //  os snapshots locais) antes de enviar — reduz o tráfego de rede,
+            //  especialmente relevante em conexão móvel.
+            //
+            //  COMPATIBILIDADE: a leitura (_fetchRemoteJSON) detecta sozinha se
+            //  o arquivo é gzip (pelos 2 primeiros bytes, assinatura 0x1f 0x8b)
+            //  ou JSON puro, e trata os dois casos. Isso garante que:
+            //   (a) arquivos antigos já salvos em JSON puro continuam sendo lidos
+            //       normalmente por esta versão;
+            //   (b) se, por qualquer motivo, uma aba ainda com a versão anterior
+            //       do app (cache do Service Worker) tentar ler um arquivo já
+            //       comprimido por esta versão, o JSON.parse direto falhará —
+            //       mas isso já cai dentro do try/catch que essas funções sempre
+            //       tiveram, então o pior caso é aquele dispositivo pular UM ciclo
+            //       de sync (sem travar nem corromper nada) até recarregar e
+            //       receber a versão nova pelo mecanismo de auto-update do SW
+            //       que já existe no app.
+            async function _compressForUpload(jsonStr) {
+                try {
+                    if (window.OPFS && typeof OPFS._compress === 'function') {
+                        const { data, compressed } = await OPFS._compress(jsonStr);
+                        if (compressed) return { blob: new Blob([data], { type: 'application/gzip' }), gzip: true };
+                    }
+                } catch(_e) {}
+                return { blob: new Blob([jsonStr], { type: 'application/json' }), gzip: false };
+            }
+
+            async function _fetchRemoteJSON(url, headers) {
+                const resp = await fetch(url, { headers, cache: 'no-store' });
+                if (!resp.ok) { const e = new Error('HTTP ' + resp.status); e.status = resp.status; e.response = resp; throw e; }
+                const buf = new Uint8Array(await resp.arrayBuffer());
+                // Assinatura gzip: primeiros 2 bytes = 0x1f 0x8b
+                const isGzip = buf.length > 2 && buf[0] === 0x1f && buf[1] === 0x8b;
+                let text;
+                if (isGzip && window.OPFS && typeof OPFS._decompress === 'function') {
+                    text = await OPFS._decompress(buf, true);
+                } else {
+                    text = new TextDecoder().decode(buf);
+                }
+                return JSON.parse(text);
+            }
+
             function _collectAllData() {
                 const storeId = window._currentStore || 'barueri';
                 // FIX: incluir contas financeiras no sync
@@ -11244,29 +11302,29 @@ body.dark-mode,
                     try {
                         const fileIdPre = await _gdriveGetOrCreateFileId();
                         if (fileIdPre) {
-                            const preResp = await fetch(
+                            // ✅ Compressão: leitura agora detecta gzip vs JSON puro sozinha
+                            const preRemote = await _fetchRemoteJSON(
                                 'https://www.googleapis.com/drive/v3/files/' + fileIdPre + '?alt=media',
-                                { headers: { Authorization: 'Bearer ' + _gdriveToken.access_token }, cache: 'no-store' }
+                                { Authorization: 'Bearer ' + _gdriveToken.access_token }
                             );
-                            if (preResp.ok) {
-                                const preRemote = await preResp.json();
-                                // ✅ FIX SEGURANÇA-SYNC: mesma fila do LocalFirst.sync — evita
-                                // que este pré-merge escreva company/config bem no meio de
-                                // uma leitura local concorrente.
-                                await _withSyncLock('cloud:gdrivePush-premerge', () => _applyCloudData(preRemote, true));
-                            }
+                            // ✅ FIX SEGURANÇA-SYNC: mesma fila do LocalFirst.sync — evita
+                            // que este pré-merge escreva company/config bem no meio de
+                            // uma leitura local concorrente.
+                            await _withSyncLock('cloud:gdrivePush-premerge', () => _applyCloudData(preRemote, true));
                         }
                     } catch(_mergeErr) {
                         console.warn('[CloudSync] merge pré-push (Drive) falhou — seguindo só com dados locais:', _mergeErr.message);
                     }
 
                     const data = JSON.stringify(_collectAllData(), null, 2);
+                    // ✅ Compressão gzip antes do envio — reduz o tráfego de rede.
+                    const { blob: uploadBlob, gzip: isGzip } = await _compressForUpload(data);
                     const fileId = await _gdriveGetOrCreateFileId();
                     if (fileId) {
                         // Atualiza arquivo existente
                         const r = await fetch(
                             'https://www.googleapis.com/upload/drive/v3/files/' + fileId + '?uploadType=media',
-                            { method: 'PATCH', headers: { Authorization: 'Bearer ' + _gdriveToken.access_token, 'Content-Type': 'application/json' }, body: data }
+                            { method: 'PATCH', headers: { Authorization: 'Bearer ' + _gdriveToken.access_token, 'Content-Type': isGzip ? 'application/gzip' : 'application/json' }, body: uploadBlob }
                         );
                         // Se 404 (arquivo deletado externamente), limpa cache e recria
                         if (r.status === 404) {
@@ -11278,7 +11336,7 @@ body.dark-mode,
                         const meta = JSON.stringify({ name: _fileName(), mimeType: 'application/json' });
                         const form = new FormData();
                         form.append('metadata', new Blob([meta], { type: 'application/json' }));
-                        form.append('file',     new Blob([data], { type: 'application/json' }));
+                        form.append('file',     uploadBlob);
                         const r = await fetch(
                             'https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id',
                             { method: 'POST', headers: { Authorization: 'Bearer ' + _gdriveToken.access_token }, body: form }
@@ -11347,11 +11405,10 @@ body.dark-mode,
                     // bate exatamente com o sintoma relatado: só um F5 completo (que
                     // o navegador trata de forma mais agressiva quanto a cache) trazia
                     // a mudança feita no outro navegador.
-                    const fileResp = await fetch(
+                    const remote = await _fetchRemoteJSON(
                         'https://www.googleapis.com/drive/v3/files/' + fileId + '?alt=media',
-                        { headers: { Authorization: 'Bearer ' + _gdriveToken.access_token }, cache: 'no-store' }
+                        { Authorization: 'Bearer ' + _gdriveToken.access_token }
                     );
-                    const remote = await fileResp.json();
                     // ✅ FIX SEGURANÇA-SYNC: aplica os dados da nuvem dentro do mutex
                     // compartilhado com LocalFirst.sync — garante que nenhuma leitura
                     // local do IDB rode no meio da aplicação+persistência do pull,
@@ -11574,23 +11631,22 @@ body.dark-mode,
                     // ✅ FIX RACE-CONDITION (mesmo problema do Google Drive, ver comentário
                     // equivalente em gdrivePush): mescla o remoto antes de sobrescrever.
                     try {
-                        const preResp = await fetch(
+                        const preRemote = await _fetchRemoteJSON(
                             'https://graph.microsoft.com/v1.0/me/drive/root:/' + encodeURIComponent(_fileName()) + ':/content',
-                            { headers: { Authorization: 'Bearer ' + _onedriveToken.access_token }, cache: 'no-store' }
+                            { Authorization: 'Bearer ' + _onedriveToken.access_token }
                         );
-                        if (preResp.ok) {
-                            const preRemote = await preResp.json();
-                            // ✅ FIX SEGURANÇA-SYNC: mesma fila do LocalFirst.sync (ver gdrivePull).
-                            await _withSyncLock('cloud:onedrivePush-premerge', () => _applyCloudData(preRemote, true));
-                        }
+                        // ✅ FIX SEGURANÇA-SYNC: mesma fila do LocalFirst.sync (ver gdrivePull).
+                        await _withSyncLock('cloud:onedrivePush-premerge', () => _applyCloudData(preRemote, true));
                     } catch(_mergeErr) {
                         console.warn('[CloudSync] merge pré-push (OneDrive) falhou — seguindo só com dados locais:', _mergeErr.message);
                     }
 
                     const data = JSON.stringify(_collectAllData(), null, 2);
+                    // ✅ Compressão gzip antes do envio — reduz o tráfego de rede.
+                    const { blob: uploadBlob, gzip: isGzip } = await _compressForUpload(data);
                     const r = await fetch(
                         'https://graph.microsoft.com/v1.0/me/drive/root:/' + encodeURIComponent(_fileName()) + ':/content',
-                        { method: 'PUT', headers: { Authorization: 'Bearer ' + _onedriveToken.access_token, 'Content-Type': 'application/json' }, body: data }
+                        { method: 'PUT', headers: { Authorization: 'Bearer ' + _onedriveToken.access_token, 'Content-Type': isGzip ? 'application/gzip' : 'application/json' }, body: uploadBlob }
                     );
                     if (r.ok) {
                         const d = await r.json();
@@ -11625,7 +11681,15 @@ body.dark-mode,
                         if (!silent) Toast.show('⚠️ Nenhum arquivo encontrado no OneDrive.', 'warning');
                         _pulling = false; return;
                     }
-                    const remote = await r.json();
+                    // ✅ Compressão: detecta gzip (assinatura 0x1f 0x8b) vs JSON puro —
+                    // mesma lógica de _fetchRemoteJSON, aqui inline porque já temos a
+                    // Response (e o guard de 404 acima precisa dela intacta).
+                    const buf = new Uint8Array(await r.arrayBuffer());
+                    const isGzipResp = buf.length > 2 && buf[0] === 0x1f && buf[1] === 0x8b;
+                    const remoteText = (isGzipResp && window.OPFS && typeof OPFS._decompress === 'function')
+                        ? await OPFS._decompress(buf, true)
+                        : new TextDecoder().decode(buf);
+                    const remote = JSON.parse(remoteText);
                     // ✅ FIX SYNC CRÍTICO: ver comentário equivalente em gdrivePull() —
                     // removida a checagem de "_ts não mudou, pular", que podia deixar
                     // o app sem detectar uma mudança real por vários ciclos de poll.
@@ -15060,8 +15124,8 @@ tbody tr td{border:1.5px solid #000;padding:2mm;text-align:center;font-weight:70
                         // (ex: todos os clientes deletados), precisamos gravar o estado vazio
                         // para que na próxima carga do IDB os dados apareçam deletados.
                         if (items.length > 0) {
-                            for (let i = 0; i < items.length; i += 50) {
-                                const chunk = items.slice(i, i + 50);
+                            for (let i = 0; i < items.length; i += 100) {  // ✅ lote aumentado de 50 → 100 (docs pequenos, reduz nº de chamadas)
+                                const chunk = items.slice(i, i + 100);
                                 const rows = chunk.map(item => ({
                                     doc_id: String(item.id),
                                     store_id: storeId,
@@ -15404,8 +15468,8 @@ tbody tr td{border:1.5px solid #000;padding:2mm;text-align:center;font-weight:70
                                     const items = (state[stateKey] || []).filter(i => i && i.id);
                                     if (!items.length) continue;
                                     const col = _COL_MAP[stateKey];
-                                    for (let i = 0; i < items.length; i += 50) {
-                                        const chunk = items.slice(i, i + 50);
+                                    for (let i = 0; i < items.length; i += 100) {  // ✅ lote aumentado de 50 → 100 (docs pequenos, reduz nº de chamadas)
+                                        const chunk = items.slice(i, i + 100);
                                         const rows = chunk.map(item => {
                                             if (!item.updated_at) item.updated_at = now;
                                             return {
