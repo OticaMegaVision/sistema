@@ -10623,7 +10623,7 @@ body.dark-mode,
             const POLL_ACTIVE_MS          = 5000;   // ✅ CORRIGIDO: 15s → 5s (bate com o texto "sync a cada 5s" da UI)
             const POLL_BACKGROUND_MS      = 15000;  // ✅ REDUZIDO: 45s → 15s em background (aba oculta) — ainda evita gasto excessivo de bateria/dados, mas sincroniza bem mais rápido
             const POLL_INTERVAL_MS        = POLL_ACTIVE_MS;
-            const PUSH_DEBOUNCE_MS        = 500;     // ✅ REDUZIDO: 800ms → 500ms — push mais rápido após a última mudança, mantendo folga suficiente para não disparar 1 upload por tecla digitada
+            const PUSH_DEBOUNCE_MS        = 800;     // push 0.8s após última mudança
 
             let _gdriveToken    = null;
             let _onedriveToken  = null;
@@ -10964,22 +10964,8 @@ body.dark-mode,
                 if (remote.notificacoes && typeof remote.notificacoes === 'object') {
                     state.notificacoes = Object.assign({}, remote.notificacoes, state.notificacoes || {});
                 }
-                // ✅ FIX SYNC BACKUP AUTOMÁTICO MULTI-DISPOSITIVO: antes o valor LOCAL
-                // sempre "vencia" o remoto para qualquer chave já presente — e como
-                // backupConfig tem todas as chaves preenchidas desde a inicialização
-                // (autoEnabled/hour/keepDays), o valor vindo da nuvem NUNCA era
-                // aplicado de fato. Isso fazia com que ativar/mudar o backup
-                // automático num aparelho nunca refletisse nos outros. Agora usa a
-                // MESMA regra de segurança já aplicada a company/config acima
-                // (localConfigIsNewer): se houve edição local nos últimos 10s ainda
-                // não confirmada na nuvem, mantém o valor local; caso contrário,
-                // aplica o valor remoto (mais recente ou vindo de outro dispositivo).
                 if (remote.backupConfig && typeof remote.backupConfig === 'object') {
-                    if (localConfigIsNewer) {
-                        // edição local recente — mantém valores em memória por enquanto
-                    } else {
-                        state.backupConfig = Object.assign({}, state.backupConfig || {}, remote.backupConfig);
-                    }
+                    state.backupConfig = Object.assign({}, remote.backupConfig, state.backupConfig || {});
                 }
                 if (remote.lastOsCounter && typeof remote.lastOsCounter === 'object') state.lastOsCounter = { ...(state.lastOsCounter || {}), ...remote.lastOsCounter };
                 // ✅ FIX SYNC CRÍTICO: merge item-por-item nas contas financeiras
@@ -11047,18 +11033,7 @@ body.dark-mode,
                 // SEM toasts e SEM cloud push-back, quebrando o ciclo pull→push→pull
                 await LocalFirst.rewriteAll(true);
                 // Atualiza backup localStorage após pull do Drive (dados mais recentes)
-                // ✅ FIX BACKUP LOCAL MULTI-LOJA: antes chamava LocalStorageBackup.save()
-                // SEM o storeId. Como save() sem argumento usa window._currentStore no
-                // momento da chamada — e esta função é assíncrona (várias awaits acima) —
-                // se o usuário trocasse de loja ENQUANTO um pull da loja anterior ainda
-                // estava em andamento, o backup local era salvo na chave da loja NOVA
-                // (window._currentStore atual) mas com os dados da loja ANTERIOR (que
-                // acabaram de ser mesclados em `state` por este pull). Isso é exatamente
-                // o "backup local sincronizando a loja errada". Ao passar `storeId`
-                // (capturado no topo desta função, antes de qualquer troca), o guard
-                // interno de LocalStorageBackup.save() volta a funcionar de verdade:
-                // se storeId != window._currentStore, o salvamento é bloqueado.
-                try { if (window.LocalStorageBackup) LocalStorageBackup.save(storeId); } catch(_e) {}
+                try { if (window.LocalStorageBackup) LocalStorageBackup.save(); } catch(_e) {}
                 // Re-renderiza toda a UI
                 try { Dashboard.update(); }             catch(e) {}
                 try { Config.load?.(); }                catch(e) {}
@@ -11072,10 +11047,6 @@ body.dark-mode,
                 try { Suppliers.renderTable?.(); }      catch(e) {}
                 try { Utils.updatePixKey?.(); }         catch(e) {}
                 try { ContasManager.renderAll?.(); }    catch(e) {}
-                // ✅ Atualiza o painel "Backup Automático Diário" se estiver aberto —
-                // sem isso, o valor de backupConfig sincronizado de outro dispositivo
-                // (fix acima) só apareceria na tela após reabrir a aba manualmente.
-                try { if (document.getElementById('tabBackup')?.style.display !== 'none') Config.renderBackupStatus?.(); } catch(e) {}
                 try { setTimeout(() => window.RxDBPanel?.refresh(), 500); } catch(e) {}
                 // Salva timestamp do último pull
                 localStorage.setItem(_lsPullTsKey(), remote._ts || new Date().toISOString());
@@ -25125,6 +25096,18 @@ window.AuthSystem = AuthSystem;
 // ==================== STORE MANAGER ====================
 const StoreManager = {
     _STORE_PREF_KEY: 'otica_current_store',
+    // ✅ FIX MISTURA DE LOJAS (RAIZ DO PROBLEMA): switchTo() fazia sua PRÓPRIA
+    // leitura assíncrona do IndexedDB e gravava direto em `state`, fora do
+    // mutex usado por LocalFirst (_withSyncLock) e sem nenhuma proteção contra
+    // reentrância. Se o usuário trocasse de loja duas vezes rápido (ou clicasse
+    // de novo antes da 1ª troca terminar), a chamada MAIS ANTIGA podia terminar
+    // DEPOIS da mais nova e sobrescrever `state.clients/sales/products/...` com
+    // os dados da loja ANTERIOR — mesmo com window._currentStore já apontando
+    // para a loja nova. Esse era o mecanismo real da "mistura entre lojas".
+    // _switchGen é incrementado a cada chamada de switchTo(); qualquer chamada
+    // cujo número de geração não seja mais o mais recente ao terminar seu
+    // trabalho assíncrono é descartada sem tocar em `state` ou na UI.
+    _switchGen: 0,
     _lojas: {
         barueri: { label: 'Barueri', fullLabel: 'Loja Barueri' },
         caucaia: { label: 'Caucaia do Alto', fullLabel: 'Loja Caucaia do Alto' }
@@ -25212,6 +25195,10 @@ const StoreManager = {
         if (!this._lojas[lojaId]) return;
         if (lojaId === window._currentStore) { this.closeModal(); return; }
 
+        // ✅ FIX MISTURA DE LOJAS: token desta chamada específica. Comparado
+        // depois de cada trecho assíncrono (ver comentário no topo do objeto).
+        const myGen = ++this._switchGen;
+
         const loja = this._lojas[lojaId];
         this.closeModal();
 
@@ -25277,77 +25264,45 @@ const StoreManager = {
         this._updateUI();
         Toast.show('⏳ ' + loja.fullLabel + ' — carregando...', 'info', 1500);
 
-        // 6. Busca dados da nova loja do IndexedDB (RxDB v17 — native IDB)
+        // 6. Busca dados da nova loja — DELEGADO ao pipeline único e protegido
+        // ✅ FIX MISTURA DE LOJAS (correção definitiva): este bloco fazia sua
+        // própria leitura do IndexedDB e escrevia direto em `state`, fora do
+        // mutex _withSyncLock usado por LocalFirst. Se outra troca de loja (ou
+        // um pull/broadcast concorrente) terminasse fora de ordem, os dados da
+        // loja ERRADA eram gravados em `state` sem nenhuma checagem. Agora toda
+        // leitura de dados passa exclusivamente por LocalFirst.switchStore(),
+        // que roda dentro do mesmo mutex usado por todo o resto do app — só uma
+        // operação de leitura/escrita em `state` roda por vez, nunca duas.
         try {
-            const db = await _openIDB();
-            const rows = await new Promise((res, rej) => {
-                const tx  = db.transaction('otica_data', 'readonly');
-                const idx = tx.objectStore('otica_data').index('store_id');
-                const req = idx.getAll(IDBKeyRange.only(lojaId));
-                req.onsuccess = () => res(req.result || []);
-                req.onerror   = () => rej(req.error);
-            });
+            await LocalFirst.switchStore(lojaId);
 
-                // Popula state com os dados recebidos
-                const byCol = {};
-                rows.forEach(row => {
-                    if (!byCol[row.collection]) byCol[row.collection] = [];
-                    byCol[row.collection].push({ ...row.data, _docId: row.doc_id });
-                });
-                const colMap = { clients:'clients', products:'products', sales:'sales',
-                    expenses:'expenses', prescriptions:'prescriptions',
-                    suppliers:'suppliers', services:'services' };
-                Object.keys(colMap).forEach(k => { if (byCol[colMap[k]]) state[k] = byCol[colMap[k]]; });
+            // ✅ Guarda de geração: se o usuário trocou de loja de novo (ou já
+            // estamos em outra loja) enquanto este await estava pendente, esta
+            // chamada é obsoleta — aborta ANTES de tocar em qualquer UI ou
+            // gravar preferências, para não sobrepor o resultado da troca mais
+            // recente com um toast/estado desatualizado.
+            if (myGen !== this._switchGen || window._currentStore !== lojaId) return;
 
-                // Config da empresa
-                const cfgRows = byCol['config'] || [];
-                // ✅ FIX MISTURA DE LOJAS: também lê o doc 'main' (mesma fonte usada por
-                // LocalFirst._fetchAllData no boot normal) — state.config só é persistido
-                // ali, nunca no doc 'empresa'. Sem isso, state.config da loja nova nunca
-                // era carregado durante a troca de loja.
-                const main = cfgRows.find(d => d._docId === 'main');
-                if (main) {
-                    if (main.config)        Object.assign(state.config, main.config);
-                    if (main.company)       Object.assign(state.company, main.company);
-                    if (main.lastOsCounter) state.lastOsCounter = { ...state.lastOsCounter, ...main.lastOsCounter };
-                }
-                const emp = cfgRows.find(d => d._docId === 'empresa');
-                if (emp) {
-                    if (emp.company)       Object.assign(state.company, emp.company);
-                    if (emp.notificacoes)  Object.assign(state.notificacoes, emp.notificacoes);
-                    if (emp.backupConfig)  Object.assign(state.backupConfig, emp.backupConfig);
-                    if (emp.lastOsCounter) state.lastOsCounter = { ...state.lastOsCounter, ...emp.lastOsCounter };
-                    if (state.company.primaryColor)   document.documentElement.style.setProperty('--primary', state.company.primaryColor);
-                    if (state.company.secondaryColor) document.documentElement.style.setProperty('--secondary', state.company.secondaryColor);
-                }
-                // Contas financeiras
-                const contas = cfgRows.find(d => d._docId === 'contas_financeiras');
-                IDB._cache['contas_financeiras_' + lojaId] = JSON.stringify(contas?.items || []);
+            // Aplica cor da loja (LocalFirst.switchStore já popula state.company)
+            if (state.company.primaryColor)   document.documentElement.style.setProperty('--primary', state.company.primaryColor);
+            if (state.company.secondaryColor) document.documentElement.style.setProperty('--secondary', state.company.secondaryColor);
 
+            // Passos de UI específicos do seletor de loja que o sync genérico
+            // (LocalFirst.sync) não cobre:
+            try { Config.renderBackupStatus?.(); } catch(e) {}
+            Utils.updatePixKey();
+            // FIX BUG#4: restaura preferência de ocultar valores para a nova loja
+            try { Dashboard._restoreHideValues?.(); } catch(e) {}
 
-                // Atualiza UI completa
-                App.updateCompanyDisplay();
-                try { Config.load(); } catch(e) {}
-                // ✅ FIX MISTURA DE LOJAS: re-renderiza a tela de Backup Automático com o
-                // state.backupConfig já correto da loja nova (antes ficava com o visual
-                // da loja anterior até o usuário reabrir a aba manualmente).
-                try { Config.renderBackupStatus?.(); } catch(e) {}
-                Utils.updatePixKey();
-                // FIX BUG#4: restaura preferência de ocultar valores para a nova loja
-                try { Dashboard._restoreHideValues?.(); } catch(e) {}
-                try { Clients.renderTable?.(); }   catch(e) {}
-                try { Products.renderTable?.(); }  catch(e) {}
-                try { Sales.renderHistory?.(); }   catch(e) {}
-                try { Expenses.renderTable?.(); Expenses.updateSummary?.(); } catch(e) {}
-                try { Services.renderTable?.(); }  catch(e) {}
-                try { Suppliers.renderTable?.(); } catch(e) {}
-                Dashboard.update().catch(()=>{});
+            Toast.show('✅ ' + loja.fullLabel + ' carregada!', 'success', 2000);
+        } catch(e) {
+            console.warn('[StoreManager] Erro ao carregar loja:', e.message);
+            Toast.show('⚠️ Erro ao carregar dados — tente novamente', 'warning', 3000);
+        }
 
-                Toast.show('✅ ' + loja.fullLabel + ' carregada!', 'success', 2000);
-            } catch(e) {
-                console.warn('[StoreManager] Erro ao carregar loja:', e.message);
-                Toast.show('⚠️ Erro ao carregar dados — tente novamente', 'warning', 3000);
-            }
+        // Se uma troca mais nova já começou, para por aqui — os passos 7 e 8
+        // abaixo pertencem à chamada mais recente, não a esta.
+        if (myGen !== this._switchGen || window._currentStore !== lojaId) return;
 
         // 7. Reinicia listeners local-first para a nova loja
         try {
@@ -25359,9 +25314,17 @@ const StoreManager = {
         // 8. FIX MULTI-LOJA: pull imediato do Drive para a nova loja
         // Garante que Caucaia e Barueri sempre tenham seus dados mais recentes
         // ao trocar de loja, mesmo que o sync automático ainda não tenha rodado.
+        // (CloudSync._applyCloudData já rejeita, por conta própria, qualquer
+        // arquivo remoto cujo _store não bata com a loja ativa no momento em
+        // que o download termina — ver comentário "FIX CRÍTICO — VALIDAÇÃO DE
+        // LOJA" — então mesmo que o usuário troque de loja de novo durante o
+        // download, o dado da loja errada não é aplicado.)
         try {
             if (window.CloudSync && CloudSync.connected) {
-                setTimeout(() => CloudSync.forcePull().catch(()=>{}), 600);
+                setTimeout(() => {
+                    if (window._currentStore !== lojaId) return;
+                    CloudSync.forcePull().catch(()=>{});
+                }, 600);
             }
         } catch(_e) {}
     }
