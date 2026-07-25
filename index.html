@@ -23581,34 +23581,11 @@ ${container.innerHTML}
                 sale.status = novoStatus;
                 sale._updatedAt = new Date().toISOString();
                 App.saveData();
-                // ✅ FIX SYNC STATUS: além do pushItem local (IndexedDB), força o
-                // envio IMEDIATO pra nuvem (Drive/OneDrive), sem esperar o debounce
-                // duplo (1.5s do LocalFirst + 0.8s do CloudSync = até 2.3s antes do
-                // upload nem começar). Outros campos toleram esse atraso porque o
-                // usuário normalmente leva mais tempo entre editar e sair da tela;
-                // o clique no botão de status costuma ser seguido de fechar o modal
-                // ou trocar de tela quase na hora, perdendo a janela do debounce.
-                Sales._forcarPushImediato(sale);
+                if (window.LocalFirst) LocalFirst.pushItem('sales', sale);
                 Sales.renderHistory();
                 Dashboard.update().catch(()=>{});
                 if (typeof ContasManager !== 'undefined') { try { ContasManager.renderAll?.(); } catch(e) {} }
                 Toast.show('Status: ' + btnEl.textContent.trim(), 'success');
-            },
-
-            // ✅ Helper compartilhado: pushItem local + push imediato à nuvem,
-            // ignorando o debounce (usado por mudanças que costumam ser seguidas
-            // de fechar a tela/modal quase na hora, como o status da venda).
-            _forcarPushImediato(sale) {
-                if (!window.LocalFirst) return;
-                LocalFirst.pushItem('sales', sale).then(() => {
-                    if (!window.CloudSync) return;
-                    window.CloudSync.cancelPendingPush();
-                    const provider = window.CloudSync.provider;
-                    const pushFn = provider === 'gdrive' ? window.CloudSync.gdrivePush
-                                 : provider === 'onedrive' ? window.CloudSync.onedrivePush
-                                 : null;
-                    if (pushFn) pushFn(true).catch(() => {});
-                }).catch(() => {});
             },
 
             // Mantidos por compatibilidade
@@ -23621,7 +23598,7 @@ ${container.innerHTML}
                 sale.status = sel.value;
                 sale._updatedAt = new Date().toISOString();
                 App.saveData();
-                Sales._forcarPushImediato(sale);
+                if (window.LocalFirst) LocalFirst.pushItem('sales', sale);
                 Sales.renderHistory();
                 Dashboard.update().catch(()=>{});
                 if (typeof ContasManager !== 'undefined') { try { ContasManager.renderAll?.(); } catch(e) {} }
