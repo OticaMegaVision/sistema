@@ -15552,7 +15552,7 @@ tbody tr td{border:1.5px solid #000;padding:2mm;text-align:center;font-weight:70
                         try {
                             const prev = document.getElementById('configLogoPreview');
                             const ph   = document.getElementById('configLogoPlaceholder');
-                            if (prev) { prev.src = e.target.result; prev.style.display = 'block'; }
+                            if (prev) { prev.src = state.company.logo; prev.style.display = 'block'; }
                             if (ph)   ph.style.display = 'none';
                         } catch(_e) {}
                         Toast.show('Logo atualizada com sucesso!');
