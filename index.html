@@ -9961,28 +9961,49 @@ body.dark-mode,
                 if (!item || !item.id) return;
                 const storeId = window._currentStore || 'barueri';
                 const col = _COL_MAP[table] || table;
-                const now = new Date().toISOString();
-                // ✅ FIX SYNC CRÍTICO: sempre usa timestamp fresco ao empurrar uma mudança.
-                // Antes: "item._updatedAt || now" reaproveitava um _updatedAt antigo (de um
-                // push anterior) sempre que o código que chamou pushItem só atualizava o campo
-                // "updated_at" (nome errado, não é o campo lido pelo merge). Resultado: o merge
-                // em _applyCloudData comparava timestamps desatualizados e podia manter a versão
-                // antiga (ex: parcela não paga) de outro dispositivo, fazendo a baixa "sumir".
-                // Agora: toda chamada a pushItem representa uma mudança local recém-feita,
-                // então SEMPRE gravamos "now" — nunca um _updatedAt herdado.
-                const doc = { ...item, _store: storeId, _updatedAt: now };
-                try {
-                    await sbUpsertDoc(storeId, col, item.id, doc);
-                    // Atualiza o item no state local com _updatedAt para manter consistência
-                    if (Array.isArray(state[table])) {
-                        const idx = state[table].findIndex(i => i && i.id === item.id);
-                        if (idx >= 0) state[table][idx] = { ...state[table][idx], _updatedAt: doc._updatedAt };
-                    }
-                    // OPFS mirror
-                    OPFS.writeJSON('last_change.json', { table, id: item.id, ts: Date.now() }).catch(()=>{});
-                    // Cloud auto-sync (debounced)
-                    this._scheduleCloudSync();
-                } catch(e) { console.error('[RxDB v17] pushItem:', table, e.message); }
+
+                // ✅ MELHORIA #2: Web Locks entre abas. O mutex _withSyncLock já usado
+                // neste arquivo só serializa operações DENTRO da mesma aba (é uma
+                // variável em memória) — duas abas/dispositivos diferentes gravando o
+                // MESMO documento ao mesmo tempo não eram protegidos por ele.
+                // navigator.locks.request() é nativo do navegador e vale ENTRE abas da
+                // mesma origem: garante que só uma aba grave este documento específico
+                // por vez. Isso é uma camada A MAIS sobre a correção já aplicada em
+                // ContasManager/darBaixaVenda (releitura da venda mais recente antes de
+                // gravar) — não substitui aquela correção, reforça. Em navegadores sem
+                // suporte a Web Locks (ou se a API falhar por qualquer motivo), cai de
+                // volta no comportamento direto, exatamente como já funcionava.
+                const run = async () => {
+                    const now = new Date().toISOString();
+                    // ✅ FIX SYNC CRÍTICO: sempre usa timestamp fresco ao empurrar uma mudança.
+                    // Antes: "item._updatedAt || now" reaproveitava um _updatedAt antigo (de um
+                    // push anterior) sempre que o código que chamou pushItem só atualizava o campo
+                    // "updated_at" (nome errado, não é o campo lido pelo merge). Resultado: o merge
+                    // em _applyCloudData comparava timestamps desatualizados e podia manter a versão
+                    // antiga (ex: parcela não paga) de outro dispositivo, fazendo a baixa "sumir".
+                    // Agora: toda chamada a pushItem representa uma mudança local recém-feita,
+                    // então SEMPRE gravamos "now" — nunca um _updatedAt herdado.
+                    const doc = { ...item, _store: storeId, _updatedAt: now };
+                    try {
+                        await sbUpsertDoc(storeId, col, item.id, doc);
+                        // Atualiza o item no state local com _updatedAt para manter consistência
+                        if (Array.isArray(state[table])) {
+                            const idx = state[table].findIndex(i => i && i.id === item.id);
+                            if (idx >= 0) state[table][idx] = { ...state[table][idx], _updatedAt: doc._updatedAt };
+                        }
+                        // OPFS mirror
+                        OPFS.writeJSON('last_change.json', { table, id: item.id, ts: Date.now() }).catch(()=>{});
+                        // Cloud auto-sync (debounced)
+                        this._scheduleCloudSync();
+                    } catch(e) { console.error('[RxDB v17] pushItem:', table, e.message); }
+                };
+
+                if (typeof navigator !== 'undefined' && navigator.locks && navigator.locks.request) {
+                    const lockName = 'ovp-push:' + storeId + ':' + col + ':' + item.id;
+                    try { await navigator.locks.request(lockName, run); return; }
+                    catch(_lockErr) { /* Web Locks indisponível/falhou — segue sem trava abaixo */ }
+                }
+                await run();
             },
 
             // ── deleteItem ────────────────────────────────────────────────────
@@ -9990,15 +10011,28 @@ body.dark-mode,
                 if (!id) return;
                 const storeId = window._currentStore || 'barueri';
                 const col = _COL_MAP[table] || table;
-                try {
-                    await sbDeleteDoc(storeId, col, id);
-                    // FIX DELETE-SYNC: registra tombstone
-                    try { if (window.CloudSync) CloudSync._recordDeletion(storeId, col, id); } catch(_e) {}
-                    // Push imediato após deleção
-                    try { if (window.CloudSync) CloudSync.autoSync(); } catch(e) {}
-                    // Agenda snapshot OPFS após deleção
-                    try { OPFS.scheduleSnapshot(storeId); } catch(_e) {}
-                } catch(e) { console.error('[RxDB v17] deleteItem:', table, e.message); }
+
+                // ✅ MELHORIA #2 (mesma proteção de deleteItem): evita que uma aba
+                // delete e outra aba, ao mesmo tempo, tente gravar/atualizar o mesmo
+                // documento — Web Locks serializa isso entre abas.
+                const run = async () => {
+                    try {
+                        await sbDeleteDoc(storeId, col, id);
+                        // FIX DELETE-SYNC: registra tombstone
+                        try { if (window.CloudSync) CloudSync._recordDeletion(storeId, col, id); } catch(_e) {}
+                        // Push imediato após deleção
+                        try { if (window.CloudSync) CloudSync.autoSync(); } catch(e) {}
+                        // Agenda snapshot OPFS após deleção
+                        try { OPFS.scheduleSnapshot(storeId); } catch(_e) {}
+                    } catch(e) { console.error('[RxDB v17] deleteItem:', table, e.message); }
+                };
+
+                if (typeof navigator !== 'undefined' && navigator.locks && navigator.locks.request) {
+                    const lockName = 'ovp-push:' + storeId + ':' + col + ':' + id;
+                    try { await navigator.locks.request(lockName, run); return; }
+                    catch(_lockErr) { /* Web Locks indisponível/falhou — segue sem trava abaixo */ }
+                }
+                await run();
             },
 
             // ── pushConfig ────────────────────────────────────────────────────
@@ -10134,6 +10168,24 @@ body.dark-mode,
             _cloudSyncTimer: null,
             _scheduleCloudSync() {
                 clearTimeout(this._cloudSyncTimer);
+
+                // ✅ MELHORIA #1: Background Sync (Service Worker) — quando o usuário
+                // está OFFLINE, o setTimeout normal abaixo não adianta: se a conexão só
+                // voltar depois que a aba for fechada, o autoSync() nunca chega a rodar.
+                // Aqui registramos a tag 'sync-data' junto ao navegador; se o SW suportar
+                // Background Sync, o PRÓPRIO NAVEGADOR dispara o evento 'sync' assim que a
+                // conexão voltar — mesmo com a aba fechada — e o sw.js pode então acordar
+                // a página (ou, num sw.js mais completo, reenviar os dados pendentes
+                // diretamente). Isso é 100% aditivo: só roda quando offline, não muda em
+                // nada o caminho normal (online) do debounce de 1.5s logo abaixo. Em
+                // navegadores sem suporte (Safari/Firefox) o try/catch simplesmente ignora,
+                // caindo de volta no comportamento já existente via evento 'online'.
+                if (!navigator.onLine && 'serviceWorker' in navigator) {
+                    navigator.serviceWorker.ready.then(reg => {
+                        if (reg && reg.sync) reg.sync.register('sync-data').catch(() => {});
+                    }).catch(() => {});
+                }
+
                 this._cloudSyncTimer = setTimeout(() => {
                     try { if (window.CloudSync) CloudSync.autoSync(); } catch(e) {}
                     // Agenda snapshot OPFS junto ao cloud sync (debounce 60s)
@@ -12812,8 +12864,29 @@ body.dark-mode,
                     const obs     = overlay.querySelector('#_vbxObs')?.value?.trim() || '';
                     if (paidVal <= 0) { Toast.show('Informe um valor válido','warning'); return; }
                     this._vbxExecuting = true; this.disabled = true; this.textContent = '⏳ Salvando...';
+
+                    // ✅ FIX SYNC "baixa duplicada entre dispositivos": a variável 'sale'
+                    // foi capturada quando o modal foi ABERTO. Entre abrir o modal e o
+                    // usuário clicar em Confirmar (podem ser vários segundos preenchendo
+                    // valor/forma de pagamento), um sync em segundo plano — BroadcastChannel
+                    // de outra aba, ou pull da nuvem vindo de outro dispositivo/navegador —
+                    // pode ter substituído essa venda em state.sales por uma versão mais
+                    // nova (ex: outra parcela já paga em outro aparelho). Se gravássemos
+                    // em cima do objeto antigo, a baixa aplicada aqui apagaria essa mudança
+                    // vinda de fora, obrigando o usuário a repetir a baixa depois.
+                    // Por isso relemos a venda mais atual de state.sales agora, no exato
+                    // momento da confirmação — mesmo padrão já usado em ContasManager.darBaixa.
+                    const freshSale = (state.sales || []).find(s => s.id === sale.id);
+                    if (!freshSale) {
+                        this._vbxExecuting = false; this.disabled = false; this.textContent = '✔ Confirmar Baixa';
+                        overlay.remove();
+                        Toast.show('⚠️ Esta venda foi alterada em outro dispositivo. Atualize a lista e tente novamente.', 'warning', 5000);
+                        ContasManager.renderAll().catch(()=>{});
+                        return;
+                    }
+
                     overlay.remove();
-                    ContasManager._executarBaixaVenda(itemId, tipo, sale, paidVal, forma, itemValor, itemDescricao, itemCliente, itemCategoria, itemVencimento, obs);
+                    ContasManager._executarBaixaVenda(itemId, tipo, freshSale, paidVal, forma, itemValor, itemDescricao, itemCliente, itemCategoria, itemVencimento, obs);
                 };
             },
 
@@ -24223,8 +24296,15 @@ ${container.innerHTML}
 
   if ('serviceWorker' in navigator) {
     window.addEventListener('load', function() {
-      navigator.serviceWorker.register('./sw.js', {scope:'./'}).then(function(reg) {
+      // ✅ MELHORIA #3: updateViaCache:'none' garante que o navegador NUNCA sirva
+      // o sw.js (nem os scripts que ele importa) a partir do cache HTTP comum ao
+      // checar por atualizações — só o próprio SW decide o que fica em cache via
+      // Cache Storage. Sem isso, um proxy/cache do navegador podia "prender" uma
+      // versão antiga do sw.js e atrasar (às vezes por dias) a detecção de nova
+      // versão do app.
+      navigator.serviceWorker.register('./sw.js', {scope:'./', updateViaCache: 'none'}).then(function(reg) {
         swReg = reg;
+        window._swReg = reg; // exposto globalmente para uso pelo LocalFirst (Background Sync)
         console.log('[PWA] SW registrado:', reg.scope);
         reg.addEventListener('updatefound', function() {
           var nw = reg.installing;
