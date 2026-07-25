@@ -7216,6 +7216,13 @@ body.dark-mode,
 
                 <!-- ── ABA CLIENTES & LTV ── -->
                 <div id="crmTabClientes" class="crm-tab" style="display:none;">
+                    <div class="cliente-card" style="margin-bottom:1rem;">
+                        <div style="display:flex;align-items:center;gap:0.6rem;margin-bottom:0.6rem;">
+                            <h3 style="margin:0;">🎯 PRIORIDADE DE CONTATO HOJE</h3>
+                        </div>
+                        <p style="font-size:0.8rem;color:var(--gray);margin-bottom:0.8rem;">Clientes com maior propensão de compra agora, combinando LTV, tempo sem comprar e aniversário — sugestão de quem contatar primeiro.</p>
+                        <div id="crmPriorityList"></div>
+                    </div>
                     <div class="cliente-card">
                         <div style="display:flex;align-items:center;gap:1rem;margin-bottom:0.8rem;flex-wrap:wrap;">
                             <h3 style="margin:0;">📊 CLIENTES — LTV & SEGMENTAÇÃO</h3>
@@ -10693,6 +10700,21 @@ body.dark-mode,
             let _pendingDeletions = {}; // ex: { 'barueri|sales|V-001': '2025-01-01T10:00:00Z' }
             const TOMBSTONE_TTL_MS = 7 * 24 * 60 * 60 * 1000; // 7 dias
 
+            // ── RETRY: reenvio automático quando o push para a nuvem falha ──
+            // gdrivePush/onedrivePush já reenviam o SNAPSHOT COMPLETO (não é uma
+            // fila por-item), então não precisamos guardar operações individuais:
+            // basta garantir que, se o upload falhar (rede caiu, 5xx, timeout), o
+            // sistema tente de novo sozinho. Hoje só tentava de novo na PRÓXIMA
+            // edição do usuário — uma venda feita e o celular ficar sem sinal
+            // podia nunca ser reenviada. Backoff exponencial (10s→20s→40s...,
+            // teto 2min) evita martelar a API quando a rede está mesmo fora.
+            let _retryTimer       = null;
+            let _retryAttempt     = 0;
+            const RETRY_BASE_MS   = 10000;   // primeira nova tentativa em 10s
+            const RETRY_MAX_MS    = 120000;  // teto de 2min entre tentativas
+            const RETRY_MAX_TRIES = 8;       // depois disso, só no próximo online/edição
+            const PENDING_PUSH_KEY = 'cs_pending_push_v1';
+
             function _recordDeletion(storeId, col, id) {
                 const key = storeId + '|' + col + '|' + String(id);
                 _pendingDeletions[key] = new Date().toISOString();
@@ -11378,8 +11400,9 @@ body.dark-mode,
                     _updateStatus('🟢 Enviado às ' + now + ' — polling a cada ' + (POLL_ACTIVE_MS/1000) + 's');
                     _showSyncIndicator('↑ Salvo ' + now);
                     if (!silent) Toast.show('✅ Dados enviados ao Google Drive!', 'success', 2000);
+                    _clearPendingPush(); // ✅ RETRY: sucesso — cancela qualquer retentativa agendada
                 } catch(e) {
-                    if (silent) _updateWidget('err', '↑ Falha no envio');
+                    if (silent) { _updateWidget('err', '↑ Falha no envio'); _scheduleRetryPush(); }
                     if (!silent) Toast.show('❌ Erro ao enviar ao Drive: ' + e.message, 'danger');
                     else console.warn('[CloudSync] gdrivePush silencioso falhou:', e.message);
                 } finally {
@@ -11686,8 +11709,10 @@ body.dark-mode,
                     _updateStatus('🟢 OneDrive — último envio: ' + now);
                     _showSyncIndicator('Salvo na nuvem ' + now);
                     if (!silent) Toast.show('✅ Dados enviados ao OneDrive!', 'success', 2000);
+                    _clearPendingPush(); // ✅ RETRY: sucesso — cancela qualquer retentativa agendada
                 } catch(e) {
                     if (!silent) Toast.show('❌ Erro ao enviar ao OneDrive: ' + e.message, 'danger');
+                    else { console.warn('[CloudSync] onedrivePush silencioso falhou:', e.message); _scheduleRetryPush(); }
                 } finally {
                     _pushing = false;
                 }
@@ -11797,6 +11822,51 @@ body.dark-mode,
                     if (_activeProvider === 'gdrive'   && _gdriveToken   && !_isExpired(_gdriveToken))   gdrivePush(true).catch(()=>{});
                     if (_activeProvider === 'onedrive' && _onedriveToken && !_isExpired(_onedriveToken)) onedrivePush(true).catch(()=>{});
                 } catch(e) {}
+            }
+
+            // ── RETRY: agenda uma nova tentativa de push após falha ────────────
+            // Chamado pelo catch() de gdrivePush/onedrivePush quando "silent"
+            // (push automático). Nunca interfere no push manual (botão), que já
+            // mostra o erro direto pro usuário via Toast.
+            function _markPendingPush() {
+                try { localStorage.setItem(PENDING_PUSH_KEY, JSON.stringify({ ts: Date.now(), store: window._currentStore || 'barueri' })); } catch(_e) {}
+            }
+            function _clearPendingPush() {
+                _retryAttempt = 0;
+                try { localStorage.removeItem(PENDING_PUSH_KEY); } catch(_e) {}
+            }
+            function _scheduleRetryPush() {
+                _markPendingPush();
+                if (_retryAttempt >= RETRY_MAX_TRIES) {
+                    // Não desiste para sempre — só para de tentar sozinho.
+                    // O listener de 'online' (abaixo) e a próxima edição do
+                    // usuário ainda vão disparar uma nova tentativa.
+                    console.warn('[CloudSync] ⏸ Retry pausado após ' + RETRY_MAX_TRIES + ' tentativas — aguardando reconexão ou nova edição.');
+                    return;
+                }
+                clearTimeout(_retryTimer);
+                const delay = Math.min(RETRY_BASE_MS * Math.pow(2, _retryAttempt), RETRY_MAX_MS);
+                _retryAttempt++;
+                console.log('[CloudSync] 🔁 Reagendando push em ' + Math.round(delay/1000) + 's (tentativa ' + _retryAttempt + '/' + RETRY_MAX_TRIES + ')');
+                _retryTimer = setTimeout(() => {
+                    if (!navigator.onLine) { _scheduleRetryPush(); return; } // ainda offline, adia de novo
+                    _silentPush();
+                }, delay);
+            }
+            // Ao voltar a ficar online, tenta imediatamente (reseta o backoff)
+            // em vez de esperar o próximo timer de retry ou a próxima edição.
+            if (typeof window !== 'undefined') {
+                window.addEventListener('online', () => {
+                    try {
+                        const pending = localStorage.getItem(PENDING_PUSH_KEY);
+                        if (pending) {
+                            console.log('[CloudSync] 🌐 Conexão restabelecida — reenviando dados pendentes.');
+                            clearTimeout(_retryTimer);
+                            _retryAttempt = 0;
+                            _silentPush();
+                        }
+                    } catch(_e) {}
+                });
             }
 
             // ── Widget de sync em tempo real (canto inferior direito) ─────────
@@ -12043,6 +12113,14 @@ body.dark-mode,
             // ── Init ─────────────────────────────────────────────────────────
             _loadTokens();
             _loadTombstones(); // FIX DELETE-SYNC: restaura tombstones persistidos
+            // ✅ RETRY: se a aba foi fechada/o app foi recarregado com um push
+            // pendente (ex: usuário fechou o app ainda offline), retoma o envio
+            // assim que houver provedor conectado e rede disponível.
+            try {
+                if (localStorage.getItem(PENDING_PUSH_KEY)) {
+                    setTimeout(() => { if (navigator.onLine) _silentPush(); else _scheduleRetryPush(); }, 6000);
+                }
+            } catch(_e) {}
             window.addEventListener('load', () => {
                 _handleOAuthCallback();
                 // FIX: pré-preenche o campo de Client ID com o valor salvo
@@ -13681,6 +13759,42 @@ body.dark-mode,
 
         // ==================== UTILITÁRIOS ====================
         const Utils = {
+            // ── Comprime uma imagem (logo/foto de produto) ANTES de guardá-la ──
+            // Em vez de excluir imagens do payload de sincronização (o que exigiria
+            // um armazenamento separado de blobs e arriscaria apagar fotos em
+            // outros dispositivos durante o merge por-item do CloudSync), a
+            // correção aqui ataca a causa raiz: reduzir o tamanho da imagem já na
+            // hora do upload. Uma foto de celular (3-5MB) normalmente cai para
+            // 30-80KB em JPEG após redimensionar para no máx. 800px, o que reduz
+            // o JSON de sincronização na mesma proporção sem mudar o formato de
+            // armazenamento (continua sendo uma data: URL no mesmo campo).
+            compressImageDataUrl(dataUrl, maxDim = 800, quality = 0.72) {
+                return new Promise((resolve) => {
+                    try {
+                        const img = new Image();
+                        img.onload = () => {
+                            let { width, height } = img;
+                            if (width <= maxDim && height <= maxDim) {
+                                // Já é pequena — ainda assim reencoda em JPEG se vier de PNG grande
+                                if (dataUrl.length < 150000) { resolve(dataUrl); return; }
+                            }
+                            const scale = Math.min(1, maxDim / Math.max(width, height));
+                            const w = Math.max(1, Math.round(width * scale));
+                            const h = Math.max(1, Math.round(height * scale));
+                            const canvas = document.createElement('canvas');
+                            canvas.width = w; canvas.height = h;
+                            const ctx = canvas.getContext('2d');
+                            ctx.fillStyle = '#ffffff'; // evita fundo preto em PNGs com transparência
+                            ctx.fillRect(0, 0, w, h);
+                            ctx.drawImage(img, 0, 0, w, h);
+                            resolve(canvas.toDataURL('image/jpeg', quality));
+                        };
+                        img.onerror = () => resolve(dataUrl); // falhou ao decodificar — mantém original
+                        img.src = dataUrl;
+                    } catch(_e) { resolve(dataUrl); }
+                });
+            },
+
             formatCurrency(value) {
                 const v = parseFloat(value);
                 return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(isNaN(v) ? 0 : v);
@@ -15424,8 +15538,10 @@ tbody tr td{border:1.5px solid #000;padding:2mm;text-align:center;font-weight:70
                 const file = event.target.files[0];
                 if (file) {
                     const reader = new FileReader();
-                    reader.onload = (e) => {
-                        state.company.logo = e.target.result;
+                    reader.onload = async (e) => {
+                        // ✅ Comprime antes de guardar — reduz o peso do logo no
+                        // snapshot sincronizado com a nuvem (ver Utils.compressImageDataUrl).
+                        state.company.logo = await Utils.compressImageDataUrl(e.target.result, 500, 0.8);
                         this.updateCompanyDisplay();
                         this.saveData();
                         // FIX BUG#1: sincroniza logo com a nuvem (Supabase/Drive/OneDrive)
@@ -17491,11 +17607,15 @@ tbody tr td{border:1.5px solid #000;padding:2mm;text-align:center;font-weight:70
                 const file = event.target.files[0];
                 if (file) {
                     const reader = new FileReader();
-                    reader.onload = (e) => {
-                        document.getElementById('productImageImg').src = e.target.result;
+                    reader.onload = async (e) => {
+                        // ✅ Comprime antes de guardar (ver Utils.compressImageDataUrl) —
+                        // reduz drasticamente o peso do catálogo de produtos no JSON
+                        // sincronizado com o Drive/OneDrive.
+                        const compressed = await Utils.compressImageDataUrl(e.target.result, 800, 0.75);
+                        document.getElementById('productImageImg').src = compressed;
                         document.getElementById('productImageImg').style.display = 'block';
                         document.getElementById('productImagePlaceholder').style.display = 'none';
-                        document.getElementById('productImageInput').dataset.image = e.target.result;
+                        document.getElementById('productImageInput').dataset.image = compressed;
                     };
                     reader.readAsDataURL(file);
                 }
@@ -17944,7 +18064,7 @@ tbody tr td{border:1.5px solid #000;padding:2mm;text-align:center;font-weight:70
                 if (btn) btn.classList.add('active');
                 if (tab === 'contatos')    this.renderContatos();
                 if (tab === 'tarefas')     this.renderTarefas();
-                if (tab === 'clientes')    this.renderLTV();
+                if (tab === 'clientes')    { this.renderLTV(); this.renderPriorityContacts(); }
                 if (tab === 'funil')       this.renderFunil();
                 if (tab === 'nps')         { this.renderNps(); const d = document.getElementById('crmNpsData'); if (d && !d.value) d.value = new Date().toISOString().slice(0,10); }
                 if (tab === 'campanhas')   this.renderCampanhas();
@@ -18047,6 +18167,81 @@ tbody tr td{border:1.5px solid #000;padding:2mm;text-align:center;font-weight:70
                 if (dias > 548) return { label: '🔴 Inativo',   cls: 'crm-badge-negativo' };
                 if (dias > 365) return { label: '🟡 Recompra',  cls: 'crm-badge-agendado'  };
                 return          { label: '🟢 Ativo',    cls: 'crm-badge-positivo' };
+            },
+
+            // ── SCORE DE PROPENSÃO À COMPRA ──────────────────────────────────
+            // Combina 3 sinais que já existem no sistema (LTV, recência da
+            // última OS e aniversário) para indicar qual cliente vale mais a
+            // pena o vendedor contatar HOJE. Não é IA/previsão estatística —
+            // é uma pontuação de regras, simples e auditável, que transforma o
+            // CRM de "reativo" (vendedor procura na lista) para "proativo"
+            // (o sistema aponta os próximos contatos prioritários).
+            _calcPropensityScore(client) {
+                const ltvMap = this._calcLTVMap();
+                const vals   = Object.values(ltvMap).filter(v => v > 0).sort((a,b) => b-a);
+                const top20  = vals[Math.floor(vals.length * 0.2)] || Infinity;
+                const ltv    = ltvMap[client.id] || 0;
+                const today  = new Date();
+
+                const lastOS = (state.sales || [])
+                    .filter(s => s.clientId === client.id && s.status !== 'cancelado')
+                    .sort((a,b) => new Date(b.date) - new Date(a.date))[0];
+                const diasSemComprar = lastOS ? (today - new Date(lastOS.date + 'T12:00:00')) / 86400000 : null;
+
+                let score = 0;
+                const motivos = [];
+
+                // Sinal 1: LTV alto (cliente valioso merece atenção prioritária)
+                if (ltv >= top20 && ltv > 0) { score += 40; motivos.push('LTV alto'); }
+                else if (ltv > 0)            { score += 10; }
+
+                // Sinal 2: janela de recompra (12-18 meses sem comprar = maior
+                // probabilidade de estar precisando trocar óculos/lentes agora;
+                // depois de 18 meses o cliente já está classificado "Inativo"
+                // e precisa de uma abordagem diferente, não pontua igual aqui)
+                if (diasSemComprar !== null) {
+                    if (diasSemComprar >= 365 && diasSemComprar <= 548) { score += 35; motivos.push('janela de recompra (12-18m)'); }
+                    else if (diasSemComprar > 548 && diasSemComprar <= 730) { score += 15; motivos.push('inativo recente'); }
+                }
+
+                // Sinal 3: aniversário nos próximos 14 dias (gatilho natural de
+                // contato — mensagem de parabéns + oferta)
+                if (client.birthDate) {
+                    const b = new Date(client.birthDate + 'T12:00:00');
+                    const bThisYear = new Date(today.getFullYear(), b.getMonth(), b.getDate());
+                    let diffDias = Math.round((bThisYear - today) / 86400000);
+                    if (diffDias < 0) diffDias += 365; // já passou este ano → conta para o próximo
+                    if (diffDias >= 0 && diffDias <= 14) { score += 25; motivos.push('aniversário em ' + diffDias + 'd'); }
+                }
+
+                return { score, motivos, ltv, diasSemComprar };
+            },
+
+            // Lista os clientes com maior prioridade de contato hoje (top N)
+            renderPriorityContacts(containerId = 'crmPriorityList', topN = 8) {
+                const el = document.getElementById(containerId);
+                if (!el) return;
+                const ranked = (state.clients || [])
+                    .map(c => ({ client: c, ...this._calcPropensityScore(c) }))
+                    .filter(r => r.score > 0)
+                    .sort((a,b) => b.score - a.score)
+                    .slice(0, topN);
+
+                if (!ranked.length) {
+                    el.innerHTML = '<p style="color:var(--gray);font-size:0.85rem;">Nenhuma prioridade de contato identificada no momento.</p>';
+                    return;
+                }
+                el.innerHTML = ranked.map(r => `
+                    <div style="display:flex;align-items:center;justify-content:space-between;gap:0.6rem;background:#fff;border:1px solid #eee;border-radius:8px;padding:8px 12px;margin-bottom:6px;">
+                        <div>
+                            <strong style="font-size:0.88rem;">${r.client.name}</strong>
+                            <div style="font-size:0.72rem;color:var(--gray);">${r.motivos.join(' · ') || '—'}</div>
+                        </div>
+                        <div style="text-align:right;white-space:nowrap;">
+                            <span style="background:#fff5ee;color:#c0392b;font-weight:700;font-size:0.78rem;padding:3px 8px;border-radius:6px;">Score ${r.score}</span>
+                        </div>
+                    </div>
+                `).join('');
             },
 
             // ── CONTATOS ──────────────────────────────────────────────────
@@ -19502,12 +19697,14 @@ tbody tr td{border:1.5px solid #000;padding:2mm;text-align:center;font-weight:70
                 const file = event.target.files[0];
                 if (file) {
                     const reader = new FileReader();
-                    reader.onload = (e) => {
+                    reader.onload = async (e) => {
+                        // ✅ Comprime antes de guardar (ver Utils.compressImageDataUrl)
+                        const compressed = await Utils.compressImageDataUrl(e.target.result, 500, 0.8);
                         const prev = document.getElementById('configLogoPreview');
                         const ph   = document.getElementById('configLogoPlaceholder');
-                        if (prev) { prev.src = e.target.result; prev.style.display = 'block'; }
+                        if (prev) { prev.src = compressed; prev.style.display = 'block'; }
                         if (ph)   ph.style.display = 'none';
-                        state.company.logo = e.target.result;
+                        state.company.logo = compressed;
                         App.saveData();
                         App.updateCompanyDisplay();
                         SupaSync.upsertConfig().catch(() => {});
