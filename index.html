@@ -7822,15 +7822,15 @@ body.dark-mode,
                                 <div class="form-group">
                                     <label for="configPrimaryColor">Cor Primária</label>
                                     <div style="display: flex; gap: 0.5rem;">
-                                        <input type="color" id="configPrimaryColor" class="form-control" style="width: 60px; height: 45px; padding: 0.25rem;" value="#ff6b00">
-                                        <input type="text" id="configPrimaryColorText" class="form-control" value="#ff6b00">
+                                        <input type="color" id="configPrimaryColor" class="form-control" style="width: 60px; height: 45px; padding: 0.25rem;" value="#ff6b00" oninput="Config._markDirty()">
+                                        <input type="text" id="configPrimaryColorText" class="form-control" value="#ff6b00" oninput="Config._markDirty()">
                                     </div>
                                 </div>
                                 <div class="form-group">
                                     <label for="configSecondaryColor">Cor Secundária</label>
                                     <div style="display: flex; gap: 0.5rem;">
-                                        <input type="color" id="configSecondaryColor" class="form-control" style="width: 60px; height: 45px; padding: 0.25rem;" value="#ffcc00">
-                                        <input type="text" id="configSecondaryColorText" class="form-control" value="#ffcc00">
+                                        <input type="color" id="configSecondaryColor" class="form-control" style="width: 60px; height: 45px; padding: 0.25rem;" value="#ffcc00" oninput="Config._markDirty()">
+                                        <input type="text" id="configSecondaryColorText" class="form-control" value="#ffcc00" oninput="Config._markDirty()">
                                     </div>
                                 </div>
                             </div>
@@ -7869,33 +7869,33 @@ body.dark-mode,
                         <div class="form-row">
                             <div class="form-group">
                                 <label for="configCreditTax">Juros Cartão de Crédito (% ao mês)</label>
-                                <input type="number" id="configCreditTax" class="form-control" value="2.5" step="0.1" min="0" max="20">
+                                <input type="number" id="configCreditTax" class="form-control" value="2.5" step="0.1" min="0" max="20" oninput="Config._markDirty()">
                             </div>
                             <div class="form-group">
                                 <label for="configWarranty">Garantia Padrão (dias)</label>
-                                <input type="number" id="configWarranty" class="form-control" value="90" min="0" max="365">
+                                <input type="number" id="configWarranty" class="form-control" value="90" min="0" max="365" oninput="Config._markDirty()">
                             </div>
                         </div>
 
                         <div class="form-row">
                             <div class="form-group">
                                 <label for="configCommission">Comissão Vendedores (%)</label>
-                                <input type="number" id="configCommission" class="form-control" value="5" step="0.5" min="0" max="100">
+                                <input type="number" id="configCommission" class="form-control" value="5" step="0.5" min="0" max="100" oninput="Config._markDirty()">
                             </div>
                             <div class="form-group">
                                 <label for="configDeliveryFee">Taxa de Entrega (R$)</label>
-                                <input type="number" id="configDeliveryFee" class="form-control" value="0" step="0.01" min="0">
+                                <input type="number" id="configDeliveryFee" class="form-control" value="0" step="0.01" min="0" oninput="Config._markDirty()">
                             </div>
                         </div>
 
                         <div class="form-row">
                             <div class="form-group">
                                 <label for="configNextOs">Próximo Nº OS</label>
-                                <input type="number" id="configNextOs" class="form-control" min="1">
+                                <input type="number" id="configNextOs" class="form-control" min="1" oninput="Config._markDirty()">
                             </div>
                             <div class="form-group">
                                 <label for="configNfSeries">Série da NF</label>
-                                <input type="text" id="configNfSeries" class="form-control" value="001" maxlength="3">
+                                <input type="text" id="configNfSeries" class="form-control" value="001" maxlength="3" oninput="Config._markDirty()">
                             </div>
                         </div>
 
@@ -7905,20 +7905,20 @@ body.dark-mode,
                         <div class="form-row" style="margin-bottom:1rem;">
                             <div class="form-group">
                                 <label for="configPixDiscount">Desconto PIX (%)</label>
-                                <input type="number" id="configPixDiscount" class="form-control" value="5" step="0.5" min="0" max="30" title="Percentual de desconto aplicado ao pagar com PIX">
+                                <input type="number" id="configPixDiscount" class="form-control" value="5" step="0.5" min="0" max="30" title="Percentual de desconto aplicado ao pagar com PIX" oninput="Config._markDirty()">
                             </div>
                             <div class="form-group">
                                 <label for="configCashDiscount">Desconto Dinheiro (%)</label>
-                                <input type="number" id="configCashDiscount" class="form-control" value="3" step="0.5" min="0" max="30" title="Percentual de desconto aplicado ao pagar com Dinheiro">
+                                <input type="number" id="configCashDiscount" class="form-control" value="3" step="0.5" min="0" max="30" title="Percentual de desconto aplicado ao pagar com Dinheiro" oninput="Config._markDirty()">
                             </div>
                         </div>
 
                         <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 0.75rem;">
-                            <label class="flex items-center gap-2"><input type="checkbox" id="configPaymentPix" checked> PIX</label>
-                            <label class="flex items-center gap-2"><input type="checkbox" id="configPaymentCash" checked> Dinheiro</label>
-                            <label class="flex items-center gap-2"><input type="checkbox" id="configPaymentDebit" checked> Débito</label>
-                            <label class="flex items-center gap-2"><input type="checkbox" id="configPaymentCredit" checked> Crédito</label>
-                            <label class="flex items-center gap-2"><input type="checkbox" id="configPaymentInstallment" checked> Crediário</label>
+                            <label class="flex items-center gap-2"><input type="checkbox" id="configPaymentPix" checked onchange="Config._markDirty()"> PIX</label>
+                            <label class="flex items-center gap-2"><input type="checkbox" id="configPaymentCash" checked onchange="Config._markDirty()"> Dinheiro</label>
+                            <label class="flex items-center gap-2"><input type="checkbox" id="configPaymentDebit" checked onchange="Config._markDirty()"> Débito</label>
+                            <label class="flex items-center gap-2"><input type="checkbox" id="configPaymentCredit" checked onchange="Config._markDirty()"> Crédito</label>
+                            <label class="flex items-center gap-2"><input type="checkbox" id="configPaymentInstallment" checked onchange="Config._markDirty()"> Crediário</label>
                         </div>
 
                         <div class="btn-group" style="margin-top: 1.5rem;">
@@ -7950,11 +7950,11 @@ body.dark-mode,
                             <div class="cfg-card-head"><div class="ic" style="background:#ffe8d6;color:#c65600;">📦</div><b>Alertas de Estoque</b></div>
                             <div class="cfg-opt-row">
                                 <div><div class="cfg-opt-label">Estoque baixo</div><div class="cfg-opt-desc">Avisa quando um produto atinge o mínimo cadastrado</div></div>
-                                <label class="tgl"><input type="checkbox" id="configNotifyLowStock" checked><span class="bg"></span><span class="knob"></span></label>
+                                <label class="tgl"><input type="checkbox" id="configNotifyLowStock" checked onchange="Config._markDirty()"><span class="bg"></span><span class="knob"></span></label>
                             </div>
                             <div class="cfg-opt-row">
                                 <div><div class="cfg-opt-label">Produto esgotado</div><div class="cfg-opt-desc">Avisa quando o estoque chega a zero</div></div>
-                                <label class="tgl"><input type="checkbox" id="configNotifyOutOfStock" checked><span class="bg"></span><span class="knob"></span></label>
+                                <label class="tgl"><input type="checkbox" id="configNotifyOutOfStock" checked onchange="Config._markDirty()"><span class="bg"></span><span class="knob"></span></label>
                             </div>
                         </div>
 
@@ -7962,14 +7962,14 @@ body.dark-mode,
                             <div class="cfg-card-head"><div class="ic" style="background:#e0e7ff;color:#4338ca;">🔧</div><b>Ordens de Serviço</b></div>
                             <div class="cfg-opt-row">
                                 <div><div class="cfg-opt-label">OS pronta</div><div class="cfg-opt-desc">Quando o status muda para "Pronto p/ retirada"</div></div>
-                                <label class="tgl"><input type="checkbox" id="configNotifyOsReady" checked><span class="bg"></span><span class="knob"></span></label>
+                                <label class="tgl"><input type="checkbox" id="configNotifyOsReady" checked onchange="Config._markDirty()"><span class="bg"></span><span class="knob"></span></label>
                             </div>
                             <div class="cfg-opt-row">
                                 <div>
                                     <div class="cfg-opt-label">OS atrasada</div>
-                                    <div class="cfg-opt-desc">Considerar atraso após <input type="number" id="configOsDelayDays" class="mini-input" value="7" min="1"> dias</div>
+                                    <div class="cfg-opt-desc">Considerar atraso após <input type="number" id="configOsDelayDays" class="mini-input" value="7" min="1" oninput="Config._markDirty()"> dias</div>
                                 </div>
-                                <label class="tgl"><input type="checkbox" id="configNotifyOsDelay" checked><span class="bg"></span><span class="knob"></span></label>
+                                <label class="tgl"><input type="checkbox" id="configNotifyOsDelay" checked onchange="Config._markDirty()"><span class="bg"></span><span class="knob"></span></label>
                             </div>
                         </div>
 
@@ -7977,11 +7977,11 @@ body.dark-mode,
                             <div class="cfg-card-head"><div class="ic" style="background:#fde8e8;color:#c0392b;">💰</div><b>Financeiro</b></div>
                             <div class="cfg-opt-row">
                                 <div><div class="cfg-opt-label">Contas a vencer</div><div class="cfg-opt-desc">Aviso alguns dias antes do vencimento</div></div>
-                                <label class="tgl"><input type="checkbox" id="configNotifyPaymentDue" checked><span class="bg"></span><span class="knob"></span></label>
+                                <label class="tgl"><input type="checkbox" id="configNotifyPaymentDue" checked onchange="Config._markDirty()"><span class="bg"></span><span class="knob"></span></label>
                             </div>
                             <div class="cfg-opt-row">
                                 <div><div class="cfg-opt-label">Contas vencidas</div><div class="cfg-opt-desc">Aviso quando uma conta passa do vencimento</div></div>
-                                <label class="tgl"><input type="checkbox" id="configNotifyPaymentOverdue" checked><span class="bg"></span><span class="knob"></span></label>
+                                <label class="tgl"><input type="checkbox" id="configNotifyPaymentOverdue" checked onchange="Config._markDirty()"><span class="bg"></span><span class="knob"></span></label>
                             </div>
                         </div>
 
@@ -7989,12 +7989,12 @@ body.dark-mode,
                             <div class="cfg-card-head"><div class="ic" style="background:#dcfce7;color:#128c4e;">💬</div><b>WhatsApp</b></div>
                             <div class="cfg-opt-row">
                                 <div><div class="cfg-opt-label">Enviar notificações via WhatsApp</div><div class="cfg-opt-desc">Encaminha os mesmos alertas para um número informado</div></div>
-                                <label class="tgl"><input type="checkbox" id="configWhatsappNotify"><span class="bg"></span><span class="knob"></span></label>
+                                <label class="tgl"><input type="checkbox" id="configWhatsappNotify" onchange="Config._markDirty()"><span class="bg"></span><span class="knob"></span></label>
                             </div>
                             <div class="cfg-opt-row">
                                 <div style="flex:1;">
                                     <label for="configWhatsappNumber" class="cfg-opt-label" style="display:block;margin-bottom:.4rem;">Número do WhatsApp (com DDD)</label>
-                                    <input type="text" id="configWhatsappNumber" class="form-control" oninput="App.maskPhone(this)">
+                                    <input type="text" id="configWhatsappNumber" class="form-control" oninput="App.maskPhone(this);Config._markDirty()">
                                 </div>
                             </div>
                         </div>
