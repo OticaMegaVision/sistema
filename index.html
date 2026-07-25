@@ -10951,21 +10951,33 @@ body.dark-mode,
                         Object.assign(state.config || (state.config = {}), remote.config);
                     }
                 }
-                // ✅ FIX SYNC: restaura mensagens de WhatsApp personalizadas de outro
-                // dispositivo. O local sempre "ganha" em caso de mesma chave (para não
-                // apagar uma edição recente que ainda não subiu pra nuvem) — a nuvem só
-                // preenche chaves que ainda não existem localmente.
-                if (remote.wppMensagens && typeof remote.wppMensagens === 'object') {
-                    state.wppMensagens = Object.assign({}, remote.wppMensagens, state.wppMensagens || {});
-                }
-                // ✅ FIX SYNC: restaura notificações e config de backup de outro
-                // dispositivo, com a mesma regra seguro-padrão (local nunca é
-                // sobrescrito por uma versão antiga vinda da nuvem).
-                if (remote.notificacoes && typeof remote.notificacoes === 'object') {
-                    state.notificacoes = Object.assign({}, remote.notificacoes, state.notificacoes || {});
-                }
-                if (remote.backupConfig && typeof remote.backupConfig === 'object') {
-                    state.backupConfig = Object.assign({}, remote.backupConfig, state.backupConfig || {});
+                // ✅ FIX SINCRONIZAÇÃO ENTRE DISPOSITIVOS: wppMensagens, notificacoes e
+                // backupConfig usavam uma regra DIFERENTE da usada por company/config
+                // acima — "local sempre vence em caso de mesma chave, a nuvem só
+                // preenche o que falta". Isso parecia seguro, mas na prática significa
+                // que, assim que os DOIS dispositivos já têm algum valor para a mesma
+                // chave (o caso comum, já que os padrões são os mesmos em toda loja
+                // nova), uma edição feita em QUALQUER um dos dois NUNCA MAIS chega ao
+                // outro — o merge aditivo nunca sobrescreve uma chave já existente.
+                // Diferente da Meta do Mês (que ficava presa só durante a janela de
+                // 10s de proteção contra corrida), aqui a divergência era permanente.
+                // Fix: mesma regra usada por company/config linhas acima — o remoto
+                // só é aplicado (substituindo por completo o valor local da chave) se
+                // NÃO houver uma edição local mais recente que o snapshot remoto. Sem
+                // edição local recente, o remoto sempre vence — igual a todo o resto
+                // do sistema.
+                if (!localConfigIsNewer) {
+                    if (remote.wppMensagens && typeof remote.wppMensagens === 'object') {
+                        state.wppMensagens = Object.assign(state.wppMensagens || {}, remote.wppMensagens);
+                    }
+                    if (remote.notificacoes && typeof remote.notificacoes === 'object') {
+                        state.notificacoes = Object.assign(state.notificacoes || {}, remote.notificacoes);
+                    }
+                    if (remote.backupConfig && typeof remote.backupConfig === 'object') {
+                        state.backupConfig = Object.assign(state.backupConfig || {}, remote.backupConfig);
+                    }
+                } else {
+                    console.log('[CloudSync] wppMensagens/notificacoes/backupConfig: edição local recente (' + storeId + ') é mais nova que o snapshot remoto — mantendo valores locais.');
                 }
                 if (remote.lastOsCounter && typeof remote.lastOsCounter === 'object') state.lastOsCounter = { ...(state.lastOsCounter || {}), ...remote.lastOsCounter };
                 // ✅ FIX SYNC CRÍTICO: merge item-por-item nas contas financeiras
@@ -12018,6 +12030,12 @@ body.dark-mode,
                     try { localStorage.removeItem('cs_gdrive_file_id_' + storeId); } catch(_e) {}
                     try { localStorage.removeItem('cs_onedrive_file_id_' + storeId); } catch(_e) {}
                 },
+                // ✅ Exposto para uso fora deste módulo (ver ContasManager.saveAll):
+                // permite que qualquer gravação local respeite os mesmos tombstones
+                // de exclusão usados pelo merge do pull da nuvem — sem isso, código
+                // fora deste closure não tinha como saber se um item já foi excluído
+                // em outro dispositivo antes de decidir se deve "ressuscitá-lo".
+                isDeletedLocally(storeId, col, id, remoteTs) { return _isDeletedLocally(storeId, col, id, remoteTs); },
                 _recordDeletion(storeId, col, id) { _recordDeletion(storeId, col, id); },
                 // ── Exposição pública do coletor de dados (para OPFS + exportação) ──
                 _collectAllDataPublic() { return _collectAllData(); },
@@ -12066,21 +12084,89 @@ body.dark-mode,
                 return [];
             },
 
-            async saveAll(contas) {
+            async saveAll(contas, opts) {
                 const storeId = window._currentStore || 'barueri';
+                // ✅ FIX SINCRONIZAÇÃO ENTRE DISPOSITIVOS (Contas a Receber/Pagar):
+                // saveAll() gravava o array INTEIRO recebido por cima do documento
+                // existente, sem mesclar — diferente de clientes/vendas/produtos, que
+                // já são gravados item a item e mesclados por _updatedAt. Se dois
+                // dispositivos desse baixa em contas DIFERENTES quase ao mesmo tempo
+                // (ex: usuário no PC paga o boleto X, celular paga o boleto Y minutos
+                // antes de sincronizar), o `contas` de cada chamada só continha a
+                // visão local de CADA dispositivo — o que salvasse por último
+                // sobrescrevia o array inteiro, revertendo silenciosamente a baixa
+                // feita no outro aparelho. Mesma classe de bug já corrigida na Meta
+                // do Mês e na troca de loja, agora fechada também aqui.
+                //
+                // Fix: antes de gravar, busca a versão mais atual persistida (pode
+                // já ter recebido um pull/merge da nuvem que este `contas` ainda não
+                // viu) e mescla item a item pelo mesmo critério usado em toda a
+                // aplicação — _updatedAt mais recente vence. Exclusões só são
+                // respeitadas se houver um tombstone registrado (ver excluirConta);
+                // caso contrário, um item ausente no array recebido é tratado como
+                // "esta chamada não sabia desse item" e é preservado, não apagado.
+                //
+                // Exceção: restauração explícita de backup (opts.forceOverwrite) —
+                // ali o usuário pediu deliberadamente para substituir tudo pelo
+                // conteúdo do arquivo importado, então pulamos o merge.
+                let finalContas;
+                if (opts && opts.forceOverwrite) {
+                    finalContas = contas || [];
+                } else {
+                    let current = [];
+                    try {
+                        const freshDoc = await sbGetDoc(storeId, 'config', 'contas_financeiras');
+                        if (freshDoc && Array.isArray(freshDoc.items)) current = freshDoc.items;
+                    } catch(_e) {}
+                    if (current.length === 0 && Array.isArray(state._contasManuais)) current = state._contasManuais;
+
+                    const currentMap = {};
+                    current.forEach(c => { if (c && c.id) currentMap[c.id] = c; });
+                    const incomingMap = {};
+                    (contas || []).forEach(c => { if (c && c.id) incomingMap[c.id] = c; });
+
+                    const merged = {};
+                    // Começa pelo que já está persistido — protege itens que este
+                    // dispositivo ainda não conhecia (vindos de outro aparelho/pull).
+                    Object.assign(merged, currentMap);
+                    Object.keys(incomingMap).forEach(id => {
+                        const incoming = incomingMap[id];
+                        const existing = currentMap[id];
+                        if (!existing) { merged[id] = incoming; return; }
+                        const incomingTs = new Date(incoming._updatedAt || 0).getTime();
+                        const existingTs = new Date(existing._updatedAt || 0).getTime();
+                        if (incomingTs >= existingTs) merged[id] = incoming;
+                        // Se o persistido for mais recente, mantém ele (já está em merged)
+                    });
+                    // Itens que existiam no persistido mas não vieram no array recebido:
+                    // só removemos se houver um tombstone real de exclusão — nunca por
+                    // simples ausência (que pode só significar "leitura desatualizada").
+                    Object.keys(currentMap).forEach(id => {
+                        if (incomingMap[id]) return; // ainda presente, nada a fazer
+                        const isDeleted = window.CloudSync && window.CloudSync.isDeletedLocally
+                            ? window.CloudSync.isDeletedLocally(storeId, 'contas_financeiras', id, currentMap[id]._updatedAt || null)
+                            : false;
+                        if (isDeleted) delete merged[id];
+                    });
+
+                    finalContas = Object.values(merged);
+                }
+
                 // Atualiza cache em memória imediatamente
-                IDB._cache[this._storeKey] = JSON.stringify(contas);
-                state._contasManuais = contas;
+                IDB._cache[this._storeKey] = JSON.stringify(finalContas);
+                state._contasManuais = finalContas;
                 // ✅ FIX SYNC: registra timestamp do último save local para proteger contra overwrite da nuvem
                 const nowIso = new Date().toISOString();
                 try { localStorage.setItem('contas_fs_savedAt_' + storeId, nowIso); } catch(_e) {}
                 try {
-                    await sbUpsertDoc(storeId, 'config', 'contas_financeiras', {
+                    // ✅ Mesma trava usada por todo gravação/leitura de config — garante
+                    // que esta escrita nunca intercale com um pull/merge em andamento.
+                    await _withSyncLock('contas:saveAll[' + storeId + ']', () => sbUpsertDoc(storeId, 'config', 'contas_financeiras', {
                         _doc_id:    'contas_financeiras',
-                        items:      contas,
+                        items:      finalContas,
                         _updatedAt: nowIso,
                         _store:     storeId
-                    });
+                    }));
                     // ✅ Dispara cloud sync para que outros dispositivos recebam as contas atualizadas
                     if (window.LocalFirst) LocalFirst._scheduleCloudSync();
                 } catch(e) { console.warn('[ContasManager] saveAll erro:', e.message); }
@@ -15465,7 +15551,9 @@ tbody tr td{border:1.5px solid #000;padding:2mm;text-align:center;font-weight:70
                             // 5. Grava contas financeiras se existirem no backup
                             const contasBackup = newData._contasManuais || newData.contasFinanceiras || newData._contasFinanceiras || [];
                             if (Array.isArray(contasBackup) && contasBackup.length > 0) {
-                                await ContasManager.saveAll(contasBackup);
+                                // forceOverwrite: restauração explícita de backup deve
+                                // substituir tudo pelo conteúdo do arquivo, sem merge.
+                                await ContasManager.saveAll(contasBackup, { forceOverwrite: true });
                             }
 
                             // 6. Atualiza UI
