@@ -9750,6 +9750,7 @@ body.dark-mode,
             // ── Boot ──────────────────────────────────────────────────────────
             async boot() {
                 const storeId = window._currentStore || 'barueri';
+                console.log('[DIAG LocalFirst.boot] storeId capturado no início do boot:', storeId);
 
                 // ── NÍVEL 1.1 — Solicita persistência permanente do IDB ───────────
                 // Sem isso, o navegador pode limpar o IndexedDB silenciosamente
@@ -9830,6 +9831,7 @@ body.dark-mode,
             // ── Fetch todos os dados do IDB ───────────────────────────────────
             async _fetchAllData() {
                 const storeId = window._currentStore || 'barueri';
+                console.log('[DIAG _fetchAllData] storeId capturado:', storeId, '| company.name ANTES do reset:', state.company?.name);
                 // ✅ FIX "meta do mês volta pro valor anterior / mistura com outra loja":
                 // dois problemas distintos, mesma causa raiz — o bloco abaixo fazia
                 // Object.assign(state.company, cfg.company) DIRETO NO MESMO OBJETO,
@@ -9917,6 +9919,7 @@ body.dark-mode,
                         console.log('[RxDB v17] Edição local recente de config/empresa detectada — mantendo valor em memória (loja ' + storeId + ')');
                     }
                     console.log('[RxDB v17] Dados carregados do IndexedDB para loja:', storeId);
+                    console.log('[DIAG _fetchAllData] company.name DEPOIS do merge:', state.company?.name, '| logo?', !!state.company?.logo, '| storeId usado:', storeId);
                 } catch(e) {
                     console.error('[RxDB v17] _fetchAllData erro:', e.message);
                 }
@@ -15298,7 +15301,9 @@ tbody tr td{border:1.5px solid #000;padding:2mm;text-align:center;font-weight:70
         const App = {
             async init() {
                 // ── Multi-Loja: inicializa loja antes de qualquer loadData ──
+                console.log('[DIAG App.init] início — _currentStore antes do StoreManager.init:', window._currentStore);
                 if (window.StoreManager) await StoreManager.init();
+                console.log('[DIAG App.init] após StoreManager.init — _currentStore:', window._currentStore);
                 await this.loadData();
                 // ── Normaliza telefones: remove prefixo +55 salvo erroneamente ──
                 let phoneFixed = 0;
@@ -15314,6 +15319,7 @@ tbody tr td{border:1.5px solid #000;padding:2mm;text-align:center;font-weight:70
                     console.log(`[App] ✅ ${phoneFixed} telefone(s) normalizados (removido +55)`);
                 }
                 // ──────────────────────────────────────────────────────────────
+                console.log('[DIAG App.init] antes do 1º updateCompanyDisplay — company.name:', state.company?.name, '| logo?', !!state.company?.logo, '| _currentStore:', window._currentStore);
                 this.updateCompanyDisplay(); // Atualiza logo e nome da empresa após carregar
                 if (window.StoreManager) StoreManager._updateUI(); // Atualiza badge de loja
                 await this.initTheme();
@@ -25868,11 +25874,14 @@ const AuthSystem = {
             user.lastAccess = new Date().toLocaleString('pt-BR');
             await this._saveUsers(users);
 
+            console.log('[DIAG login] usuário autenticado:', user.username, '| user.stores:', JSON.stringify(user.stores));
+
             // Se usuário tem acesso a apenas uma loja, define automaticamente
             if (user.stores.length === 1) {
                 window._currentStore = user.stores[0];
                 try { await IDB.set(StoreManager._STORE_PREF_KEY, user.stores[0]); } catch(e) {}
             }
+            console.log('[DIAG login] window._currentStore após bloco de 1-loja:', window._currentStore);
 
             // ✅ FIX FLASH DE LOJA ERRADA APÓS LOGIN: até aqui, `state.company`
             // ainda contém o que foi pré-carregado PARA A TELA DE LOGIN, que
@@ -25887,6 +25896,7 @@ const AuthSystem = {
             try {
                 await StoreManager.preloadCompanyConfig(window._currentStore || 'barueri');
             } catch(e) {}
+            console.log('[DIAG login] após preloadCompanyConfig — state.company.name:', state.company?.name, '| logo?', !!state.company?.logo, '| _currentStore:', window._currentStore);
 
             this.hideLoginScreen();
             this._updateUserBadge();
@@ -26004,6 +26014,7 @@ const AuthSystem = {
                 const savedPref = await IDB.get(StoreManager._STORE_PREF_KEY);
                 if (savedPref === 'caucaia' || savedPref === 'barueri') preloadStoreId = savedPref;
             } catch(e) {}
+            console.log('[DIAG checkSession] tela de login — preloadStoreId resolvido:', preloadStoreId);
             if (window.StoreManager && window.StoreManager.preloadCompanyConfig) {
                 await window.StoreManager.preloadCompanyConfig(preloadStoreId);
             } else {
@@ -26012,6 +26023,7 @@ const AuthSystem = {
                     if (docData && docData.company) Object.assign(state.company, docData.company);
                 } catch(e) {}
             }
+            console.log('[DIAG checkSession] após preload da tela de login — company.name:', state.company?.name, '| logo?', !!state.company?.logo);
             // Pequeno delay removido: login mostrado imediatamente, sem flash do sistema
             try { this.showLoginScreen(); } catch(e) {}
             return false;
@@ -26076,12 +26088,20 @@ const StoreManager = {
         // causando o "flash" de dados errados e, em corrida, a mistura real
         // entre lojas. Agora essa checagem é centralizada aqui, então vale
         // tanto para login novo quanto para sessão retomada.
+        let sessionForDiag = null;
         try {
             const session = (window.AuthSystem && AuthSystem._getSession) ? AuthSystem._getSession() : null;
+            sessionForDiag = session;
             if (session && Array.isArray(session.stores) && session.stores.length === 1) {
                 resolved = session.stores[0];
             }
         } catch(e) {}
+
+        console.log('[DIAG StoreManager.init]', {
+            savedPref: saved,
+            sessionStores: sessionForDiag ? sessionForDiag.stores : null,
+            resolved
+        });
 
         window._currentStore = resolved;
         // Persiste a resolução final para manter a preferência global consistente
