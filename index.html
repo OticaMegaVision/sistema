@@ -26034,7 +26034,33 @@ const StoreManager = {
                 if (doc && doc.storeId) saved = doc.storeId;
             } catch(e) {}
         }
-        window._currentStore = (saved === 'caucaia') ? 'caucaia' : 'barueri';
+        let resolved = (saved === 'caucaia') ? 'caucaia' : 'barueri';
+
+        // ✅ FIX MISTURA DE LOJAS (login com sessão existente): a chave de
+        // preferência acima ('otica_current_store') é GLOBAL ao navegador —
+        // compartilhada entre TODAS as sessões/usuários dele. Se o admin trocar
+        // de loja nesse navegador, essa preferência muda para todo mundo.
+        // AuthSystem.login() já corrigia isso no login "a frio" (forçando a
+        // loja do usuário quando ele só tem 1), mas checkSession() — usado em
+        // TODO reload de página com sessão já válida (F5, pós-logout, nova aba)
+        // — nunca reaplicava essa correção. Resultado: um usuário restrito a
+        // 1 loja podia herdar a loja errada (a última que outra sessão deixou
+        // na preferência global) sem passar pelo mutex/_switchGen do switchTo(),
+        // causando o "flash" de dados errados e, em corrida, a mistura real
+        // entre lojas. Agora essa checagem é centralizada aqui, então vale
+        // tanto para login novo quanto para sessão retomada.
+        try {
+            const session = (window.AuthSystem && AuthSystem._getSession) ? AuthSystem._getSession() : null;
+            if (session && Array.isArray(session.stores) && session.stores.length === 1) {
+                resolved = session.stores[0];
+            }
+        } catch(e) {}
+
+        window._currentStore = resolved;
+        // Persiste a resolução final para manter a preferência global consistente
+        // com a sessão atual (evita que a próxima leitura por outra rota reintroduza
+        // a loja errada).
+        try { await IDB.set(this._STORE_PREF_KEY, resolved); } catch(e) {}
         this._updateUI();
     },
 
