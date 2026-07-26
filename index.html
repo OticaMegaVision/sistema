@@ -12265,6 +12265,30 @@ body.dark-mode,
                     setTimeout(() => { if (navigator.onLine) _silentPush(); else _scheduleRetryPush(); }, 6000);
                 }
             } catch(_e) {}
+            // ✅ FIX FLASH/MISTURA DE LOJA NO BOOT: este bloco fazia _startPolling()
+            // e um gdrivePull()/onedrivePull() IMEDIATO assim que a página terminava
+            // de carregar (evento 'load'), SEM checar se havia um usuário logado ou
+            // qual era a loja correta. Como isso acontece ANTES do login, `window.
+            // _currentStore` ainda estava no valor padrão fixo do carregamento do
+            // script ("barueri") — então esse pull automático buscava e aplicava
+            // dados/config da loja errada (Barueri) mesmo com o usuário prestes a
+            // logar em Caucaia. Era exatamente esse pull "fantasma" pré-login que
+            // aparecia nos logs como `_fetchAllData storeId: barueri` com a tela de
+            // login ainda visível, e que continuava concorrendo (via polling) com o
+            // fluxo correto por vários ciclos depois do login — daí o "flash" indo
+            // e voltando. Correção: NÃO conectar automaticamente aqui. Em vez disso,
+            // expor `resumeAutoConnect()` (ver no objeto retornado abaixo) e chamá-lo
+            // apenas depois que AuthSystem confirma sessão válida e a loja correta já
+            // foi resolvida (StoreManager.init concluído) — ver AuthSystem.login() e
+            // AuthSystem.checkSession().
+            function _resumeAutoConnect() {
+                _updateUI();
+                // Se já estava conectado, retoma polling e faz pull inicial
+                if (_activeProvider === 'gdrive'   && _gdriveToken   && !_isExpired(_gdriveToken))   { _startPolling(); setTimeout(() => gdrivePull(true).catch(()=>{}), 1500); }
+                if (_activeProvider === 'onedrive' && _onedriveToken && !_isExpired(_onedriveToken)) { _startPolling(); setTimeout(() => onedrivePull(true).catch(()=>{}), 1500); }
+                // FIX: mostra banner se token expirado logo na abertura
+                setTimeout(_checkTokenExpiry, 3000);
+            }
             window.addEventListener('load', () => {
                 _handleOAuthCallback();
                 // FIX: pré-preenche o campo de Client ID com o valor salvo
@@ -12273,14 +12297,16 @@ body.dark-mode,
                     const inp = document.getElementById('gdriveClientId');
                     if (inp && savedId && !inp.value) inp.value = savedId;
                 }, 800);
-                setTimeout(() => {
-                    _updateUI();
-                    // Se já estava conectado, retoma polling e faz pull inicial
-                    if (_activeProvider === 'gdrive'   && _gdriveToken   && !_isExpired(_gdriveToken))   { _startPolling(); setTimeout(() => gdrivePull(true).catch(()=>{}), 1500); }
-                    if (_activeProvider === 'onedrive' && _onedriveToken && !_isExpired(_onedriveToken)) { _startPolling(); setTimeout(() => onedrivePull(true).catch(()=>{}), 1500); }
-                    // FIX: mostra banner se token expirado logo na abertura
-                    setTimeout(_checkTokenExpiry, 3000);
-                }, 500);
+                // ✅ Só conecta/faz pull automaticamente aqui se JÁ existir uma sessão
+                // válida neste exato instante (ex: F5 com login já feito) — nesse caso
+                // checkSession() ainda vai rodar e resolver a loja corretamente antes
+                // de qualquer render, então é seguro. Se NÃO há sessão (tela de login
+                // prestes a aparecer), pulamos: o próprio login() chama
+                // resumeAutoConnect() assim que a loja do usuário for conhecida.
+                try {
+                    const hasSession = window.AuthSystem && AuthSystem._getSession && AuthSystem._getSession();
+                    if (hasSession) setTimeout(_resumeAutoConnect, 500);
+                } catch(e) {}
             });
 
             return {
@@ -12288,6 +12314,9 @@ body.dark-mode,
                 connectOneDrive, onedrivePush, onedrivePull, onedriveDisconnect,
                 showTab, _updateUI,
                 autoSync() { _schedulePush(); },
+                // ✅ Chamado por AuthSystem depois que a loja correta do usuário logado
+                // já foi resolvida (nunca antes disso — ver comentário acima).
+                resumeAutoConnect: _resumeAutoConnect,
                 cancelPendingPush() { _cancelPendingPush(); },
                 forcePull() { return _activeProvider === 'gdrive' ? gdrivePull(false) : onedrivePull(false); },
                 // ✅ FIX: StoreManager.switchTo() tentava invalidar o cache do fileId
@@ -24057,6 +24086,11 @@ ${container.innerHTML}
                 return;
             }
             await App.init();
+            // ✅ Loja já resolvida por App.init()/StoreManager.init() — agora sim é
+            // seguro deixar o CloudSync se conectar e puxar dados automaticamente
+            // (ver fix em CloudSync: antes ele fazia isso sozinho no 'load' da
+            // página, sem saber ainda qual era a loja certa).
+            try { if (window.CloudSync && CloudSync.resumeAutoConnect) CloudSync.resumeAutoConnect(); } catch(e) {}
             // Sync imediato antes do primeiro render para garantir dados frescos
             // Especialmente importante para: aniversariantes, contas a receber, clientes
             if (navigator.onLine && window.LocalFirst) {
@@ -25897,6 +25931,10 @@ const AuthSystem = {
                 await StoreManager.preloadCompanyConfig(window._currentStore || 'barueri');
             } catch(e) {}
             console.log('[DIAG login] após preloadCompanyConfig — state.company.name:', state.company?.name, '| logo?', !!state.company?.logo, '| _currentStore:', window._currentStore);
+
+            // ✅ Só agora — com a loja correta já resolvida — deixamos o CloudSync
+            // se conectar/puxar dados automaticamente (ver fix em CloudSync acima).
+            try { if (window.CloudSync && CloudSync.resumeAutoConnect) CloudSync.resumeAutoConnect(); } catch(e) {}
 
             this.hideLoginScreen();
             this._updateUserBadge();
