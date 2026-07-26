@@ -25874,6 +25874,20 @@ const AuthSystem = {
                 try { await IDB.set(StoreManager._STORE_PREF_KEY, user.stores[0]); } catch(e) {}
             }
 
+            // ✅ FIX FLASH DE LOJA ERRADA APÓS LOGIN: até aqui, `state.company`
+            // ainda contém o que foi pré-carregado PARA A TELA DE LOGIN, que
+            // sempre usa `window._currentStore` no valor padrão do boot do
+            // script (Barueri) — porque antes de autenticar não dá pra saber
+            // qual loja é do usuário. Se não recarregarmos aqui, App.init()
+            // chama updateCompanyDisplay() (antes do LocalFirst.boot() terminar
+            // de buscar os dados certos) usando esse `state.company` desatualizado,
+            // e o usuário vê o nome/logo da loja errada por um instante antes do
+            // boot() corrigir. Recarregando aqui, ANTES do App.init(), a tela
+            // já nasce com a marca correta da loja do usuário.
+            try {
+                await StoreManager.preloadCompanyConfig(window._currentStore || 'barueri');
+            } catch(e) {}
+
             this.hideLoginScreen();
             this._updateUserBadge();
             this._restrictStoreSelector();
@@ -25975,8 +25989,21 @@ const AuthSystem = {
         if (!session) {
             await this._ensureDefaultUsers();
             // Pré-carrega config da empresa do IndexedDB antes de mostrar o login
-            // para que logo e nome já estejam disponíveis no card de login
-            const preloadStoreId = window._currentStore || 'barueri';
+            // para que logo e nome já estejam disponíveis no card de login.
+            // ✅ FIX LOGO ERRADO NA TELA DE LOGIN: antes disso usava direto
+            // `window._currentStore`, que a essa altura AINDA é o valor padrão
+            // fixado no carregamento do script (Barueri) — porque StoreManager.init()
+            // só roda dentro de App.init(), e App.init() só é chamado DEPOIS do
+            // login. Ou seja, a tela de login sempre mostrava a marca de Barueri,
+            // não importa qual loja o navegador usou por último. Aqui lemos a
+            // preferência de loja salva (mesma chave usada pelo StoreManager) para
+            // pré-carregar a marca mais provável — a última loja realmente usada
+            // neste navegador — em vez de um valor fixo errado.
+            let preloadStoreId = 'barueri';
+            try {
+                const savedPref = await IDB.get(StoreManager._STORE_PREF_KEY);
+                if (savedPref === 'caucaia' || savedPref === 'barueri') preloadStoreId = savedPref;
+            } catch(e) {}
             if (window.StoreManager && window.StoreManager.preloadCompanyConfig) {
                 await window.StoreManager.preloadCompanyConfig(preloadStoreId);
             } else {
