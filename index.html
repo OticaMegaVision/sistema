@@ -10134,8 +10134,23 @@ body.dark-mode,
                                 doc_id:     String(item.id),
                                 store_id:   storeId,
                                 collection: col,
-                                data:       { ...item, _store: storeId, _updatedAt: now },
-                                updated_at: now
+                                // ✅ FIX SYNC CONGELADO (dispositivo desatualizado): antes,
+                                // rewriteAll() carimbava _updatedAt = now() em TODO item,
+                                // mesmo quando o conteúdo não mudou. Como rewriteAll(true)
+                                // roda depois de TODO pull automático (a cada 5-15s em
+                                // qualquer aparelho aberto), isso "envelhecia" o timestamp
+                                // do catálogo inteiro sem uma edição real ter acontecido —
+                                // corrompendo a comparação de "quem é mais recente" usada
+                                // pelo merge. Um aparelho usado raramente (ex: só fim de
+                                // semana) podia ficar com um carimbo "congelado" daquele
+                                // dia que, por causa de qualquer diferença de relógio,
+                                // passava a vencer edições genuinamente mais novas feitas
+                                // depois em outros aparelhos — travando a atualização até
+                                // apagar os dados locais. Agora só carimbamos "now" quando
+                                // o item realmente não tem _updatedAt ainda (item legado);
+                                // caso contrário preservamos o timestamp que já existia.
+                                data:       { ...item, _store: storeId, _updatedAt: item._updatedAt || now },
+                                updated_at: item._updatedAt || now
                             }));
                             try { await sbUpsertBatch(rows); total += chunk.length; }
                             catch(e) { erros++; console.error('[RxDB v17] rewriteAll', col, e.message); }
@@ -10771,6 +10786,72 @@ body.dark-mode,
             function _isNearExpiry(tok) { return  tok && Date.now() >= (tok.expires_at - 600000); } // < 10 min restantes
             function _randomStr(n) { return Array.from(crypto.getRandomValues(new Uint8Array(n))).map(b => b.toString(16).padStart(2,'0')).join('').slice(0,n); }
 
+            // ── FIX SYNC CONGELADO: fetch com timeout ──────────────────────────
+            // Nenhuma chamada de rede do CloudSync tinha timeout. Se uma requisição
+            // travasse (aba em segundo plano por muito tempo no celular, rede
+            // instável, proxy que derruba conexão sem erro explícito), o await nunca
+            // resolvia nem rejeitava — o código nunca chegava no catch/finally, e
+            // as flags _pushing/_pulling ficavam travadas em "true" para sempre.
+            // Como gdrivePush/gdrivePull/onedrivePush/onedrivePull se recusam a
+            // rodar de novo enquanto a própria flag estiver true, isso congelava o
+            // sync nos dois sentidos até um F5 completo (era exatamente o sintoma:
+            // "sincroniza por um tempo, depois edições no outro aparelho param de
+            // chegar"). Agora toda chamada de rede do CloudSync tem um teto de 20s.
+            // ── FIX SYNC CONGELADO: detecção de relógio dessincronizado ────────
+            // O merge decide "quem é mais recente" comparando _updatedAt (carimbo
+            // gerado pelo relógio de CADA aparelho). Um PC usado raramente (ex: só
+            // fim de semana) é o cenário clássico de relógio desconfigurado (sem
+            // sincronização automática de hora, pilha da placa-mãe fraca, etc.).
+            // Isso pode fazer dados antigos "parecerem" mais novos e vencer o
+            // merge, travando a atualização. Toda resposta HTTP inclui um cabeçalho
+            // "Date" com a hora real do servidor — comparamos com o relógio local
+            // e avisamos (uma vez por sessão) se a diferença for grande.
+            let _clockSkewWarned = false;
+            function _checkClockSkew(resp) {
+                try {
+                    const serverHeader = resp && resp.headers && resp.headers.get('Date');
+                    if (!serverHeader) return;
+                    const serverTime = new Date(serverHeader).getTime();
+                    if (!serverTime) return;
+                    const diffMin = (Date.now() - serverTime) / 60000;
+                    if (Math.abs(diffMin) > 5 && !_clockSkewWarned) {
+                        _clockSkewWarned = true;
+                        const dir = diffMin > 0 ? 'adiantado' : 'atrasado';
+                        console.warn('[CloudSync] ⏰ Relógio deste aparelho parece ' + dir + ' ~' + Math.abs(Math.round(diffMin)) + 'min em relação à internet.');
+                        Toast.show('⏰ O relógio deste computador/celular parece ' + dir + ' em relação à hora da internet (~' + Math.abs(Math.round(diffMin)) + ' min). Isso pode causar dados desatualizados na sincronização. Corrija a data/hora do sistema (ative "ajustar automaticamente").', 'warning', 10000);
+                    }
+                } catch(_e) {}
+            }
+
+            async function _fetchTimeout(url, options = {}, timeoutMs = 20000) {
+                const controller = new AbortController();
+                const timer = setTimeout(() => controller.abort(), timeoutMs);
+                try {
+                    const resp = await fetch(url, { ...options, signal: controller.signal });
+                    _checkClockSkew(resp);
+                    return resp;
+                } finally {
+                    clearTimeout(timer);
+                }
+            }
+
+            // ── FIX SYNC CONGELADO: watchdog de segurança ──────────────────────
+            // Rede de proteção extra: mesmo com o timeout acima, se por qualquer
+            // motivo _pushing/_pulling ficarem travados por mais de 30s, força o
+            // reset para não depender de F5.
+            let _pushingSince = 0, _pullingSince = 0;
+            setInterval(() => {
+                const now = Date.now();
+                if (_pushing && _pushingSince && (now - _pushingSince) > 30000) {
+                    console.warn('[CloudSync] ⏰ Watchdog: _pushing travado há +30s — forçando reset.');
+                    _pushing = false; _pushingSince = 0;
+                }
+                if (_pulling && _pullingSince && (now - _pullingSince) > 30000) {
+                    console.warn('[CloudSync] ⏰ Watchdog: _pulling travado há +30s — forçando reset.');
+                    _pulling = false; _pullingSince = 0;
+                }
+            }, 10000);
+
             // ── Auto-refresh silencioso do token Google Drive ─────────────────
             // (via refresh_token + Edge Function — sem popup, imune a bloqueador
             //  de popup do navegador. Ver _refreshGDriveAccessToken() mais abaixo,
@@ -11174,7 +11255,7 @@ body.dark-mode,
             //    via Edge Function (o client_secret nunca fica no navegador) ──────
             async function _exchangeGDriveCode(code, clientIdUsed) {
                 try {
-                    const resp = await fetch(GDRIVE_OAUTH_FN, {
+                    const resp = await _fetchTimeout(GDRIVE_OAUTH_FN, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({
@@ -11219,7 +11300,7 @@ body.dark-mode,
                 }
                 _autoRefreshing = true;
                 try {
-                    const resp = await fetch(GDRIVE_OAUTH_FN, {
+                    const resp = await _fetchTimeout(GDRIVE_OAUTH_FN, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({ action: 'refresh', refresh_token: _gdriveToken.refresh_token })
@@ -11279,7 +11360,7 @@ body.dark-mode,
                 if (cachedId) return cachedId;
                 // Busca por nome (arquivo específico da loja ativa)
                 const fn = encodeURIComponent(_fileName());
-                const searchResp = await fetch(
+                const searchResp = await _fetchTimeout(
                     'https://www.googleapis.com/drive/v3/files?spaces=drive&q=name%3D%22' + fn + '%22%20and%20trashed%3Dfalse&fields=files(id,modifiedTime)',
                     { headers: { Authorization: 'Bearer ' + _gdriveToken.access_token } }
                 );
@@ -11320,7 +11401,7 @@ body.dark-mode,
             // ── Obtém modifiedTime do arquivo no Drive ────────────────────────
             async function _gdriveGetModifiedTime(fileId) {
                 try {
-                    const r = await fetch(
+                    const r = await _fetchTimeout(
                         'https://www.googleapis.com/drive/v3/files/' + fileId + '?fields=modifiedTime',
                         { headers: { Authorization: 'Bearer ' + _gdriveToken.access_token } }
                     );
@@ -11337,7 +11418,7 @@ body.dark-mode,
                     return;
                 }
                 if (_pushing) return;
-                _pushing = true;
+                _pushing = true; _pushingSince = Date.now();
                 if (silent) _updateWidget('push', '↑ Enviando...');
                 try {
                     // ✅ FIX RACE-CONDITION (causa da "venda que some" entre aparelhos):
@@ -11351,7 +11432,7 @@ body.dark-mode,
                     try {
                         const fileIdPre = await _gdriveGetOrCreateFileId();
                         if (fileIdPre) {
-                            const preResp = await fetch(
+                            const preResp = await _fetchTimeout(
                                 'https://www.googleapis.com/drive/v3/files/' + fileIdPre + '?alt=media',
                                 { headers: { Authorization: 'Bearer ' + _gdriveToken.access_token }, cache: 'no-store' }
                             );
@@ -11371,13 +11452,29 @@ body.dark-mode,
                     const fileId = await _gdriveGetOrCreateFileId();
                     if (fileId) {
                         // Atualiza arquivo existente
-                        const r = await fetch(
+                        const r = await _fetchTimeout(
                             'https://www.googleapis.com/upload/drive/v3/files/' + fileId + '?uploadType=media',
                             { method: 'PATCH', headers: { Authorization: 'Bearer ' + _gdriveToken.access_token, 'Content-Type': 'application/json' }, body: data }
                         );
                         // Se 404 (arquivo deletado externamente), limpa cache e recria
                         if (r.status === 404) {
+                            // ⚠️ AVISO: o arquivo do Drive sumiu — o pré-merge (que protegeria
+                            // contra sobrescrever mudanças de outro aparelho) não teve nada
+                            // pra baixar, então o arquivo recriado abaixo só tem os dados
+                            // DESTE aparelho. Nenhum dado é apagado localmente em nenhum
+                            // aparelho (o merge nunca deleta, só o tombstone explícito
+                            // deleta), mas uma edição recente de outro aparelho que só
+                            // existia no arquivo apagado fica temporariamente fora do
+                            // registro compartilhado até o próximo push dele. Por isso
+                            // avisamos, em vez de recriar silenciosamente.
+                            console.warn('[CloudSync] ⚠️ Arquivo do Drive não encontrado (404) — recriando com os dados deste aparelho.');
+                            Toast.show('⚠️ Arquivo de backup não encontrado no Google Drive — foi recriado com os dados deste aparelho. Se você tem outro dispositivo com edições recentes, confira se sincronizou antes de continuar.', 'warning', 8000);
                             _clearGDriveFileId();
+                            // ✅ FIX: libera a trava de reentrância ANTES de recriar — sem
+                            // isso, a chamada recursiva abaixo batia na guarda
+                            // "if (_pushing) return;" (ainda true) e não fazia nada, então
+                            // o arquivo nunca era realmente recriado.
+                            _pushing = false; _pushingSince = 0;
                             return gdrivePush(silent);
                         }
                     } else {
@@ -11386,7 +11483,7 @@ body.dark-mode,
                         const form = new FormData();
                         form.append('metadata', new Blob([meta], { type: 'application/json' }));
                         form.append('file',     new Blob([data], { type: 'application/json' }));
-                        const r = await fetch(
+                        const r = await _fetchTimeout(
                             'https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id',
                             { method: 'POST', headers: { Authorization: 'Bearer ' + _gdriveToken.access_token }, body: form }
                         );
@@ -11406,7 +11503,7 @@ body.dark-mode,
                     if (!silent) Toast.show('❌ Erro ao enviar ao Drive: ' + e.message, 'danger');
                     else console.warn('[CloudSync] gdrivePush silencioso falhou:', e.message);
                 } finally {
-                    _pushing = false;
+                    _pushing = false; _pushingSince = 0;
                 }
             }
 
@@ -11418,13 +11515,13 @@ body.dark-mode,
                     return;
                 }
                 if (_pulling) return;
-                _pulling = true;
+                _pulling = true; _pullingSince = Date.now();
                 if (silent) _updateWidget('pull', '↓ Verificando...');
                 try {
                     const fileId = await _gdriveGetOrCreateFileId();
                     if (!fileId) {
                         if (!silent) Toast.show('⚠️ Nenhum arquivo de backup encontrado no Google Drive.', 'warning');
-                        _pulling = false;
+                        _pulling = false; _pullingSince = 0;
                         if (silent) _showSyncIndicator('Sem arquivo no Drive');
                         return;
                     }
@@ -11455,7 +11552,7 @@ body.dark-mode,
                     // bate exatamente com o sintoma relatado: só um F5 completo (que
                     // o navegador trata de forma mais agressiva quanto a cache) trazia
                     // a mudança feita no outro navegador.
-                    const fileResp = await fetch(
+                    const fileResp = await _fetchTimeout(
                         'https://www.googleapis.com/drive/v3/files/' + fileId + '?alt=media',
                         { headers: { Authorization: 'Bearer ' + _gdriveToken.access_token }, cache: 'no-store' }
                     );
@@ -11473,7 +11570,7 @@ body.dark-mode,
                     if (!silent) Toast.show('❌ Erro ao baixar do Drive: ' + e.message, 'danger');
                     else { console.warn('[CloudSync] gdrivePull silencioso falhou:', e.message); _updateWidget('err', 'Erro no pull'); }
                 } finally {
-                    _pulling = false;
+                    _pulling = false; _pullingSince = 0;
                 }
             }
 
@@ -11538,7 +11635,7 @@ body.dark-mode,
                         grant_type:    'authorization_code',
                         code_verifier: verifier
                     });
-                    const resp = await fetch('https://login.microsoftonline.com/consumers/oauth2/v2.0/token', {
+                    const resp = await _fetchTimeout('https://login.microsoftonline.com/consumers/oauth2/v2.0/token', {
                         method:  'POST',
                         headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
                         body:    body.toString()
@@ -11588,7 +11685,7 @@ body.dark-mode,
                         refresh_token: _onedriveToken.refresh_token,
                         grant_type:    'refresh_token'
                     });
-                    const resp = await fetch('https://login.microsoftonline.com/consumers/oauth2/v2.0/token', {
+                    const resp = await _fetchTimeout('https://login.microsoftonline.com/consumers/oauth2/v2.0/token', {
                         method:  'POST',
                         headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
                         body:    body.toString()
@@ -11650,7 +11747,7 @@ body.dark-mode,
                 const cachedId = _getOdFileId();
                 if (cachedId) {
                     try {
-                        const r = await fetch(
+                        const r = await _fetchTimeout(
                             'https://graph.microsoft.com/v1.0/me/drive/items/' + cachedId,
                             { headers: { Authorization: 'Bearer ' + _onedriveToken.access_token } }
                         );
@@ -11659,7 +11756,7 @@ body.dark-mode,
                     _clearOdFileId();
                 }
                 try {
-                    const r = await fetch(
+                    const r = await _fetchTimeout(
                         'https://graph.microsoft.com/v1.0/me/drive/root:/' + encodeURIComponent(_fileName()) + ':/driveItem?$select=id,lastModifiedDateTime',
                         { headers: { Authorization: 'Bearer ' + _onedriveToken.access_token } }
                     );
@@ -11677,12 +11774,12 @@ body.dark-mode,
                     return;
                 }
                 if (_pushing) return;
-                _pushing = true;
+                _pushing = true; _pushingSince = Date.now();
                 try {
                     // ✅ FIX RACE-CONDITION (mesmo problema do Google Drive, ver comentário
                     // equivalente em gdrivePush): mescla o remoto antes de sobrescrever.
                     try {
-                        const preResp = await fetch(
+                        const preResp = await _fetchTimeout(
                             'https://graph.microsoft.com/v1.0/me/drive/root:/' + encodeURIComponent(_fileName()) + ':/content',
                             { headers: { Authorization: 'Bearer ' + _onedriveToken.access_token }, cache: 'no-store' }
                         );
@@ -11696,7 +11793,7 @@ body.dark-mode,
                     }
 
                     const data = JSON.stringify(_collectAllData(), null, 2);
-                    const r = await fetch(
+                    const r = await _fetchTimeout(
                         'https://graph.microsoft.com/v1.0/me/drive/root:/' + encodeURIComponent(_fileName()) + ':/content',
                         { method: 'PUT', headers: { Authorization: 'Bearer ' + _onedriveToken.access_token, 'Content-Type': 'application/json' }, body: data }
                     );
@@ -11714,7 +11811,7 @@ body.dark-mode,
                     if (!silent) Toast.show('❌ Erro ao enviar ao OneDrive: ' + e.message, 'danger');
                     else { console.warn('[CloudSync] onedrivePush silencioso falhou:', e.message); _scheduleRetryPush(); }
                 } finally {
-                    _pushing = false;
+                    _pushing = false; _pushingSince = 0;
                 }
             }
 
@@ -11724,16 +11821,16 @@ body.dark-mode,
                     return;
                 }
                 if (_pulling) return;
-                _pulling = true;
+                _pulling = true; _pullingSince = Date.now();
                 try {
                     if (!silent) Toast.show('☁️ Baixando dados do OneDrive...', 'info', 1500);
-                    const r = await fetch(
+                    const r = await _fetchTimeout(
                         'https://graph.microsoft.com/v1.0/me/drive/root:/' + encodeURIComponent(_fileName()) + ':/content',
                         { headers: { Authorization: 'Bearer ' + _onedriveToken.access_token }, cache: 'no-store' }
                     );
                     if (!r.ok) {
                         if (!silent) Toast.show('⚠️ Nenhum arquivo encontrado no OneDrive.', 'warning');
-                        _pulling = false; return;
+                        _pulling = false; _pullingSince = 0; return;
                     }
                     const remote = await r.json();
                     // ✅ FIX SYNC CRÍTICO: ver comentário equivalente em gdrivePull() —
@@ -11745,7 +11842,7 @@ body.dark-mode,
                 } catch(e) {
                     if (!silent) Toast.show('❌ Erro ao baixar do OneDrive: ' + e.message, 'danger');
                 } finally {
-                    _pulling = false;
+                    _pulling = false; _pullingSince = 0;
                 }
             }
 
