@@ -11300,6 +11300,25 @@ body.dark-mode,
 
             // ── Troca o "code" recebido do Google por access_token + refresh_token
             //    via Edge Function (o client_secret nunca fica no navegador) ──────
+            // ── Indicador diagnóstico: quantas vezes ESTE navegador gerou um
+            //    refresh_token novo (cada "Conectar"/consentimento consome uma
+            //    unidade do limite de 100 do Google por conta+client_id). Isso
+            //    é só visibilidade — não impede o limite de ser estourado, só
+            //    ajuda a perceber quando reconexões estão sendo feitas demais.
+            function _logGDriveTokenIssued(kind) {
+                try {
+                    const key = 'cs_gdrive_token_issue_log';
+                    const log = JSON.parse(localStorage.getItem(key) || '[]');
+                    log.push({ kind, at: new Date().toISOString() });
+                    if (log.length > 50) log.splice(0, log.length - 50); // mantém só os últimos 50
+                    localStorage.setItem(key, JSON.stringify(log));
+                    const newTokenCount = log.filter(e => e.kind === 'new_refresh_token').length;
+                    console.log('[CloudSync] 🔎 Indicador de token — evento: ' + kind +
+                        ' | novos refresh_tokens emitidos por este navegador (histórico local): ' + newTokenCount +
+                        ' | limite do Google por conta: 100');
+                } catch(e) {}
+            }
+
             async function _exchangeGDriveCode(code, clientIdUsed) {
                 try {
                     const resp = await _fetchTimeout(GDRIVE_OAUTH_FN, {
@@ -11317,6 +11336,9 @@ body.dark-mode,
                         Toast.show('⚠️ Falha ao conectar Google Drive. Tente novamente.', 'danger', 4000);
                         return false;
                     }
+                    // Um refresh_token novo só vem quando o Google de fato emite um
+                    // (nem toda troca retorna um — às vezes reaproveita o existente).
+                    if (data.refresh_token) _logGDriveTokenIssued('new_refresh_token');
                     _gdriveToken = {
                         access_token:  data.access_token,
                         refresh_token: data.refresh_token || _gdriveToken?.refresh_token || null,
@@ -11346,6 +11368,7 @@ body.dark-mode,
                     return false;
                 }
                 _autoRefreshing = true;
+                _logGDriveTokenIssued('silent_refresh_attempt');
                 try {
                     const resp = await _fetchTimeout(GDRIVE_OAUTH_FN, {
                         method: 'POST',
@@ -11356,14 +11379,19 @@ body.dark-mode,
                     if (!resp.ok || !data.access_token) {
                         console.warn('[CloudSync] ⚠️ Falha ao renovar token via refresh_token:', data);
                         // refresh_token pode ter sido revogado — pede reconexão manual
+                        _logGDriveTokenIssued('refresh_failed_invalid_grant');
                         _showReconnectBanner();
                         return false;
                     }
+                    // Raro, mas o Google às vezes retorna um refresh_token novo mesmo
+                    // numa renovação de access_token — se acontecer, também conta.
+                    if (data.refresh_token) _logGDriveTokenIssued('new_refresh_token');
                     _gdriveToken = {
                         ..._gdriveToken,
-                        access_token: data.access_token,
-                        expires_at:   Date.now() + (parseInt(data.expires_in || '3600', 10) * 1000)
-                        // refresh_token geralmente não vem de novo — mantém o existente (spread acima)
+                        access_token:  data.access_token,
+                        refresh_token: data.refresh_token || _gdriveToken.refresh_token,
+                        expires_at:    Date.now() + (parseInt(data.expires_in || '3600', 10) * 1000)
+                        // refresh_token geralmente não vem de novo — mantém o existente (fallback acima)
                     };
                     _saveTokens();
                     const mins = Math.round((data.expires_in || 3600) / 60);
@@ -11375,6 +11403,32 @@ body.dark-mode,
                 } finally {
                     _autoRefreshing = false;
                 }
+            }
+
+            // ── Garante um access_token válido antes de qualquer push/pull.
+            //    ✅ FIX RECONEXÃO DESNECESSÁRIA: push/pull/_silentPush/_silentPull
+            //    checavam apenas _isExpired() e, se o token já tivesse expirado,
+            //    pediam reconexão manual na hora — mesmo com um refresh_token
+            //    perfeitamente válido em mãos. O único lugar que de fato chamava
+            //    _refreshGDriveAccessToken() era o setInterval de 60s
+            //    (_checkTokenExpiry). Se o token expirasse enquanto o app ficava
+            //    em segundo plano (celular bloqueado, aba suspensa) por tempo
+            //    suficiente, a PRIMEIRA sincronização ao voltar (disparada por
+            //    focus/visibilitychange) já encontrava o token expirado e exibia
+            //    o banner de reconexão antes que o timer tivesse chance de rodar
+            //    de novo — daí o "já tinha sido resolvido e voltou a pedir para
+            //    reconectar". Agora toda tentativa de push/pull tenta renovar
+            //    silenciosamente primeiro, e só pede reconexão manual se o
+            //    próprio refresh_token falhar (revogado/expirado de verdade).
+            async function _ensureValidGDriveToken(silent) {
+                if (!_gdriveToken) return false;
+                if (!_isExpired(_gdriveToken)) return true;
+                const renewed = await _refreshGDriveAccessToken();
+                if (!renewed) {
+                    if (!silent) Toast.show('⚠️ Token Google Drive expirado. Reconecte.', 'warning');
+                    return false;
+                }
+                return true;
             }
 
             // ── Obtém ou cria o fileId no Drive (por loja) ──────────────────
@@ -11459,8 +11513,7 @@ body.dark-mode,
 
             // ── Push para Google Drive ────────────────────────────────────────
             async function gdrivePush(silent) {
-                if (!_gdriveToken || _isExpired(_gdriveToken)) {
-                    if (!silent) Toast.show('⚠️ Token Google Drive expirado. Reconecte.', 'warning');
+                if (!(await _ensureValidGDriveToken(silent))) {
                     if (silent) _showReconnectBanner();
                     return;
                 }
@@ -11556,8 +11609,7 @@ body.dark-mode,
 
             // ── Pull do Google Drive (com verificação de modifiedTime) ─────────
             async function gdrivePull(silent) {
-                if (!_gdriveToken || _isExpired(_gdriveToken)) {
-                    if (!silent) Toast.show('⚠️ Token Google Drive expirado. Reconecte.', 'warning');
+                if (!(await _ensureValidGDriveToken(silent))) {
                     if (silent) _showReconnectBanner();
                     return;
                 }
@@ -11941,7 +11993,7 @@ body.dark-mode,
                     return;
                 }
                 try {
-                    if (_activeProvider === 'gdrive'   && _gdriveToken   && !_isExpired(_gdriveToken))   gdrivePull(true).catch(()=>{});
+                    if (_activeProvider === 'gdrive'   && _gdriveToken)                                  gdrivePull(true).catch(()=>{});
                     if (_activeProvider === 'onedrive' && _onedriveToken && !_isExpired(_onedriveToken)) onedrivePull(true).catch(()=>{});
                 } catch(e) {}
             }
@@ -11963,7 +12015,7 @@ body.dark-mode,
 
             function _silentPush() {
                 try {
-                    if (_activeProvider === 'gdrive'   && _gdriveToken   && !_isExpired(_gdriveToken))   gdrivePush(true).catch(()=>{});
+                    if (_activeProvider === 'gdrive'   && _gdriveToken)                                  gdrivePush(true).catch(()=>{});
                     if (_activeProvider === 'onedrive' && _onedriveToken && !_isExpired(_onedriveToken)) onedrivePush(true).catch(()=>{});
                 } catch(e) {}
             }
@@ -12284,7 +12336,21 @@ body.dark-mode,
             function _resumeAutoConnect() {
                 _updateUI();
                 // Se já estava conectado, retoma polling e faz pull inicial
-                if (_activeProvider === 'gdrive'   && _gdriveToken   && !_isExpired(_gdriveToken))   { _startPolling(); setTimeout(() => gdrivePull(true).catch(()=>{}), 1500); }
+                if (_activeProvider === 'gdrive' && _gdriveToken) {
+                    if (!_isExpired(_gdriveToken)) {
+                        _startPolling(); setTimeout(() => gdrivePull(true).catch(()=>{}), 1500);
+                    } else {
+                        // ✅ FIX: token já expirado no boot (app ficou fechado/em background
+                        // por mais tempo que a validade do access_token). Antes disso caía
+                        // direto no fallback do _checkTokenExpiry (3s depois) sem nunca
+                        // iniciar o polling — então mesmo depois de renovar o token,
+                        // a sync automática ficava "parada" até o usuário mexer em algo.
+                        // Agora tenta renovar de imediato e, se der certo, já liga o polling.
+                        _refreshGDriveAccessToken().then(ok => {
+                            if (ok) { _startPolling(); gdrivePull(true).catch(()=>{}); }
+                        });
+                    }
+                }
                 if (_activeProvider === 'onedrive' && _onedriveToken && !_isExpired(_onedriveToken)) { _startPolling(); setTimeout(() => onedrivePull(true).catch(()=>{}), 1500); }
                 // FIX: mostra banner se token expirado logo na abertura
                 setTimeout(_checkTokenExpiry, 3000);
@@ -12310,6 +12376,19 @@ body.dark-mode,
             });
 
             return {
+                // ── Indicador de tokens: mostra no console o histórico de emissões
+                // de refresh_token deste navegador (diagnóstico do limite de 100
+                // do Google por conta+client_id — ver CloudSync.showTokenLog()).
+                showTokenLog() {
+                    try {
+                        const log = JSON.parse(localStorage.getItem('cs_gdrive_token_issue_log') || '[]');
+                        const newTokens = log.filter(e => e.kind === 'new_refresh_token').length;
+                        console.log('[CloudSync] 📋 Histórico de eventos de token (este navegador):');
+                        console.table(log);
+                        console.log('[CloudSync] Total de refresh_tokens NOVOS emitidos (contam pro limite de 100 do Google): ' + newTokens);
+                        return log;
+                    } catch(e) { console.warn('[CloudSync] Sem log disponível.'); return []; }
+                },
                 connectGDrive, gdrivePush, gdrivePull, gdriveDisconnect,
                 connectOneDrive, onedrivePush, onedrivePull, onedriveDisconnect,
                 showTab, _updateUI,
