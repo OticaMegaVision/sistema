@@ -9832,6 +9832,16 @@ body.dark-mode,
             async _fetchAllData() {
                 const storeId = window._currentStore || 'barueri';
                 console.log('[DIAG _fetchAllData] storeId capturado:', storeId, '| company.name ANTES do reset:', state.company?.name);
+                // ✅ FIX RACE LOGIN/TROCA-DE-LOJA: qualquer await abaixo pode terminar
+                // DEPOIS que o usuário já trocou de loja (seletor) ou que o login já
+                // resolveu a loja real do usuário. Sem esta trava, um fetch "atrasado"
+                // da loja ANTERIOR grava seus dados em `state` por cima do que já foi
+                // corretamente carregado para a loja NOVA — é exatamente o "flash de
+                // Barueri que chega atrasado e mistura com Caucaia". A partir daqui,
+                // toda escrita em `state` é condicionada a `stillActive()`: se a loja
+                // ativa mudou desde que este fetch começou, abortamos ANTES de tocar
+                // em `state`, sem exceção parcial (nunca escrevemos "só metade").
+                const stillActive = () => (window._currentStore || 'barueri') === storeId;
                 // ✅ FIX "meta do mês volta pro valor anterior / mistura com outra loja":
                 // dois problemas distintos, mesma causa raiz — o bloco abaixo fazia
                 // Object.assign(state.company, cfg.company) DIRETO NO MESMO OBJETO,
@@ -9872,6 +9882,14 @@ body.dark-mode,
                     const cols = Object.values(_COL_MAP).filter((v,i,a) => a.indexOf(v) === i);
                     for (const col of cols) {
                         let items = await sbGetCollection(storeId, col);
+                        // ✅ FIX RACE: a busca acima é assíncrona — se a loja ativa mudou
+                        // enquanto ela rodava, este resultado pertence à loja ANTERIOR e
+                        // NUNCA deve ser gravado em `state`. Aborta a função inteira aqui
+                        // (nenhuma coleção restante é escrita) em vez de só pular esta.
+                        if (!stillActive()) {
+                            console.warn('[RxDB v17] ⚠️ _fetchAllData abortado: loja mudou de "' + storeId + '" durante o fetch de "' + col + '" — descartando resultado desatualizado.');
+                            return;
+                        }
                         const stateKey = Object.entries(_COL_MAP).find(([k,v]) => v === col)?.[0];
                         // ✅ FIX MIGRAÇÃO CRM: coleções antigas (crmContatos/crmTarefas/crmNps)
                         // podem conter o formato legado de doc único "bulk" com
@@ -9898,6 +9916,12 @@ body.dark-mode,
                         // FIX #4: restaura state.company, config e lastOsCounter corretamente
                         // sem usar Object.assign(state, cfg) que poluía o state com keys extras.
                         const cfg = await sbGetDoc(storeId, 'config', 'main');
+                        // ✅ FIX RACE: mesma trava do loop de coleções — este sbGetDoc também
+                        // é assíncrono e pode resolver depois de uma troca de loja.
+                        if (!stillActive()) {
+                            console.warn('[RxDB v17] ⚠️ _fetchAllData abortado: loja mudou durante fetch de config/main.');
+                            return;
+                        }
                         if (cfg && typeof cfg === 'object') {
                             if (cfg.config        && typeof cfg.config        === 'object') Object.assign(state.config        || (state.config        = {}), cfg.config);
                             if (cfg.company       && typeof cfg.company       === 'object') Object.assign(state.company       || (state.company       = {}), cfg.company);
@@ -9907,6 +9931,11 @@ body.dark-mode,
                         }
                         // Tenta também o doc 'empresa' para compatibilidade com switchTo
                         const emp = await sbGetDoc(storeId, 'config', 'empresa');
+                        // ✅ FIX RACE: mesma trava — aborta se a loja mudou durante este await.
+                        if (!stillActive()) {
+                            console.warn('[RxDB v17] ⚠️ _fetchAllData abortado: loja mudou durante fetch de config/empresa.');
+                            return;
+                        }
                         if (emp && typeof emp === 'object') {
                             if (emp.company)       Object.assign(state.company       || (state.company       = {}), emp.company);
                             if (emp.notificacoes)  Object.assign(state.notificacoes  || (state.notificacoes  = {}), emp.notificacoes);
@@ -9982,32 +10011,59 @@ body.dark-mode,
             },
 
             // ── Sync ──────────────────────────────────────────────────────────
+            _syncPending: false,
             async sync(reason) {
-                if (this._syncing) return;
+                // ✅ FIX RACE LOGIN/TROCA-DE-LOJA (parte 2): antes, se um sync já
+                // estivesse rodando (ex: boot() ainda buscando a loja default),
+                // uma chamada concorrente — como a que StoreManager.switchTo()
+                // dispara ao trocar de loja no seletor — era SIMPLESMENTE
+                // DESCARTADA aqui (`return` sem fazer nada). Resultado: a troca de
+                // loja "terminava" (a Promise resolvia, o toast de sucesso aparecia)
+                // sem que os dados da loja nova tivessem sido buscados de verdade —
+                // o app ficava com os dados antigos/parciais até algum OUTRO
+                // gatilho (foco na aba, polling de 30s, dashboard) rodar por acaso.
+                // Agora: se chegar uma chamada enquanto já há uma em andamento, ela
+                // não é perdida — marca `_syncPending` e a rodada JÁ EM ANDAMENTO,
+                // ao terminar, dispara automaticamente mais uma rodada (que vai ler
+                // `window._currentStore` de novo — já atualizado para a loja certa).
+                // ✅ Se já existe uma rodada em andamento, NÃO retornamos "no vazio":
+                // devolvemos a MESMA Promise dessa rodada (que, por causa do loop
+                // `do/while (_syncPending)` abaixo, só resolve depois de rodar mais
+                // uma vez do zero). Assim, quem chamou `await LocalFirst.sync(...)`
+                // esperando dados prontos (ex: StoreManager.switchTo) só segue em
+                // frente quando os dados da loja CERTA já estiverem em `state` —
+                // nunca antes, e nunca com o pedido simplesmente ignorado.
+                if (this._syncing) { this._syncPending = true; return this._syncingPromise; }
                 this._syncing = true;
-                try {
-                    // ✅ FIX SEGURANÇA-SYNC: fila única com CloudSync — impede que uma
-                    // leitura local (troca de seção, BroadcastChannel, foco na aba)
-                    // resete state.company/config no meio de um pull do Drive/OneDrive.
-                    await _withSyncLock('local:sync[' + (reason || '?') + ']', () => this._fetchAllData());
-                    // FIX #2: re-renderiza todas as seções da UI após carregar os dados,
-                    // não apenas o dashboard — corrige telas vazias após F5 ou troca de aba.
-                    try { Dashboard.update(); } catch(e) {}
-                    try { this._scheduleDashUpdate?.(); } catch(e) {}
-                    // Re-renderiza tabelas e listas somente quando não for um sync silencioso
-                    if (reason !== 'push') {
-                        try { if (window.Clients)   Clients.renderTable?.(); }   catch(e) {}
-                        try { if (window.Products)  Products.renderTable?.(); }  catch(e) {}
-                        try { if (window.Sales)     Sales.renderHistory?.(); }   catch(e) {}
-                        try { if (window.Expenses)  { Expenses.renderTable?.(); Expenses.updateSummary?.(); } } catch(e) {}
-                        try { if (window.Services)  Services.renderTable?.(); }  catch(e) {}
-                        try { if (window.Suppliers) Suppliers.renderTable?.(); } catch(e) {}
-                        try { if (window.Config)    Config.load?.(); }           catch(e) {}
-                        try { App.updateCompanyDisplay?.(); }                    catch(e) {}
+                this._syncingPromise = (async () => {
+                    try {
+                        do {
+                            this._syncPending = false;
+                            // ✅ FIX SEGURANÇA-SYNC: fila única com CloudSync — impede que uma
+                            // leitura local (troca de seção, BroadcastChannel, foco na aba)
+                            // resete state.company/config no meio de um pull do Drive/OneDrive.
+                            await _withSyncLock('local:sync[' + (reason || '?') + ']', () => this._fetchAllData());
+                            // FIX #2: re-renderiza todas as seções da UI após carregar os dados,
+                            // não apenas o dashboard — corrige telas vazias após F5 ou troca de aba.
+                            try { Dashboard.update(); } catch(e) {}
+                            try { this._scheduleDashUpdate?.(); } catch(e) {}
+                            // Re-renderiza tabelas e listas somente quando não for um sync silencioso
+                            if (reason !== 'push') {
+                                try { if (window.Clients)   Clients.renderTable?.(); }   catch(e) {}
+                                try { if (window.Products)  Products.renderTable?.(); }  catch(e) {}
+                                try { if (window.Sales)     Sales.renderHistory?.(); }   catch(e) {}
+                                try { if (window.Expenses)  { Expenses.renderTable?.(); Expenses.updateSummary?.(); } } catch(e) {}
+                                try { if (window.Services)  Services.renderTable?.(); }  catch(e) {}
+                                try { if (window.Suppliers) Suppliers.renderTable?.(); } catch(e) {}
+                                try { if (window.Config)    Config.load?.(); }           catch(e) {}
+                                try { App.updateCompanyDisplay?.(); }                    catch(e) {}
+                            }
+                        } while (this._syncPending);
+                    } finally {
+                        this._syncing = false;
                     }
-                } finally {
-                    this._syncing = false;
-                }
+                })();
+                return this._syncingPromise;
             },
 
             // ── pushItem ──────────────────────────────────────────────────────
