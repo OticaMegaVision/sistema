@@ -4918,6 +4918,11 @@ body.dark-mode,
 .table-container tbody tr td{padding:0.5rem 0.9rem!important;font-size:0.82rem!important;vertical-align:middle!important;}
 .table-container tbody tr:hover td{background:rgba(255,107,0,0.03)!important;}
 .dark-mode .table-container::-webkit-scrollbar-track{background:#1a1208!important;}
+
+/* ── Barra de filtros fixa (sticky) acima das listas ── */
+.table-filtros{position:sticky!important;top:0!important;z-index:11!important;background:#fff!important;padding-bottom:0.75rem!important;margin-bottom:0!important;}
+.table-container.tf-ready thead tr th{top:var(--tf-h,0px)!important;}
+.dark-mode .table-filtros{background:#1a1208!important;}
 .os-pdf-wrapper,.os-pdf-wrapper *{font-family:"DM Sans",Arial,sans-serif!important;}
 .os-pdf-wrapper .os-empresa-nome{font-weight:900!important;letter-spacing:-0.3px!important;}
 .os-pdf-wrapper .os-empresa-badge{font-weight:800!important;letter-spacing:0.5px!important;}
@@ -5692,8 +5697,8 @@ body.dark-mode,
                         <div class="bar-chart" id="productsChart"></div>
                     </div>
                 </div>
-                <div class="table-container">
-                    <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:0.5rem;margin-bottom:0.75rem;">
+                <div class="table-container tf-ready">
+                    <div class="table-filtros" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:0.5rem;">
                         <h3 style="margin:0;">Últimas Vendas</h3>
                         <div style="display:flex;gap:0.5rem;flex-wrap:wrap;">
                             <input type="text" id="filterRecentClient" class="form-control" placeholder="🔍 Cliente..." oninput="Dashboard.filterRecentSales()" style="max-width:160px;font-size:0.82rem;">
@@ -6695,7 +6700,8 @@ body.dark-mode,
                 </div>
 
                 <!-- Histórico de Vendas -->
-                <div class="table-container no-print">
+                <div class="table-container no-print tf-ready">
+                    <div class="table-filtros">
                     <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:0.75rem;margin-bottom:1rem;">
                         <h3 style="margin:0;">Histórico de Vendas</h3>
                         <span class="sales-count-badge" id="salesCountBadge">0 OS</span>
@@ -6731,6 +6737,7 @@ body.dark-mode,
                             <option value="dual">Duplo</option>
                         </select>
                         <button class="btn btn-secondary btn-sm" onclick="Sales.clearHistoryFilter()" title="Limpar filtros"><i class="fas fa-times"></i> Limpar</button>
+                    </div>
                     </div>
                     <table id="salesHistoryTable">
                         <thead>
@@ -7055,8 +7062,8 @@ body.dark-mode,
                 </div>
 
                 <!-- Tabela de Clientes (com coluna Receita) -->
-                <div class="table-container">
-                    <div style="display:flex;align-items:center;gap:0.75rem;margin-bottom:1rem;flex-wrap:wrap;">
+                <div class="table-container tf-ready">
+                    <div class="table-filtros" style="display:flex;align-items:center;gap:0.75rem;flex-wrap:wrap;">
                         <div style="flex:1;min-width:200px;position:relative;">
                             <i class="fas fa-search" style="position:absolute;left:12px;top:50%;transform:translateY(-50%);color:var(--gray);"></i>
                             <input type="text" id="searchClient" class="form-control" placeholder="Buscar por nome, CPF, telefone..." oninput="Clients.searchDebounced()" style="padding-left:36px;">
@@ -7472,8 +7479,8 @@ body.dark-mode,
                         </div>
                     </form>
                 </div>
-                <div class="table-container">
-                    <div style="display:flex;align-items:center;gap:0.5rem;flex-wrap:wrap;margin-bottom:1rem;">
+                <div class="table-container tf-ready">
+                    <div class="table-filtros" style="display:flex;align-items:center;gap:0.5rem;flex-wrap:wrap;">
                         <input type="text" id="searchProduct" class="form-control" placeholder="🔍 Buscar produto..." onkeyup="Products.search()" style="flex:1;min-width:180px;margin:0;">
                         <span id="productsCountBadge" style="background:#ff6b00;color:#fff;border-radius:20px;padding:3px 12px;font-size:0.78rem;font-weight:700;white-space:nowrap;">0 produtos</span>
                         <button class="btn btn-secondary btn-sm" onclick="document.getElementById('importProductsFile').click()" title="Importar produtos via Excel/CSV">
@@ -14117,6 +14124,35 @@ body.dark-mode,
         if (!state.nfe_counter)   state.nfe_counter   = '1';
 
         // ==================== UTILITÁRIOS ====================
+        // ── Barra de filtros fixa (sticky) nas listas com rolagem ──
+        // Mede a altura real de cada .table-filtros (ela pode quebrar em 2 linhas
+        // no celular) e expõe como --tf-h no .table-container, para o cabeçalho
+        // da tabela (thead, já sticky) grudar logo abaixo dela sem sobrepor.
+        const TableFiltros = {
+            sync(container) {
+                if (!container) return;
+                const bar = container.querySelector('.table-filtros');
+                if (!bar) return;
+                const h = bar.getBoundingClientRect().height;
+                if (h > 0) container.style.setProperty('--tf-h', h + 'px');
+            },
+            syncAll() {
+                document.querySelectorAll('.table-container.tf-ready').forEach(c => this.sync(c));
+            },
+            init() {
+                this.syncAll();
+                let t;
+                window.addEventListener('resize', () => { clearTimeout(t); t = setTimeout(() => this.syncAll(), 150); });
+                // Reajusta quando alguma barra de filtro mudar de tamanho (ex: contador de itens cresce e quebra linha)
+                if (window.ResizeObserver) {
+                    document.querySelectorAll('.table-filtros').forEach(bar => {
+                        new ResizeObserver(() => this.sync(bar.closest('.table-container'))).observe(bar);
+                    });
+                }
+            }
+        };
+        window.TableFiltros = TableFiltros;
+
         const Utils = {
             // ── Comprime uma imagem (logo/foto de produto) ANTES de guardá-la ──
             // Em vez de excluir imagens do payload de sincronização (o que exigiria
@@ -15871,6 +15907,7 @@ tbody tr td{border:1.5px solid #000;padding:2mm;text-align:center;font-weight:70
                         else if (section === 'crm') {
                             if (typeof CRM !== 'undefined') CRM.init();
                         }
+                        setTimeout(() => { try { if (window.TableFiltros) TableFiltros.syncAll(); } catch(e) {} }, 30);
                     });
                 });
             },
@@ -24322,6 +24359,7 @@ ${container.innerHTML}
                 return;
             }
             await App.init();
+            try { if (window.TableFiltros) TableFiltros.init(); } catch(e) {}
             // ✅ Loja já resolvida por App.init()/StoreManager.init() — agora sim é
             // seguro deixar o CloudSync se conectar e puxar dados automaticamente
             // (ver fix em CloudSync: antes ele fazia isso sozinho no 'load' da
