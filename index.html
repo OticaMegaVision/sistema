@@ -6061,6 +6061,27 @@ body.dark-mode,
                                     <select id="armacaoSelect" class="form-control" style="border-radius:8px;border-color:#ffb385;background:#fff;font-size:0.85rem;">
                                         <option value="">🔍 Escolha uma armação...</option>
                                     </select>
+                                    <div style="background:#fff;border:1.5px dashed #ffb385;border-radius:10px;padding:10px;">
+                                        <div style="font-size:0.72rem;font-weight:700;color:#e85500;text-transform:uppercase;letter-spacing:0.4px;margin-bottom:8px;">📏 Medidas da Armação (opcional)</div>
+                                        <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;">
+                                            <div style="display:flex;flex-direction:column;gap:4px;">
+                                                <label style="font-size:0.68rem;color:#888;font-weight:700;text-transform:uppercase;">Ponte</label>
+                                                <input type="number" id="armacaoPonte" placeholder="mm" style="border:1.5px solid #ffcbb0;border-radius:7px;padding:7px 6px;font-size:0.85rem;text-align:center;font-weight:700;color:#333;">
+                                            </div>
+                                            <div style="display:flex;flex-direction:column;gap:4px;">
+                                                <label style="font-size:0.68rem;color:#888;font-weight:700;text-transform:uppercase;">Aro</label>
+                                                <input type="number" id="armacaoAro" placeholder="mm" style="border:1.5px solid #ffcbb0;border-radius:7px;padding:7px 6px;font-size:0.85rem;text-align:center;font-weight:700;color:#333;">
+                                            </div>
+                                            <div style="display:flex;flex-direction:column;gap:4px;">
+                                                <label style="font-size:0.68rem;color:#888;font-weight:700;text-transform:uppercase;">Diag. Maior</label>
+                                                <input type="number" id="armacaoDiagMaior" placeholder="mm" style="border:1.5px solid #ffcbb0;border-radius:7px;padding:7px 6px;font-size:0.85rem;text-align:center;font-weight:700;color:#333;">
+                                            </div>
+                                            <div style="display:flex;flex-direction:column;gap:4px;">
+                                                <label style="font-size:0.68rem;color:#888;font-weight:700;text-transform:uppercase;">Vertical</label>
+                                                <input type="number" id="armacaoVertical" placeholder="mm" style="border:1.5px solid #ffcbb0;border-radius:7px;padding:7px 6px;font-size:0.85rem;text-align:center;font-weight:700;color:#333;">
+                                            </div>
+                                        </div>
+                                    </div>
                                     <div style="display:flex;gap:10px;align-items:center;">
                                         <div style="flex:1;">
                                             <label style="font-size:11px;color:#888;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;">Quantidade</label>
@@ -7371,7 +7392,7 @@ body.dark-mode,
                             </div>
                             <div class="form-group">
                                 <label for="productCategory" class="required">Categoria</label>
-                                <select id="productCategory" class="form-control" required>
+                                <select id="productCategory" class="form-control" required onchange="Products.toggleArmacaoFields()">
                                     <option value="lentes">Lentes</option>
                                     <option value="armacoes">Armações</option>
                                     <option value="oculos_sol">Óculos de Sol</option>
@@ -7413,6 +7434,25 @@ body.dark-mode,
                                     <input type="file" id="productImageInput" accept="image/*" class="d-none" onchange="Products.uploadImage(event)">
                                     <button type="button" class="btn-remove-photo" onclick="Products.removeImage()">🗑 Remover foto</button>
                                 </div>
+                            </div>
+                        </div>
+                        <div class="form-row" id="productArmacaoFields" style="display:none;">
+                            <div class="form-group">
+                                <label for="productColor">Cor</label>
+                                <input type="text" id="productColor" class="form-control" placeholder="Ex: Havana / Marrom">
+                            </div>
+                            <div class="form-group">
+                                <label for="productFrameType">Tipo de Armação</label>
+                                <select id="productFrameType" class="form-control">
+                                    <option value="">Selecione...</option>
+                                    <option value="Acetato">Acetato</option>
+                                    <option value="Metal">Metal</option>
+                                    <option value="Mista (Metal + Acetato)">Mista (Metal + Acetato)</option>
+                                    <option value="Nylon / TR90">Nylon / TR90</option>
+                                    <option value="3 Peças">3 Peças</option>
+                                    <option value="Fio de Aço">Fio de Aço</option>
+                                    <option value="Outro">Outro</option>
+                                </select>
                             </div>
                         </div>
                         <div class="btn-group">
@@ -17955,6 +17995,8 @@ tbody tr td{border:1.5px solid #000;padding:2mm;text-align:center;font-weight:70
                     price: Utils.parseMoney(document.getElementById('productPrice').value) || 0,
                     qty: parseInt(document.getElementById('productQty').value) || 0,
                     minQty: parseInt(document.getElementById('productMinQty').value) || 5,
+                    color: document.getElementById('productColor')?.value || '',
+                    frameType: document.getElementById('productFrameType')?.value || '',
                     image: document.getElementById('productImageInput').dataset.image || null,
                     updated_at: new Date().toISOString()
                 };
@@ -17991,6 +18033,9 @@ tbody tr td{border:1.5px solid #000;padding:2mm;text-align:center;font-weight:70
                 document.getElementById('productPrice').value = p.price;
                 document.getElementById('productQty').value = p.qty;
                 document.getElementById('productMinQty').value = p.minQty;
+                if (document.getElementById('productColor')) document.getElementById('productColor').value = p.color || '';
+                if (document.getElementById('productFrameType')) document.getElementById('productFrameType').value = p.frameType || '';
+                this.toggleArmacaoFields();
                 
                 if (p.image) {
                     document.getElementById('productImageImg').src = p.image;
@@ -18016,7 +18061,16 @@ tbody tr td{border:1.5px solid #000;padding:2mm;text-align:center;font-weight:70
                 document.getElementById('productForm').reset();
                 state.editingId = null;
                 document.getElementById('productCode').value = 'PROD-' + (state.products.length + 1).toString().padStart(3, '0');
+                this.toggleArmacaoFields();
                 this.removeImage();
+            },
+
+            // Mostra/oculta Cor + Tipo de Armação apenas quando a categoria for "Armações"
+            toggleArmacaoFields() {
+                const wrap = document.getElementById('productArmacaoFields');
+                if (!wrap) return;
+                const cat = document.getElementById('productCategory')?.value;
+                wrap.style.display = (cat === 'armacoes') ? 'grid' : 'none';
             },
 
             search() {
@@ -21245,10 +21299,22 @@ ${container.innerHTML}
                 const prod = state.products.find(p => p.id === prodId);
                 const name = prod ? prod.name : select.options[select.selectedIndex].text.split(' - ')[0];
                 const code = prod ? (prod.code || '') : '';
+                const color = prod ? (prod.color || '') : '';
+                const frameType = prod ? (prod.frameType || '') : '';
                 if (prod && prod.qty < qty) { Toast.show('Estoque insuficiente! Disponível: ' + prod.qty, 'warning'); return; }
-                state.currentSale.items.push({ type: 'armacao', productId: prodId, code, name, qty, price, subtotal: price * qty });
+                const frameMeasures = {
+                    ponte: document.getElementById('armacaoPonte')?.value || '',
+                    aro: document.getElementById('armacaoAro')?.value || '',
+                    diagMaior: document.getElementById('armacaoDiagMaior')?.value || '',
+                    vertical: document.getElementById('armacaoVertical')?.value || ''
+                };
+                state.currentSale.items.push({ type: 'armacao', productId: prodId, code, name, color, frameType, frameMeasures, qty, price, subtotal: price * qty });
                 select.value = '';
                 document.getElementById('armacaoQty').value = 1;
+                document.getElementById('armacaoPonte').value = '';
+                document.getElementById('armacaoAro').value = '';
+                document.getElementById('armacaoDiagMaior').value = '';
+                document.getElementById('armacaoVertical').value = '';
                 this.renderItems(); this.calculateTotal();
                 Toast.show('Armação adicionada!');
             },
@@ -22430,6 +22496,29 @@ ${container.innerHTML}
                     ? `<img src="${squareLogo}" width="100%" height="100%" style="display:block;border-radius:50%;">`
                     : '<span style="font-size:16px;line-height:1;display:block;text-align:center;">👁️</span>';
 
+                // ── Dados da Armação (referência/grife/cor/tipo + medidas) ──
+                // Reaproveita o mesmo estilo visual do bloco os-receita-extra —
+                // nenhum CSS novo, não altera a altura fixa da via impressa.
+                const buildArmacaoHtml = () => {
+                    const frames = (sale.items || []).filter(i => i.type === 'armacao');
+                    if (!frames.length) return '';
+                    const rows = frames.map(f => {
+                        const m = f.frameMeasures || {};
+                        const mm = v => v ? v + 'mm' : '—';
+                        return `<div class="os-receita-extra">
+                          <span>Referência: <strong>${f.code || '—'}</strong></span>
+                          <span>Grife: <strong>${f.name || '—'}</strong></span>
+                          <span>Cor: <strong>${f.color || '—'}</strong></span>
+                          <span>Tipo: <strong>${f.frameType || '—'}</strong></span>
+                          <span>Ponte: <strong>${mm(m.ponte)}</strong></span>
+                          <span>Aro: <strong>${mm(m.aro)}</strong></span>
+                          <span>Diag. Maior: <strong>${mm(m.diagMaior)}</strong></span>
+                          <span>Vertical: <strong>${mm(m.vertical)}</strong></span>
+                        </div>`;
+                    }).join('');
+                    return `<div class="os-section-title">🕶️ Dados da Armação</div>${rows}`;
+                };
+
                 // ── Receituário ──
                 const buildPrescHtml = () => {
                     if (!presc) return '';
@@ -22599,6 +22688,7 @@ ${container.innerHTML}
                           </div>
                         </div>
                       </div>
+                      ${buildArmacaoHtml()}
                       ${buildPrescHtml()}
                       <div class="os-itens-section">
                         <div class="os-section-title">Itens da Ordem de Serviço</div>
