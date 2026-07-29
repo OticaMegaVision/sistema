@@ -5230,6 +5230,41 @@ body.dark-mode,
 .aging-col .ag-num    { font-size: 10px; font-weight: 700; }
 .aging-col .ag-period { font-size: 9px; color: var(--gray); }
 /* ======================================================= */
+
+/* ── Searchable Select (busca por nome/código nos itens da venda) ── */
+.ss-wrapper { position: relative; }
+.ss-input { width: 100%; cursor: text; }
+.ss-input.ss-has-value { color: #222; font-weight: 600; }
+.ss-dropdown {
+    position: absolute;
+    top: calc(100% + 4px);
+    left: 0;
+    right: 0;
+    z-index: 400;
+    background: #fff;
+    border: 1.5px solid #ffcc80;
+    border-radius: 10px;
+    max-height: 240px;
+    overflow-y: auto;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.18);
+}
+.ss-item {
+    padding: 10px 12px;
+    font-size: 0.85rem;
+    color: #333;
+    cursor: pointer;
+    border-bottom: 1px solid #f2f2f2;
+    line-height: 1.3;
+}
+.ss-item:last-child { border-bottom: none; }
+.ss-item:hover, .ss-item.ss-active { background: #fff3e0; }
+.ss-item.ss-disabled { color: #bbb; cursor: not-allowed; background: #fafafa; }
+.ss-item.ss-disabled:hover { background: #fafafa; }
+.ss-empty { padding: 12px; font-size: 0.82rem; color: #999; text-align: center; }
+.dark-mode .ss-dropdown { background: #1e1e1e; border-color: #444; }
+.dark-mode .ss-item { color: #eee; border-bottom-color: #333; }
+.dark-mode .ss-item:hover, .dark-mode .ss-item.ss-active { background: #2a2a2a; }
+.dark-mode .ss-empty { color: #777; }
 </style>
 </head>
 <body>
@@ -6045,7 +6080,15 @@ body.dark-mode,
                                         </div>
                                         <span style="font-weight:700;font-size:0.82rem;color:#e65100;">Selecionar Lente</span>
                                     </div>
-                                    <select id="lenteSelect" class="form-control" style="border-radius:8px;border-color:#ffcc80;background:#fff;font-size:0.85rem;">
+                                    <div class="ss-wrapper">
+                                        <input type="text" id="lenteSearch" class="form-control ss-input" placeholder="🔍 Buscar por nome ou código..." autocomplete="off"
+                                            style="border-radius:8px;border-color:#ffcc80;background:#fff;font-size:0.85rem;"
+                                            oninput="Sales.ssFilter('lenteSelect','lenteSearch','lenteDropdown')"
+                                            onfocus="Sales.ssFilter('lenteSelect','lenteSearch','lenteDropdown')"
+                                            onclick="Sales.ssFilter('lenteSelect','lenteSearch','lenteDropdown')">
+                                        <div id="lenteDropdown" class="ss-dropdown" style="display:none;"></div>
+                                    </div>
+                                    <select id="lenteSelect" style="display:none;">
                                         <option value="">🔍 Escolha uma lente...</option>
                                     </select>
                                     <div style="display:flex;gap:10px;align-items:center;">
@@ -6074,7 +6117,15 @@ body.dark-mode,
                                         </div>
                                         <span style="font-weight:700;font-size:0.82rem;color:#e85500;">Selecionar Armação</span>
                                     </div>
-                                    <select id="armacaoSelect" class="form-control" style="border-radius:8px;border-color:#ffb385;background:#fff;font-size:0.85rem;">
+                                    <div class="ss-wrapper">
+                                        <input type="text" id="armacaoSearch" class="form-control ss-input" placeholder="🔍 Buscar por nome ou código..." autocomplete="off"
+                                            style="border-radius:8px;border-color:#ffb385;background:#fff;font-size:0.85rem;"
+                                            oninput="Sales.ssFilter('armacaoSelect','armacaoSearch','armacaoDropdown')"
+                                            onfocus="Sales.ssFilter('armacaoSelect','armacaoSearch','armacaoDropdown')"
+                                            onclick="Sales.ssFilter('armacaoSelect','armacaoSearch','armacaoDropdown')">
+                                        <div id="armacaoDropdown" class="ss-dropdown" style="display:none;"></div>
+                                    </div>
+                                    <select id="armacaoSelect" style="display:none;">
                                         <option value="">🔍 Escolha uma armação...</option>
                                     </select>
                                     <div style="background:#fff;border:1.5px dashed #ffb385;border-radius:10px;padding:10px;">
@@ -6124,7 +6175,15 @@ body.dark-mode,
                                         </div>
                                         <span style="font-weight:700;font-size:0.82rem;color:#ff8f00;">Selecionar Serviço</span>
                                     </div>
-                                    <select id="servicoSelect" class="form-control" style="border-radius:8px;border-color:#ffc266;background:#fff;font-size:0.85rem;">
+                                    <div class="ss-wrapper">
+                                        <input type="text" id="servicoSearch" class="form-control ss-input" placeholder="🔍 Buscar por nome ou código..." autocomplete="off"
+                                            style="border-radius:8px;border-color:#ffc266;background:#fff;font-size:0.85rem;"
+                                            oninput="Sales.ssFilter('servicoSelect','servicoSearch','servicoDropdown')"
+                                            onfocus="Sales.ssFilter('servicoSelect','servicoSearch','servicoDropdown')"
+                                            onclick="Sales.ssFilter('servicoSelect','servicoSearch','servicoDropdown')">
+                                        <div id="servicoDropdown" class="ss-dropdown" style="display:none;"></div>
+                                    </div>
+                                    <select id="servicoSelect" style="display:none;">
                                         <option value="">🔍 Escolha um serviço...</option>
                                     </select>
                                     <div style="display:flex;gap:10px;align-items:center;">
@@ -6153,7 +6212,15 @@ body.dark-mode,
                                         </div>
                                         <span style="font-weight:700;font-size:0.82rem;color:#b36b00;">Selecionar Tratamento</span>
                                     </div>
-                                    <select id="tratamentoSelect" class="form-control" style="border-radius:8px;border-color:#e0af5c;background:#fff;font-size:0.85rem;">
+                                    <div class="ss-wrapper">
+                                        <input type="text" id="tratamentoSearch" class="form-control ss-input" placeholder="🔍 Buscar por nome ou código..." autocomplete="off"
+                                            style="border-radius:8px;border-color:#e0af5c;background:#fff;font-size:0.85rem;"
+                                            oninput="Sales.ssFilter('tratamentoSelect','tratamentoSearch','tratamentoDropdown')"
+                                            onfocus="Sales.ssFilter('tratamentoSelect','tratamentoSearch','tratamentoDropdown')"
+                                            onclick="Sales.ssFilter('tratamentoSelect','tratamentoSearch','tratamentoDropdown')">
+                                        <div id="tratamentoDropdown" class="ss-dropdown" style="display:none;"></div>
+                                    </div>
+                                    <select id="tratamentoSelect" style="display:none;">
                                         <option value="">🔍 Escolha um tratamento...</option>
                                     </select>
                                     <div style="display:flex;gap:10px;align-items:center;">
@@ -20861,6 +20928,75 @@ ${container.innerHTML}
                 Utils.updatePixKey();
             },
 
+            // ===== Searchable Select (busca por nome/código nos itens da venda) =====
+            // Remove acentos p/ comparação (ex: "óculos" casa com "oculos")
+            _ssNormalize(str) {
+                return (str || '').toString().normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+            },
+
+            // Filtra as <option> do select oculto conforme o texto digitado e renderiza a lista
+            ssFilter(selectId, searchId, dropdownId) {
+                const select = document.getElementById(selectId);
+                const search = document.getElementById(searchId);
+                const dropdown = document.getElementById(dropdownId);
+                if (!select || !search || !dropdown) return;
+
+                const term = this._ssNormalize(search.value);
+                const options = Array.from(select.options).filter(o => o.value !== '');
+
+                const matches = term
+                    ? options.filter(o => this._ssNormalize(o.textContent).includes(term))
+                    : options;
+
+                dropdown.innerHTML = '';
+                if (matches.length === 0) {
+                    dropdown.innerHTML = '<div class="ss-empty">Nenhum resultado encontrado</div>';
+                } else {
+                    matches.forEach(o => {
+                        const item = document.createElement('div');
+                        item.className = 'ss-item' + (o.disabled ? ' ss-disabled' : '');
+                        item.textContent = o.textContent;
+                        if (!o.disabled) {
+                            item.onmousedown = (ev) => {
+                                ev.preventDefault(); // evita perder o foco antes do click
+                                Sales.ssSelectItem(selectId, searchId, dropdownId, o.value, o.textContent);
+                            };
+                        }
+                        dropdown.appendChild(item);
+                    });
+                }
+                dropdown.style.display = 'block';
+                // fecha outras listas abertas
+                document.querySelectorAll('.ss-dropdown').forEach(d => { if (d !== dropdown) d.style.display = 'none'; });
+            },
+
+            // Aplica a seleção: atualiza o select oculto (compatível com o resto do código) e o campo de busca
+            ssSelectItem(selectId, searchId, dropdownId, value, label) {
+                const select = document.getElementById(selectId);
+                const search = document.getElementById(searchId);
+                const dropdown = document.getElementById(dropdownId);
+                if (select) {
+                    select.value = value;
+                    select.dispatchEvent(new Event('change', { bubbles: true }));
+                }
+                if (search) {
+                    search.value = label;
+                    search.classList.add('ss-has-value');
+                }
+                if (dropdown) dropdown.style.display = 'none';
+            },
+
+            // Fecha todas as listas suspensas abertas
+            ssCloseAll() {
+                document.querySelectorAll('.ss-dropdown').forEach(d => d.style.display = 'none');
+            },
+
+            // Limpa o campo de busca (usado sempre que o select oculto correspondente é resetado)
+            _ssReset(searchId) {
+                const search = document.getElementById(searchId);
+                if (search) { search.value = ''; search.classList.remove('ss-has-value'); }
+            },
+
             // Popula os selects de lentes, armações e serviços com dados reais do state
             populateSaleSelects() {
                 const Utils2 = { fmt: v => 'R$ ' + (v || 0).toLocaleString('pt-BR', {minimumFractionDigits:2, maximumFractionDigits:2}) };
@@ -21441,6 +21577,7 @@ ${container.innerHTML}
                 if (prod && prod.qty < qty) { Toast.show('Estoque insuficiente! Disponível: ' + prod.qty, 'warning'); return; }
                 state.currentSale.items.push({ type: 'lente', productId: prodId, name, qty, price, subtotal: price * qty });
                 select.value = '';
+                this._ssReset('lenteSearch');
                 document.getElementById('lenteQty').value = 1;
                 this.renderItems(); this.calculateTotal();
                 Toast.show('Lente adicionada!');
@@ -21466,6 +21603,7 @@ ${container.innerHTML}
                 };
                 state.currentSale.items.push({ type: 'armacao', productId: prodId, code, name, color, frameType, frameMeasures, qty, price, subtotal: price * qty });
                 select.value = '';
+                this._ssReset('armacaoSearch');
                 document.getElementById('armacaoQty').value = 1;
                 document.getElementById('armacaoPonte').value = '';
                 document.getElementById('armacaoAro').value = '';
@@ -21485,6 +21623,7 @@ ${container.innerHTML}
                 const name = serv ? serv.name : select.options[select.selectedIndex].text.split(' - ')[0];
                 state.currentSale.items.push({ type: 'servico', serviceId: servId, name, qty, price, subtotal: price * qty });
                 select.value = '';
+                this._ssReset('servicoSearch');
                 document.getElementById('servicoQty').value = 1;
                 this.renderItems(); this.calculateTotal();
                 Toast.show('Serviço adicionado!');
@@ -21500,6 +21639,7 @@ ${container.innerHTML}
                 const name = prod ? prod.name : select.options[select.selectedIndex].text.split(' - ')[0];
                 state.currentSale.items.push({ type: 'tratamento', productId: tId, name, qty, price, subtotal: price * qty });
                 select.value = '';
+                this._ssReset('tratamentoSearch');
                 document.getElementById('tratamentoQty').value = 1;
                 this.renderItems(); this.calculateTotal();
                 Toast.show('Tratamento adicionado!');
@@ -23973,6 +24113,13 @@ ${container.innerHTML}
                 if (typeof professionalEl !== 'undefined' && professionalEl) professionalEl.value = '';
                 const clientSelectEl = document.getElementById('clientSelect');
                 if (clientSelectEl) clientSelectEl.innerHTML = '<option value="">Selecione um cliente</option>';
+                // Limpa os campos de busca e selects ocultos dos itens (lente/armação/serviço/tratamento)
+                ['lente','armacao','servico','tratamento'].forEach(k => {
+                    const sel = document.getElementById(k + 'Select');
+                    if (sel) sel.value = '';
+                    this._ssReset(k + 'Search');
+                });
+                this.ssCloseAll();
                 const entryValEl = document.getElementById('entryValue');
                 if (entryValEl) entryValEl.value = '0';
                 const retiradaEntryEl = document.getElementById('retiradaEntry');
@@ -24494,6 +24641,13 @@ ${container.innerHTML}
         });
     
         
+        // Fecha as listas suspensas de busca (lente/armação/serviço/tratamento) ao tocar/clicar fora delas
+        document.addEventListener('click', function(ev) {
+            if (!ev.target.closest('.ss-wrapper')) {
+                document.querySelectorAll('.ss-dropdown').forEach(d => d.style.display = 'none');
+            }
+        });
+
         // ============================================
         // 🚀 MELHORIAS ADICIONADAS - VERSÃO 2.0
         // ============================================
