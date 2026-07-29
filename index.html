@@ -7489,6 +7489,9 @@ body.dark-mode,
                         <button class="btn btn-secondary btn-sm" onclick="Products.exportToExcel()" title="Exportar lista de produtos">
                             <i class="fas fa-download"></i> Exportar
                         </button>
+                        <button class="btn btn-danger btn-sm" onclick="Products.removeDuplicates()" title="Remove produtos com mesmo código e nome, mantendo apenas um registro">
+                            <i class="fas fa-clone"></i> Remover Duplicidade
+                        </button>
                         <input type="file" id="importProductsFile" accept=".xlsx,.csv" class="d-none" onchange="Products.importFromFile(event)">
                     </div>
                     <table id="productsTable">
@@ -18152,6 +18155,62 @@ tbody tr td{border:1.5px solid #000;padding:2mm;text-align:center;font-weight:70
                     this.renderTable();
                     Toast.show('Produto excluído com sucesso!');
                 });
+            },
+
+            // ── Remove produtos duplicados (mesmo código + nome) ─────────────────
+            // Mantém o registro mais completo/recente de cada grupo duplicado e
+            // remove os demais, tanto localmente quanto no Supabase/LocalFirst.
+            removeDuplicates() {
+                const products = state.products || [];
+
+                // Agrupa por chave código+nome (normalizados)
+                const groups = new Map();
+                products.forEach(p => {
+                    const key = ((p.code || '').trim().toLowerCase()) + '|' + ((p.name || '').trim().toLowerCase());
+                    if (!groups.has(key)) groups.set(key, []);
+                    groups.get(key).push(p);
+                });
+
+                const duplicateGroups = Array.from(groups.values()).filter(g => g.length > 1);
+
+                if (duplicateGroups.length === 0) {
+                    Toast.show('Nenhum produto duplicado encontrado.', 'info');
+                    return;
+                }
+
+                const totalDuplicatas = duplicateGroups.reduce((sum, g) => sum + (g.length - 1), 0);
+
+                Modal.showConfirm(
+                    `Foram encontrados ${totalDuplicatas} produto(s) duplicado(s) em ${duplicateGroups.length} grupo(s). ` +
+                    `Deseja remover as duplicatas, mantendo apenas um registro de cada?`,
+                    () => {
+                        const idsParaRemover = [];
+
+                        duplicateGroups.forEach(group => {
+                            // Escolhe qual manter: prioriza o que tem imagem, depois o mais
+                            // recentemente atualizado, depois o de maior estoque.
+                            const melhor = group.reduce((best, cur) => {
+                                if (!best) return cur;
+                                const bestScore = (best.image ? 2 : 0) + (Number(best.qty) > 0 ? 1 : 0);
+                                const curScore = (cur.image ? 2 : 0) + (Number(cur.qty) > 0 ? 1 : 0);
+                                if (curScore !== bestScore) return curScore > bestScore ? cur : best;
+                                const bestDate = new Date(best.updated_at || 0).getTime();
+                                const curDate = new Date(cur.updated_at || 0).getTime();
+                                return curDate > bestDate ? cur : best;
+                            }, null);
+
+                            group.forEach(p => {
+                                if (p.id !== melhor.id) idsParaRemover.push(p.id);
+                            });
+                        });
+
+                        state.products = state.products.filter(p => !idsParaRemover.includes(p.id));
+                        App.saveData();
+                        idsParaRemover.forEach(id => SupaSync.deletarProduto(id).catch(() => {}));
+                        this.renderTable();
+                        Toast.show(`${idsParaRemover.length} produto(s) duplicado(s) removido(s) com sucesso!`);
+                    }
+                );
             },
 
             clearForm() {
