@@ -931,9 +931,18 @@
             grid-column: span 2;
         }
 
+        /* ✅ Card de dados da loja: preenche todas as colunas restantes da linha,
+           em vez de ocupar sempre 2 (o que deixava espaço vazio em telas largas) */
+        .dashboard-cards .card-info-loja {
+            grid-column: 2 / -1;
+        }
+
         @media (max-width: 600px) {
             .dashboard-cards .card[style*="grid-column: span 2"],
             .dashboard-cards .card[style*="grid-column:span 2"] {
+                grid-column: span 1;
+            }
+            .dashboard-cards .card-info-loja {
                 grid-column: span 1;
             }
         }
@@ -16929,7 +16938,7 @@ tbody tr td{border:1.5px solid #000;padding:2mm;text-align:center;font-weight:70
                             <div style="font-size:0.76rem;color:var(--gray);">Clique aqui para configurar a meta de vendas do mês</div>
                         `}
                     </div>
-                    <div class="card" style="--card-accent:#8b6b3d;grid-column:span 2;">
+                    <div class="card card-info-loja" style="--card-accent:#8b6b3d;">
                         <div class="card-header">
                             <span class="card-title" style="font-size:0.8rem;font-weight:700;color:var(--dark);">${company.name || 'ÓticaVision Pro'}</span>
                             <div class="card-icon" style="background:#f4ede0;color:#8b6b3d;"><i class="fas fa-store"></i></div>
