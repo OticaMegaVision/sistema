@@ -5841,6 +5841,10 @@ body.dark-mode,
                                     <input type="text" id="searchClientSale" class="form-control" placeholder="Digite nome, CPF ou telefone" onkeyup="Sales.searchClient()">
                                     <button type="button" class="btn btn-primary" onclick="Sales.searchClient()"><i class="fas fa-search"></i> Buscar</button>
                                 </div>
+                                <button type="button" onclick="Sales.openQuickClient()"
+                                    style="width:100%;margin-top:10px;padding:10px;border-radius:10px;border:1.5px solid #ffd4b3;background:#fff3e8;color:#e55a00;font-weight:700;font-size:0.85rem;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px;">
+                                    <i class="fas fa-user-plus"></i> Criar Cliente
+                                </button>
                             </div>
                         </div>
                         <div id="clientSearchResults" class="form-group" style="display: none;">
@@ -6097,6 +6101,10 @@ body.dark-mode,
                                     <select id="lenteSelect" style="display:none;">
                                         <option value="">🔍 Escolha uma lente...</option>
                                     </select>
+                                    <button type="button" onclick="Sales.openQuickProduct('lente')"
+                                        style="padding:8px;border-radius:8px;border:1.5px dashed #ffcc80;background:#fff;color:#e65100;font-weight:700;font-size:0.78rem;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px;">
+                                        <i class="fas fa-plus-circle"></i> Cadastrar Produto
+                                    </button>
                                     <div style="display:flex;gap:10px;align-items:center;">
                                         <div style="flex:1;">
                                             <label style="font-size:11px;color:#888;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;">Quantidade</label>
@@ -6134,6 +6142,10 @@ body.dark-mode,
                                     <select id="armacaoSelect" style="display:none;">
                                         <option value="">🔍 Escolha uma armação...</option>
                                     </select>
+                                    <button type="button" onclick="Sales.openQuickProduct('armacao')"
+                                        style="padding:8px;border-radius:8px;border:1.5px dashed #ffb385;background:#fff;color:#e85500;font-weight:700;font-size:0.78rem;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px;">
+                                        <i class="fas fa-plus-circle"></i> Cadastrar Produto
+                                    </button>
                                     <div style="background:#fff;border:1.5px dashed #ffb385;border-radius:10px;padding:10px;">
                                         <div style="font-size:0.72rem;font-weight:700;color:#e85500;text-transform:uppercase;letter-spacing:0.4px;margin-bottom:8px;">📏 Medidas da Armação (opcional)</div>
                                         <div class="medidas-armacao-grid">
@@ -6192,6 +6204,10 @@ body.dark-mode,
                                     <select id="servicoSelect" style="display:none;">
                                         <option value="">🔍 Escolha um serviço...</option>
                                     </select>
+                                    <button type="button" onclick="Sales.openQuickProduct('servico')"
+                                        style="padding:8px;border-radius:8px;border:1.5px dashed #ffc266;background:#fff;color:#ff8f00;font-weight:700;font-size:0.78rem;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px;">
+                                        <i class="fas fa-plus-circle"></i> Cadastrar Serviço
+                                    </button>
                                     <div style="display:flex;gap:10px;align-items:center;">
                                         <div style="flex:1;">
                                             <label style="font-size:11px;color:#888;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;">Quantidade</label>
@@ -6229,6 +6245,10 @@ body.dark-mode,
                                     <select id="tratamentoSelect" style="display:none;">
                                         <option value="">🔍 Escolha um tratamento...</option>
                                     </select>
+                                    <button type="button" onclick="Sales.openQuickProduct('tratamento')"
+                                        style="padding:8px;border-radius:8px;border:1.5px dashed #e0af5c;background:#fff;color:#b36b00;font-weight:700;font-size:0.78rem;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px;">
+                                        <i class="fas fa-plus-circle"></i> Cadastrar Tratamento
+                                    </button>
                                     <div style="display:flex;gap:10px;align-items:center;">
                                         <div style="flex:1;">
                                             <label style="font-size:11px;color:#888;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;">Quantidade</label>
@@ -9121,6 +9141,69 @@ body.dark-mode,
                 <button onclick="Modal.close('clienteSalvoModal')" style="width:100%;padding:0.7rem;border-radius:10px;border:1px solid #dee2e6;background:white;color:#6c757d;font-size:0.85rem;font-weight:600;cursor:pointer;">
                     Continuar no Cadastro de Clientes
                 </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal: Criar Cliente Rápido (usado dentro da tela de Vendas, sem perder o carrinho) -->
+    <div class="modal" id="quickClientModal" role="dialog" aria-modal="true" aria-labelledby="quickClientTitle">
+        <div class="modal-content" style="max-width:420px;overflow:hidden;padding:0;">
+            <div style="background:linear-gradient(135deg,#ff6b00,#e55a00);padding:16px 20px;display:flex;justify-content:space-between;align-items:center;">
+                <div id="quickClientTitle" style="color:#fff;font-weight:800;font-size:1rem;display:flex;align-items:center;gap:8px;"><i class="fas fa-user-plus"></i> Criar Cliente Rápido</div>
+                <button onclick="Modal.close('quickClientModal')" style="background:none;border:none;color:#fff;font-size:1.2rem;cursor:pointer;opacity:.85;">&times;</button>
+            </div>
+            <div style="padding:20px;">
+                <div class="form-group">
+                    <label for="quickClientName" class="required">Nome</label>
+                    <input type="text" id="quickClientName" class="form-control" placeholder="Nome completo">
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="quickClientPhone">Telefone / WhatsApp</label>
+                        <input type="text" id="quickClientPhone" class="form-control" placeholder="(00) 00000-0000" oninput="Utils.maskPhone(this)">
+                    </div>
+                    <div class="form-group">
+                        <label for="quickClientCpf">CPF</label>
+                        <input type="text" id="quickClientCpf" class="form-control" placeholder="000.000.000-00" oninput="Utils.maskCpfCnpj(this)">
+                    </div>
+                </div>
+                <p style="font-size:0.78rem;color:#6c757d;margin:6px 0 0;">Dados completos (endereço, receita, etc.) podem ser preenchidos depois, na tela de Clientes.</p>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="Modal.close('quickClientModal')">Cancelar</button>
+                <button class="btn btn-primary" onclick="Sales.quickSaveClient()"><i class="fas fa-save"></i> Salvar e Selecionar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal: Cadastrar Produto/Serviço Rápido (usado dentro da tela de Vendas, sem perder o carrinho) -->
+    <div class="modal" id="quickProductModal" role="dialog" aria-modal="true" aria-labelledby="quickProductTitle">
+        <div class="modal-content" style="max-width:420px;overflow:hidden;padding:0;">
+            <div style="background:linear-gradient(135deg,#ff6b00,#e55a00);padding:16px 20px;display:flex;justify-content:space-between;align-items:center;">
+                <div id="quickProductTitle" style="color:#fff;font-weight:800;font-size:1rem;display:flex;align-items:center;gap:8px;"><i class="fas fa-plus-circle"></i> Cadastrar Item Rápido</div>
+                <button onclick="Modal.close('quickProductModal')" style="background:none;border:none;color:#fff;font-size:1.2rem;cursor:pointer;opacity:.85;">&times;</button>
+            </div>
+            <div style="padding:20px;">
+                <input type="hidden" id="quickProductTab" value="">
+                <div class="form-group">
+                    <label for="quickProductName" class="required">Nome do produto/serviço</label>
+                    <input type="text" id="quickProductName" class="form-control" placeholder="Ex: Lente Multifocal Anti-Reflexo">
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="quickProductPrice" class="required">Preço de venda (R$)</label>
+                        <input type="text" inputmode="numeric" id="quickProductPrice" class="form-control" placeholder="0,00" oninput="Utils.maskMoney(this)">
+                    </div>
+                    <div class="form-group" id="quickProductQtyGroup">
+                        <label for="quickProductQty">Estoque inicial</label>
+                        <input type="number" id="quickProductQty" class="form-control" placeholder="0" min="0" value="0">
+                    </div>
+                </div>
+                <p id="quickProductHint" style="font-size:0.78rem;color:#6c757d;margin:6px 0 0;"></p>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="Modal.close('quickProductModal')">Cancelar</button>
+                <button class="btn btn-primary" onclick="Sales.quickSaveProduct()"><i class="fas fa-save"></i> Salvar e Adicionar à Venda</button>
             </div>
         </div>
     </div>
@@ -21511,6 +21594,75 @@ ${container.innerHTML}
                 Toast.show(`Cliente ${client.name} selecionado! ✅`, 'success');
             },
 
+            // ── Criar Cliente Rápido (a partir da tela de Vendas) ──────────────
+            // Abre um modal simples por cima da venda em andamento. Não navega
+            // para a seção de Clientes, então o carrinho/itens da venda atual
+            // permanecem intactos.
+            openQuickClient() {
+                const termo = (document.getElementById('searchClientSale')?.value || '').trim();
+                const nameEl = document.getElementById('quickClientName');
+                if (nameEl) nameEl.value = /^[0-9\s()+-]+$/.test(termo) ? '' : termo;
+                const phoneEl = document.getElementById('quickClientPhone');
+                if (phoneEl) phoneEl.value = '';
+                const cpfEl = document.getElementById('quickClientCpf');
+                if (cpfEl) cpfEl.value = '';
+                Modal.show('quickClientModal');
+                setTimeout(() => { document.getElementById('quickClientName')?.focus(); }, 150);
+            },
+
+            quickSaveClient() {
+                const name = (document.getElementById('quickClientName').value || '').trim();
+                if (!name) {
+                    Toast.show('Informe o nome do cliente', 'warning');
+                    document.getElementById('quickClientName').focus();
+                    return;
+                }
+                const phone = (document.getElementById('quickClientPhone').value || '').trim();
+                const cpf = (document.getElementById('quickClientCpf').value || '').trim();
+                const cpfDigits = cpf.replace(/\D/g, '');
+
+                // Mesmas verificações de duplicata do cadastro completo de clientes
+                const dupNome = state.clients.find(c => (c.name || '').trim().toLowerCase() === name.toLowerCase());
+                if (dupNome) {
+                    Toast.show(`Já existe um cliente com o nome "${dupNome.name}". Use a busca acima para selecioná-lo.`, 'warning', 6000);
+                    return;
+                }
+                if (cpfDigits.length === 11) {
+                    const dupCpf = state.clients.find(c => c.cpf && c.cpf.replace(/\D/g, '') === cpfDigits);
+                    if (dupCpf) {
+                        Toast.show(`CPF já cadastrado para "${dupCpf.name}".`, 'warning', 6000);
+                        return;
+                    }
+                }
+
+                // Gera código sequencial único no mesmo padrão do cadastro completo
+                const existingCodes = (state.clients || []).map(c => c.code || c.id).filter(Boolean);
+                let nextNum = (state.clients || []).length + 1;
+                let code = 'CLI-' + String(nextNum).padStart(3, '0');
+                while (existingCodes.includes(code)) { nextNum++; code = 'CLI-' + String(nextNum).padStart(3, '0'); }
+
+                const client = {
+                    id: Utils.generateId('CLI'),
+                    code,
+                    birthDate: '',
+                    name,
+                    phone,
+                    email: '',
+                    cpf,
+                    cep: '', address: '', number: '', complement: '', neighborhood: '', city: '', state: '',
+                    updated_at: new Date().toISOString()
+                };
+
+                state.clients.push(client);
+                App.saveData();
+                SupaSync.upsertCliente(client);
+                if (typeof Clients !== 'undefined') { try { Clients.renderTable(); } catch (e) {} }
+
+                Modal.close('quickClientModal');
+                this.selectClient(client.id);
+                Toast.show(`Cliente ${client.name} criado e selecionado! ✅`, 'success');
+            },
+
             loadClientData() {
                 const clientId = document.getElementById('clientSelect').value;
                 if (!clientId) return;
@@ -21653,6 +21805,81 @@ ${container.innerHTML}
                         btn.style.color = '#888';
                     }
                 });
+            },
+
+            // ── Cadastrar Produto/Serviço Rápido (a partir da tela de Vendas) ──
+            // Abre um modal simples por cima da venda em andamento, sem navegar
+            // para as seções de Produtos/Serviços — o carrinho atual não é afetado.
+            openQuickProduct(tab) {
+                const cfg = {
+                    lente:      { title: 'Cadastrar Lente Rápida',      hint: 'Categoria: Lentes. Detalhes extras (custo, código, imagem) podem ser preenchidos depois na tela de Produtos.', showQty: true },
+                    armacao:    { title: 'Cadastrar Armação Rápida',    hint: 'Categoria: Armações. Detalhes extras (cor, medidas, imagem) podem ser preenchidos depois na tela de Produtos.', showQty: true },
+                    servico:    { title: 'Cadastrar Serviço Rápido',    hint: 'Será salvo na tela de Serviços.', showQty: false },
+                    tratamento: { title: 'Cadastrar Tratamento Rápido', hint: 'Categoria: Tratamentos. Detalhes extras podem ser preenchidos depois na tela de Produtos.', showQty: true }
+                };
+                const c = cfg[tab] || cfg.lente;
+                document.getElementById('quickProductTab').value = tab;
+                document.getElementById('quickProductTitle').innerHTML = '<i class="fas fa-plus-circle"></i> ' + c.title;
+                document.getElementById('quickProductHint').textContent = c.hint;
+                document.getElementById('quickProductQtyGroup').style.display = c.showQty ? '' : 'none';
+                document.getElementById('quickProductName').value = '';
+                document.getElementById('quickProductPrice').value = '';
+                document.getElementById('quickProductQty').value = 0;
+                Modal.show('quickProductModal');
+                setTimeout(() => { document.getElementById('quickProductName')?.focus(); }, 150);
+            },
+
+            quickSaveProduct() {
+                const tab = document.getElementById('quickProductTab').value || 'lente';
+                const name = (document.getElementById('quickProductName').value || '').trim();
+                const price = Utils.parseMoney(document.getElementById('quickProductPrice').value);
+                const qty = parseInt(document.getElementById('quickProductQty').value) || 0;
+
+                if (!name) { Toast.show('Informe o nome', 'warning'); document.getElementById('quickProductName').focus(); return; }
+                if (!price || price <= 0) { Toast.show('Informe um preço de venda maior que zero', 'warning'); document.getElementById('quickProductPrice').focus(); return; }
+
+                if (tab === 'servico') {
+                    const id = 'SERV-' + (state.services.length + 1).toString().padStart(3, '0');
+                    const service = { id, code: id, name, value: price, desc: '', updated_at: new Date().toISOString() };
+                    state.services.push(service);
+                    App.saveData();
+                    SupaSync.upsertServico(service);
+                    if (typeof Services !== 'undefined') { try { Services.renderTable(); } catch (e) {} }
+                    this.populateSaleSelects();
+                    Modal.close('quickProductModal');
+                    Toast.show(`Serviço "${name}" cadastrado!`, 'success');
+                    const sel = document.getElementById('servicoSelect');
+                    if (sel) {
+                        sel.value = id + '|' + price;
+                        const srch = document.getElementById('servicoSearch');
+                        if (srch) { srch.value = name; srch.classList.add('ss-has-value'); }
+                    }
+                } else {
+                    const categoryMap = { lente: 'lentes', armacao: 'armacoes', tratamento: 'tratamentos' };
+                    const category = categoryMap[tab] || 'lentes';
+                    const id = 'PROD-' + (state.products.length + 1).toString().padStart(3, '0');
+                    const product = {
+                        id, code: id, category, name,
+                        costPrice: 0, price, qty, minQty: 5,
+                        color: '', frameType: '', image: null,
+                        updated_at: new Date().toISOString()
+                    };
+                    state.products.push(product);
+                    App.saveData();
+                    SupaSync.upsertProduto(product);
+                    if (typeof Products !== 'undefined') { try { Products.renderTable(); } catch (e) {} }
+                    this.populateSaleSelects();
+                    Modal.close('quickProductModal');
+                    Toast.show(`"${name}" cadastrado!`, 'success');
+                    const selId = tab === 'armacao' ? 'armacaoSelect' : (tab === 'tratamento' ? 'tratamentoSelect' : 'lenteSelect');
+                    const srchId = tab === 'armacao' ? 'armacaoSearch' : (tab === 'tratamento' ? 'tratamentoSearch' : 'lenteSearch');
+                    const sel = document.getElementById(selId);
+                    if (sel) {
+                        sel.value = id + '|' + price;
+                        const srch = document.getElementById(srchId);
+                        if (srch) { srch.value = name; srch.classList.add('ss-has-value'); }
+                    }
+                }
             },
 
             addLente() {
