@@ -18140,13 +18140,31 @@ tbody tr td{border:1.5px solid #000;padding:2mm;text-align:center;font-weight:70
                 visco: ['VISCO']
             },
             _VISCO_CODE_PREFIXES: ['CH1-', 'CH2-', 'UV-', 'BLUECUT-', 'FOTOSSENSIVEL-', 'SUPER-'],
-            _escolherLogoMarca(nome, codigo) {
+            // Mapa direto pela coluna "Laboratorio" do arquivo importado, para os
+            // grupos em que TODOS os produtos daquele laboratório são da mesma marca
+            // (ex.: todo o grupo "Braslab" é Braslab; todo "OPTRA/PTRA" é Visco).
+            // "Surf. VS" e "Tech Vantagens" ficam de fora daqui de propósito, pois
+            // misturam produtos de marcas diferentes dentro do mesmo laboratório —
+            // esses continuam sendo resolvidos pelas palavras-chave do nome.
+            _LAB_COLUNA_MARCA: {
+                'braslab': 'braslab',
+                'optra/ptra': 'visco'
+            },
+            _escolherLogoMarca(nome, codigo, laboratorio) {
                 const n = ' ' + (nome || '').toUpperCase() + ' ';
                 for (const marca of ['technopark', 'kodak', 'prodesign', 'braslab', 'visco']) {
                     const keywords = this._MARCA_KEYWORDS[marca];
                     if (keywords.some(kw => n.includes(kw))) {
                         return this._LOGOS_MARCA[marca];
                     }
+                }
+                // BUG FIX: antes a coluna "Laboratorio" do arquivo nunca era consultada,
+                // então grupos como Braslab (cujos nomes de produto não contêm a palavra
+                // "BRASLAB") ficavam sempre sem logo. Agora usamos essa coluna quando o
+                // laboratório mapeia 1:1 para uma marca.
+                const lab = (laboratorio || '').trim().toLowerCase();
+                if (lab && this._LAB_COLUNA_MARCA[lab]) {
+                    return this._LOGOS_MARCA[this._LAB_COLUNA_MARCA[lab]];
                 }
                 const cod = (codigo || '').toUpperCase();
                 if (this._VISCO_CODE_PREFIXES.some(p => cod.startsWith(p))) {
@@ -18200,7 +18218,13 @@ tbody tr td{border:1.5px solid #000;padding:2mm;text-align:center;font-weight:70
                             existing.price = price;
                             existing.qty = qty;
                             existing.minQty = minQty;
-                            if (!existing.image) existing.image = self._escolherLogoMarca(name, code);
+                            // BUG FIX: antes só definia o logo se existing.image estivesse vazio,
+                            // então reimportar o arquivo NUNCA corrigia o logo de um produto já
+                            // cadastrado (mesmo com a regra de marca corrigida). Agora recalculamos
+                            // a cada importação e só preservamos o logo atual quando a regra não
+                            // conseguir determinar nenhuma marca para o produto.
+                            const logoDet = self._escolherLogoMarca(name, code, r[7]);
+                            if (logoDet) existing.image = logoDet;
                             existing.updated_at = new Date().toISOString();
                             toSync.push(existing);
                             updated++;
@@ -18214,7 +18238,7 @@ tbody tr td{border:1.5px solid #000;padding:2mm;text-align:center;font-weight:70
                                 price,
                                 qty,
                                 minQty,
-                                image:     self._escolherLogoMarca(name, code),
+                                image:     self._escolherLogoMarca(name, code, r[7]),
                                 updated_at: new Date().toISOString()
                             };
                             state.products.push(prod);
