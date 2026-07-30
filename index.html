@@ -6756,6 +6756,9 @@ body.dark-mode,
                             <button type="button" class="btn btn-success" onclick="Sales.save()">
                                 <i class="fas fa-save"></i> Salvar OS
                             </button>
+                            <button type="button" class="btn btn-warning" onclick="Sales.finalize()">
+                                <i class="fas fa-check-double"></i> Dar Baixa
+                            </button>
                         </div>
                     </div>
                 </div>
@@ -24683,7 +24686,7 @@ ${container.innerHTML}
                         background-image:url('data:image/svg+xml,${arrow}');
                         background-repeat:no-repeat;background-position:right 10px center;">
                     ${options}
-                    <option value="__baixa__" style="background:#fff;color:#155724;font-weight:800;">💰 Dar Baixa (Marcar como Pago)</option>
+                    <option value="__baixa__" style="background:#fff;color:#155724;font-weight:800;">💰 Finalizado (Marcar como Pago)</option>
                 </select>`;
             },
 
