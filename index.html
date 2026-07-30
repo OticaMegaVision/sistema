@@ -5778,6 +5778,24 @@ body.dark-mode,
                             <span style="display:block;font-size:0.62rem;opacity:0.85;font-weight:600;letter-spacing:0.5px;margin-bottom:2px;">04</span>Pagamento
                         </div>
                     </div>
+
+                    <!-- STATUS DISPLAY (NOVO) -->
+                    <div class="cliente-card" id="statusDisplayCard" style="background:linear-gradient(135deg,#fff9f5 0%,#ffe8d6 100%);border-left:4px solid #ff6b00;padding-top:16px;padding-bottom:16px;">
+                        <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;">
+                            <div>
+                                <h3 class="ic-head" style="margin:0;"><span class="ic-badge"><i class="fas fa-check-circle"></i></span>ESTADO ATUAL</h3>
+                                <div id="statusBadgeDisplay" style="margin-top:12px;display:flex;align-items:center;gap:8px;">
+                                    <span id="statusIcon" style="font-size:20px;">⏳</span>
+                                    <span id="statusLabel" style="font-weight:600;font-size:14px;color:#333;">Em Andamento</span>
+                                </div>
+                                <div id="statusTimestamp" style="margin-top:6px;font-size:11px;color:#999;">Atualizado agora</div>
+                            </div>
+                            <div id="statusQueueInfo" style="text-align:right;padding:10px;background:rgba(255,255,255,0.6);border-radius:6px;border:1px solid rgba(255,107,0,0.2);">
+                                <div style="font-size:11px;color:#999;text-transform:uppercase;font-weight:700;letter-spacing:0.5px;">Próximas Ações</div>
+                                <div id="nextStepsInfo" style="font-size:12px;color:#333;margin-top:4px;font-weight:600;">Aguardando revisão</div>
+                            </div>
+                        </div>
+                    </div>
                     
                     <!-- DADOS DA OS -->
                     <div class="cliente-card">
@@ -5818,6 +5836,7 @@ body.dark-mode,
                                     <option value="entregue">✅ Entregue</option>
                                     <option value="cancelado">❌ Cancelado</option>
                                 </select>
+                                <small id="statusUpdateTime" style="color:#999;font-size:11px;margin-top:4px;display:block;"></small>
                             </div>
                         </div>
                     </div>
@@ -6745,6 +6764,16 @@ body.dark-mode,
                         <textarea id="saleObservations" class="form-control" rows="3" placeholder="Observações sobre a OS, lentes, entregas..."></textarea>
                     </div>
 
+                    <!-- HISTÓRICO DA VENDA (NOVO) -->
+                    <div class="cliente-card" id="saleHistoryPanel" style="display:none;">
+                        <h3><i class="fas fa-history"></i> Histórico da Venda</h3>
+                        <div id="saleHistoryContent" style="max-height:300px;overflow-y:auto;">
+                            <div style="text-align:center;color:#999;padding:20px;">
+                                <i class="fas fa-spinner" style="animation:spin 1s linear infinite;"></i> Carregando histórico...
+                            </div>
+                        </div>
+                    </div>
+
                     <!-- BOTÕES DE AÇÃO -->
                     <div class="btn-group justify-between" style="margin-top: 20px;">
                         <div>
@@ -6754,10 +6783,10 @@ body.dark-mode,
                         </div>
                         <div class="btn-group">
                             <button type="button" class="btn btn-success" onclick="Sales.save()">
-                                <i class="fas fa-save"></i> Salvar OS
+                                <i class="fas fa-save"></i> Salvar Alterações
                             </button>
-                            <button type="button" class="btn btn-warning" onclick="Sales.finalize()">
-                                <i class="fas fa-check-double"></i> Dar Baixa
+                            <button type="button" class="btn btn-info" onclick="Sales.showSaleHistory()" id="btnViewHistory">
+                                <i class="fas fa-history"></i> Ver Histórico
                             </button>
                         </div>
                     </div>
@@ -20794,6 +20823,69 @@ tbody tr td{border:1.5px solid #000;padding:2mm;text-align:center;font-weight:70
     .no-print { display: none !important; }
     body { font-size: 9.5pt; }
   }
+
+  /* ===== NOVO: Status Display Melhorado ===== */
+  @keyframes spin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+  }
+
+  #statusDisplayCard h3 {
+    margin: 0;
+    font-size: 0.85rem;
+    letter-spacing: 0.5px;
+    color: #ff6b00;
+  }
+
+  #statusBadgeDisplay {
+    padding: 8px 12px;
+    background: white;
+    border-radius: 6px;
+    display: inline-flex;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+  }
+
+  #saleHistoryPanel {
+    border-left: 3px solid #ff6b00;
+    border-top: 1px solid #e0e0e0;
+  }
+
+  #saleHistoryPanel h3 {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 12px;
+  }
+
+  #saleHistoryContent {
+    scrollbar-width: thin;
+    scrollbar-color: #ddd #f9f9f9;
+  }
+
+  #saleHistoryContent::-webkit-scrollbar {
+    width: 6px;
+  }
+
+  #saleHistoryContent::-webkit-scrollbar-track {
+    background: #f9f9f9;
+    border-radius: 3px;
+  }
+
+  #saleHistoryContent::-webkit-scrollbar-thumb {
+    background: #ddd;
+    border-radius: 3px;
+  }
+
+  #saleHistoryContent::-webkit-scrollbar-thumb:hover {
+    background: #ccc;
+  }
+
+  #statusUpdateTime {
+    display: block;
+    margin-top: 4px;
+    font-size: 0.75rem;
+    color: #999;
+  }
 </style>
 </head>
 <body>
@@ -22793,6 +22885,8 @@ ${container.innerHTML}
                 document.getElementById('saleSeller').value = sale.seller || '';
                 document.getElementById('deliveryForecast').value = sale.deliveryForecast || '';
                 document.getElementById('saleStatus').value = sale.status;
+                // Atualizar display de status (novo design)
+                Sales.updateStatusDisplay(sale.status, sale.statusUpdatedAt);
                 document.getElementById('discountValue').value = sale.discount;
                 document.getElementById('additionValue').value = sale.addition;
                 document.getElementById('saleObservations').value = sale.observations || '';
@@ -24717,6 +24811,122 @@ ${container.innerHTML}
                     Dashboard.update().catch(()=>{});
                     Toast.show('Venda excluída com sucesso!');
                 });
+            },
+
+            // ===== UPDATE STATUS DISPLAY (NOVO) =====
+            // Atualiza o painel de status com design profissional
+            updateStatusDisplay(status, updatedAt) {
+                const statusLabels = {
+                    'orcamento': { label: 'Orçamento', icon: '📋', color: '#17a2b8' },
+                    'andamento': { label: 'Em Andamento', icon: '⏳', color: '#ff6b00' },
+                    'laboratorio': { label: 'Laboratório', icon: '🔬', color: '#6f42c1' },
+                    'pronto': { label: 'Pronto p/ Retirada', icon: '📦', color: '#d4a017' },
+                    'entregue': { label: 'Entregue', icon: '✅', color: '#28a745' },
+                    'cancelado': { label: 'Cancelado', icon: '❌', color: '#dc3545' }
+                };
+
+                const statusInfo = statusLabels[status] || statusLabels['andamento'];
+                const now = new Date();
+                const updateTime = updatedAt ? new Date(updatedAt) : now;
+                const timeStr = updateTime.toLocaleString('pt-BR', { 
+                    hour: '2-digit', 
+                    minute: '2-digit',
+                    second: '2-digit'
+                });
+
+                // Atualizar badge
+                const statusIcon = document.getElementById('statusIcon');
+                const statusLabel = document.getElementById('statusLabel');
+                const statusTimestamp = document.getElementById('statusTimestamp');
+
+                if (statusIcon) statusIcon.textContent = statusInfo.icon;
+                if (statusLabel) {
+                    statusLabel.textContent = statusInfo.label;
+                    statusLabel.style.color = statusInfo.color;
+                }
+                if (statusTimestamp) {
+                    const timeDiff = Math.floor((now - updateTime) / 1000);
+                    let timeDisplay = 'Agora';
+                    if (timeDiff >= 60) timeDisplay = Math.floor(timeDiff / 60) + 'm atrás';
+                    if (timeDiff >= 3600) timeDisplay = Math.floor(timeDiff / 3600) + 'h atrás';
+                    statusTimestamp.textContent = `Atualizado ${timeDisplay} (${timeStr})`;
+                }
+
+                // Atualizar info de próximas ações
+                const nextSteps = {
+                    'orcamento': 'Aguardando aprovação do cliente',
+                    'andamento': 'Aguardando revisão',
+                    'laboratorio': 'Em processamento no laboratório',
+                    'pronto': 'Pronto para retirada do cliente',
+                    'entregue': 'Entrega realizada',
+                    'cancelado': 'Venda cancelada'
+                };
+                const nextStepsInfo = document.getElementById('nextStepsInfo');
+                if (nextStepsInfo) nextStepsInfo.textContent = nextSteps[status] || 'Sem informações';
+            },
+
+            // ===== SHOW SALE HISTORY (NOVO) =====
+            // Exibe o histórico de alterações da venda
+            showSaleHistory() {
+                const sale = state.currentSale;
+                if (!sale) {
+                    Toast.show('Nenhuma venda selecionada', 'warning');
+                    return;
+                }
+
+                const panel = document.getElementById('saleHistoryPanel');
+                const content = document.getElementById('saleHistoryContent');
+                
+                if (!panel || !content) return;
+
+                // Criar HTML do histórico
+                let historyHTML = '';
+                
+                if (!sale.statusHistory || sale.statusHistory.length === 0) {
+                    historyHTML = '<div style="text-align:center;color:#999;padding:20px;">' +
+                        '<i class="fas fa-info-circle"></i> Nenhuma alteração registrada ainda' +
+                        '</div>';
+                } else {
+                    // Mostrar histórico em ordem reversa (mais recente primeiro)
+                    const sortedHistory = [...sale.statusHistory].reverse();
+                    sortedHistory.forEach((entry, idx) => {
+                        const icon = entry.status === 'entregue' ? '✅' : 
+                                   entry.status === 'cancelado' ? '❌' :
+                                   entry.status === 'pronto' ? '📦' :
+                                   entry.status === 'laboratorio' ? '🔬' :
+                                   entry.status === 'andamento' ? '⏳' : '📋';
+                        
+                        const date = new Date(entry.timestamp || Date.now());
+                        const dateStr = date.toLocaleString('pt-BR', {
+                            day: '2-digit',
+                            month: '2-digit',
+                            year: 'numeric',
+                            hour: '2-digit',
+                            minute: '2-digit'
+                        });
+
+                        historyHTML += `
+                            <div style="display:flex;gap:12px;padding:12px;border-bottom:1px solid #e0e0e0;">
+                                <div style="font-size:16px;flex-shrink:0;">${icon}</div>
+                                <div style="flex:1;">
+                                    <div style="font-weight:600;color:#333;font-size:13px;">Status: ${entry.status.toUpperCase()}</div>
+                                    <div style="font-size:11px;color:#999;margin-top:2px;">${dateStr}</div>
+                                    ${entry.user ? '<div style="font-size:11px;color:#666;margin-top:2px;">Por: ' + entry.user + '</div>' : ''}
+                                </div>
+                            </div>
+                        `;
+                    });
+                }
+
+                content.innerHTML = historyHTML;
+                panel.style.display = 'block';
+                
+                // Scroll suave para o painel
+                setTimeout(() => {
+                    panel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                }, 100);
+
+                Toast.show('Histórico da venda carregado', 'info');
             }
         };
 
