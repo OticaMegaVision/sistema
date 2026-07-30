@@ -6756,9 +6756,6 @@ body.dark-mode,
                             <button type="button" class="btn btn-success" onclick="Sales.save()">
                                 <i class="fas fa-save"></i> Salvar OS
                             </button>
-                            <button type="button" class="btn btn-warning" onclick="Sales.finalize()">
-                                <i class="fas fa-check-double"></i> Dar Baixa
-                            </button>
                         </div>
                     </div>
                 </div>
@@ -21329,7 +21326,10 @@ ${container.innerHTML}
                         <td>${Utils.formatCurrency(s.total)}</td>
                         <td><span style="background:${payBadgeColor};color:#fff;border-radius:10px;padding:2px 8px;font-size:0.72rem;font-weight:700;white-space:nowrap;">${payLbl}</span></td>
                         <td style="color:${saldo.cls};font-weight:700;font-size:0.82rem;">${saldo.txt}</td>
-                        <td><span class="badge badge-${st.cls}">${st.label}</span></td>
+                        <td>${(() => {
+                            const stAtual2 = Sales._STATUS_LIST.find(x => x.v === Sales._normStatus(s.status)) || {e:'❓', l:s.status || '—', c:'#6c757d'};
+                            return Sales.renderStatusSelect(s, stAtual2, { size: 'sm' });
+                        })()}</td>
                         <td>${Utils.formatDate(s.date)}</td>
                         <td class="action-buttons">
                             <button class="btn-icon btn-view" onclick="Sales.view('${s.id}')" title="Visualizar"><i class="fas fa-eye"></i></button>
@@ -24426,16 +24426,8 @@ ${container.innerHTML}
                 const cur = sale.status;
                 const stAtual = ST.find(s => s.v===cur||(s.v==='producao'&&cur==='production')||(s.v==='pronto'&&cur==='ready')||(s.v==='entregue'&&cur==='delivered')) || {e:'❓',l:cur||'—',c:'#6c757d'};
 
-                // Botões de status
-                const botoesStatus = ST.map(s => {
-                    const on = cur===s.v||(s.v==='producao'&&cur==='production')||(s.v==='pronto'&&cur==='ready')||(s.v==='entregue'&&cur==='delivered');
-                    return `<button onclick="Sales._salvarStatusBtn('${sale.id}','${s.v}',this)"${on?' data-ativo="1"':''}
-                        style="display:inline-flex;align-items:center;gap:4px;padding:5px 12px;border-radius:20px;
-                        border:2px solid ${on?s.c:'#ddd'};background:${on?s.c:'#fff'};color:${on?'#fff':'#555'};
-                        font-size:11px;font-weight:${on?'700':'500'};cursor:pointer;transition:all .15s;margin:0;
-                        box-shadow:${on?'0 2px 8px '+s.c+'66':'none'};">
-                        ${s.e} ${s.l}</button>`;
-                }).join('');
+                // Seletor de status (dropdown profissional — substitui a antiga grade de botões)
+                const statusSelectHtml = Sales.renderStatusSelect(sale, stAtual, { size: 'lg' });
 
                 // Itens
                 // ✅ Receituário na lente + foto/código na armação (aprovado em amostra):
@@ -24530,12 +24522,11 @@ ${container.innerHTML}
                     </div>
 
                     <!-- ── Status clicável ── -->
-                    <div style="margin-bottom:14px;padding:12px 14px;background:#f8f9fa;border-radius:10px;border:1px solid #e8e8e8;">
-                        <div style="font-size:10px;color:#999;text-transform:uppercase;letter-spacing:.8px;margin-bottom:9px;display:flex;align-items:center;gap:7px;">
-                            🏷️ <span>Alterar Status</span>
-                            <span style="background:#ff6b00;color:white;font-size:9px;padding:1px 7px;border-radius:8px;font-weight:700;text-transform:none;">toque para mudar</span>
+                    <div style="margin-bottom:14px;padding:12px 14px;background:#f8f9fa;border-radius:10px;border:1px solid #e8e8e8;display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;">
+                        <div style="font-size:10px;color:#999;text-transform:uppercase;letter-spacing:.8px;display:flex;align-items:center;gap:7px;">
+                            🏷️ <span>Status da OS</span>
                         </div>
-                        <div style="display:flex;flex-wrap:wrap;gap:6px;">${botoesStatus}</div>
+                        ${statusSelectHtml}
                     </div>
 
                     <!-- ── Info grid ── -->
@@ -24645,53 +24636,125 @@ ${container.innerHTML}
                 document.getElementById('viewTitle').innerText = `Detalhes — OS ${sale.number}`;
             },
 
-            // Salva status clicando diretamente no botão
-            _salvarStatusBtn(saleId, novoStatus, btnEl) {
-                var sale = state.sales.find(function(s){ return s.id === saleId; });
-                if (!sale) return;
-                var COR = {
-                    orcamento:'#17a2b8', pendente:'#e0a800', producao:'#6610f2',
-                    laboratorio:'#0056b3', tratamento:'#6f42c1', atrasado:'#c0392b',
-                    pronto:'#fd7e14', entregue:'#28a745', cancelado:'#dc3545'
-                };
-                var container = btnEl.closest('div[style*="flex-wrap"]');
-                if (container) {
-                    container.querySelectorAll('button').forEach(function(b){
-                        b.style.background='#fff'; b.style.color='#555';
-                        b.style.borderColor='#ddd'; b.style.fontWeight='500';
-                        b.style.boxShadow='none'; delete b.dataset.ativo;
-                    });
-                }
-                var c = COR[novoStatus] || '#6c757d';
-                btnEl.style.background=c; btnEl.style.color='#fff';
-                btnEl.style.borderColor=c; btnEl.style.fontWeight='700';
-                btnEl.style.boxShadow='0 2px 8px '+c+'55';
-                btnEl.dataset.ativo='1';
-                sale.status = novoStatus;
-                sale._updatedAt = new Date().toISOString();
-                App.saveData();
-                if (window.LocalFirst) LocalFirst.pushItem('sales', sale);
-                Sales.renderHistory();
-                Dashboard.update().catch(()=>{});
-                if (typeof ContasManager !== 'undefined') { try { ContasManager.renderAll?.(); } catch(e) {} }
-                Toast.show('Status: ' + btnEl.textContent.trim(), 'success');
+            // ===== Lista única de status (usada no dropdown e no histórico) =====
+            _STATUS_LIST: [
+                {v:'orcamento',   e:'📋', l:'Orçamento',         c:'#17a2b8'},
+                {v:'pendente',    e:'⏳', l:'Pendente',           c:'#e0a800'},
+                {v:'producao',    e:'🔧', l:'Em Produção',        c:'#6610f2'},
+                {v:'laboratorio', e:'🔬', l:'Laboratório',        c:'#0056b3'},
+                {v:'tratamento',  e:'🧪', l:'Tratamento',         c:'#6f42c1'},
+                {v:'atrasado',    e:'⚠️', l:'Atrasado',           c:'#c0392b'},
+                {v:'pronto',      e:'📦', l:'Pronto p/ Retirada', c:'#fd7e14'},
+                {v:'entregue',    e:'✅', l:'Entregue',           c:'#28a745'},
+                {v:'cancelado',   e:'❌', l:'Cancelado',          c:'#dc3545'},
+            ],
+
+            _normStatus(cur) {
+                if (cur === 'production') return 'producao';
+                if (cur === 'ready') return 'pronto';
+                if (cur === 'delivered') return 'entregue';
+                return cur;
             },
 
-            // Mantidos por compatibilidade
-            _previewStatus(val) {},
-            _salvarStatus(saleId) {
-                var sel = document.getElementById('modalStatusSelect');
-                if (!sel) return;
-                var sale = state.sales.find(function(s){ return s.id===saleId; });
+            // Dropdown de status profissional e clicável — usado no modal de detalhes e no histórico.
+            // Inclui a opção "Dar Baixa" ao final, sempre visível, separada visualmente das demais.
+            renderStatusSelect(sale, stAtual, opts) {
+                opts = opts || {};
+                const size = opts.size === 'lg' ? 'lg' : 'sm';
+                const cur = Sales._normStatus(sale.status);
+                const cor = (stAtual && stAtual.c) || '#6c757d';
+                const options = Sales._STATUS_LIST.map(s =>
+                    `<option value="${s.v}" ${cur === s.v ? 'selected' : ''}>${s.e} ${s.l}</option>`
+                ).join('');
+                const pad     = size === 'lg' ? '7px 30px 7px 14px' : '4px 24px 4px 10px';
+                const fontSz  = size === 'lg' ? '12.5px' : '11px';
+                const arrow   = encodeURIComponent(
+                    `<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 10 10">` +
+                    `<path d="M1.5 3.5l3.5 3.5 3.5-3.5" stroke="white" stroke-width="1.6" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>`
+                );
+                return `<select onchange="Sales.changeStatus('${sale.id}', this.value, this)"
+                    title="Clique para alterar o status ou dar baixa"
+                    style="appearance:none;-webkit-appearance:none;-moz-appearance:none;
+                        background-color:${cor};color:#fff;font-weight:700;font-size:${fontSz};
+                        padding:${pad};border-radius:20px;border:none;cursor:pointer;
+                        box-shadow:0 2px 6px ${cor}55;letter-spacing:.2px;
+                        background-image:url('data:image/svg+xml,${arrow}');
+                        background-repeat:no-repeat;background-position:right 10px center;">
+                    ${options}
+                    <option value="__baixa__" style="background:#fff;color:#155724;font-weight:800;">💰 Dar Baixa (Marcar como Pago)</option>
+                </select>`;
+            },
+
+            // Handler único do dropdown — troca de status normal ou aciona "Dar Baixa"
+            changeStatus(saleId, novoValor, selEl) {
+                const sale = state.sales.find(s => s.id === saleId);
                 if (!sale) return;
-                sale.status = sel.value;
+
+                if (novoValor === '__baixa__') {
+                    // Volta o select para o status atual até a confirmação (evita ficar preso em "__baixa__")
+                    if (selEl) selEl.value = Sales._normStatus(sale.status);
+                    Modal.showConfirm('Dar baixa nesta venda? Ela será marcada como PAGA e sairá de Contas a Receber.', () => {
+                        Sales.finalizeById(saleId);
+                    });
+                    return;
+                }
+
+                sale.status = novoValor;
                 sale._updatedAt = new Date().toISOString();
                 App.saveData();
                 if (window.LocalFirst) LocalFirst.pushItem('sales', sale);
+                SupaSync?.inserirVenda?.(sale);
+
+                // Atualiza a cor do próprio select imediatamente (feedback visual instantâneo)
+                if (selEl) {
+                    const st = Sales._STATUS_LIST.find(s => s.v === novoValor);
+                    const cor = st ? st.c : '#6c757d';
+                    selEl.style.backgroundColor = cor;
+                    selEl.style.boxShadow = `0 2px 6px ${cor}55`;
+                }
+
                 Sales.renderHistory();
                 Dashboard.update().catch(()=>{});
                 if (typeof ContasManager !== 'undefined') { try { ContasManager.renderAll?.(); } catch(e) {} }
-                Toast.show('Status atualizado!', 'success');
+                const stLbl = Sales._STATUS_LIST.find(s => s.v === novoValor);
+                Toast.show('Status: ' + (stLbl ? stLbl.e + ' ' + stLbl.l : novoValor), 'success');
+            },
+
+            // Dar baixa diretamente por ID — não depende do formulário de edição estar aberto.
+            // Reaproveita a mesma lógica usada no toggle Pago/Pendente, mas endereçada por saleId.
+            finalizeById(saleId) {
+                const sale = state.sales.find(s => s.id === saleId);
+                if (!sale) return;
+                sale.paymentStatus = 'pago';
+                sale.paidAt = new Date().toISOString();
+                sale._updatedAt = sale.paidAt;
+                if (sale.paymentDetails && sale.paymentDetails.parcels) {
+                    sale.paymentDetails.parcels.forEach(p => {
+                        p.status = 'pago'; p.paid = true;
+                        p.paidDate = sale.paidAt.slice(0, 10);
+                        p.paidValue = p.paidValue || p.value;
+                    });
+                }
+                App.saveData();
+                if (window.LocalFirst) LocalFirst.pushItem('sales', sale);
+                SupaSync?.inserirVenda?.(sale);
+                Sales.renderHistory();
+                Dashboard.update().catch(()=>{});
+                if (typeof ContasManager !== 'undefined') { try { ContasManager.renderAll?.(); } catch(e) {} }
+                Toast.show('✅ Venda marcada como PAGA!', 'success');
+                // Se o modal de detalhes desta OS estiver aberto, atualiza os valores exibidos
+                const modal = document.getElementById('viewModal');
+                if (modal && modal.style.display !== 'none') {
+                    Sales.view(saleId);
+                }
+            },
+
+            // Mantidos por compatibilidade (chamadas antigas, se ainda existirem em algum lugar)
+            _previewStatus(val) {},
+            _salvarStatus(saleId) {
+                const sel = document.getElementById('modalStatusSelect');
+                if (!sel) return;
+                Sales.changeStatus(saleId, sel.value, sel);
                 Modal.close('viewModal');
             },
 
