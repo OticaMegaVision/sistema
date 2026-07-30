@@ -21185,6 +21185,7 @@ ${container.innerHTML}
                 if (this._rhTimer) clearTimeout(this._rhTimer);
                 this._rhTimer = setTimeout(() => {
                     this._rhTimer = null;
+                    if (Sales._statusInteracting) return;
                     const tbody = document.querySelector('#salesHistoryTable tbody');
                     if (!tbody) return;
                     tbody.innerHTML = '';
@@ -21193,6 +21194,11 @@ ${container.innerHTML}
             },
 
             filterHistory() {
+                // Não re-renderiza enquanto a pessoa está com o seletor de status aberto
+                // (evita que o polling de sincronização em segundo plano feche o menu
+                // ou reverta a seleção antes da escolha ser concluída).
+                if (Sales._statusInteracting) return;
+
                 const tbody = document.querySelector('#salesHistoryTable tbody');
                 if (!tbody) return;
 
@@ -24411,20 +24417,9 @@ ${container.innerHTML}
                 const client = state.clients.find(c => c.id === sale.clientId);
                 const fd = d => d ? new Date(d+'T12:00:00').toLocaleDateString('pt-BR') : '—';
 
-                // Tabela de status
-                const ST = [
-                    {v:'orcamento',   e:'📋', l:'Orçamento',         c:'#17a2b8'},
-                    {v:'pendente',    e:'⏳', l:'Pendente',           c:'#e0a800'},
-                    {v:'producao',    e:'🔧', l:'Em Produção',        c:'#6610f2'},
-                    {v:'laboratorio', e:'🔬', l:'Laboratório',        c:'#0056b3'},
-                    {v:'tratamento',  e:'🧪', l:'Tratamento',         c:'#6f42c1'},
-                    {v:'atrasado',    e:'⚠️', l:'Atrasado',           c:'#c0392b'},
-                    {v:'pronto',      e:'📦', l:'Pronto p/ Retirada', c:'#fd7e14'},
-                    {v:'entregue',    e:'✅', l:'Entregue',           c:'#28a745'},
-                    {v:'cancelado',   e:'❌', l:'Cancelado',          c:'#dc3545'},
-                ];
-                const cur = sale.status;
-                const stAtual = ST.find(s => s.v===cur||(s.v==='producao'&&cur==='production')||(s.v==='pronto'&&cur==='ready')||(s.v==='entregue'&&cur==='delivered')) || {e:'❓',l:cur||'—',c:'#6c757d'};
+                // Status atual (usa a lista única e reduzida de status ativos)
+                const cur = Sales._normStatus(sale.status);
+                const stAtual = Sales._STATUS_LIST.find(s => s.v === cur) || {e:'❓',l:sale.status||'—',c:'#6c757d'};
 
                 // Seletor de status (dropdown profissional — substitui a antiga grade de botões)
                 const statusSelectHtml = Sales.renderStatusSelect(sale, stAtual, { size: 'lg' });
@@ -24637,20 +24632,25 @@ ${container.innerHTML}
             },
 
             // ===== Lista única de status (usada no dropdown e no histórico) =====
+            // Somente os status atualmente em uso pelo formulário de venda.
+            // Status antigos (pendente/em produção/tratamento/atrasado) continuam
+            // sendo reconhecidos em OS antigas via _normStatus(), mas não aparecem
+            // mais como opção — evita uma lista longa e confusa no celular.
             _STATUS_LIST: [
                 {v:'orcamento',   e:'📋', l:'Orçamento',         c:'#17a2b8'},
-                {v:'pendente',    e:'⏳', l:'Pendente',           c:'#e0a800'},
-                {v:'producao',    e:'🔧', l:'Em Produção',        c:'#6610f2'},
+                {v:'andamento',   e:'⏳', l:'Em Andamento',       c:'#e0a800'},
                 {v:'laboratorio', e:'🔬', l:'Laboratório',        c:'#0056b3'},
-                {v:'tratamento',  e:'🧪', l:'Tratamento',         c:'#6f42c1'},
-                {v:'atrasado',    e:'⚠️', l:'Atrasado',           c:'#c0392b'},
                 {v:'pronto',      e:'📦', l:'Pronto p/ Retirada', c:'#fd7e14'},
                 {v:'entregue',    e:'✅', l:'Entregue',           c:'#28a745'},
                 {v:'cancelado',   e:'❌', l:'Cancelado',          c:'#dc3545'},
             ],
 
+            // Evita que um sync/atualização em segundo plano substitua a linha
+            // (e feche o seletor) enquanto a pessoa ainda está escolhendo uma opção.
+            _statusInteracting: false,
+
             _normStatus(cur) {
-                if (cur === 'production') return 'producao';
+                if (['pendente','producao','production','tratamento','atrasado'].includes(cur)) return 'andamento';
                 if (cur === 'ready') return 'pronto';
                 if (cur === 'delivered') return 'entregue';
                 return cur;
@@ -24673,6 +24673,8 @@ ${container.innerHTML}
                     `<path d="M1.5 3.5l3.5 3.5 3.5-3.5" stroke="white" stroke-width="1.6" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>`
                 );
                 return `<select onchange="Sales.changeStatus('${sale.id}', this.value, this)"
+                    onfocus="Sales._statusInteracting=true"
+                    onblur="Sales._statusInteracting=false; Sales.renderHistory();"
                     title="Clique para alterar o status ou dar baixa"
                     style="appearance:none;-webkit-appearance:none;-moz-appearance:none;
                         background-color:${cor};color:#fff;font-weight:700;font-size:${fontSz};
