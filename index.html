@@ -940,17 +940,30 @@
             align-self: stretch;
         }
 
+        /* Card da Empresa: base = igual ao que já era (celular não muda) */
+        .empresa-nome { font-size: 0.8rem; }
+        .dash-empresa-info-wrap { font-size: 0.8rem; }
+
+        @media (min-width: 993px) {
+            /* ✅ fonte maior no card Empresa só no computador, pra aproveitar o espaço extra */
+            .empresa-nome { font-size: 0.95rem; }
+            .dash-empresa-info-wrap {
+                font-size: 0.92rem;
+                gap: 0.7rem 2rem;
+            }
+        }
+
         /* ✅ Desktop: grade fixa de 4 colunas — os 4 KPIs de cima ocupam 1 coluna cada;
-           embaixo, o card combinado OS+Meta ocupa 3 colunas e Empresa ocupa 1 */
+           embaixo, OS+Meta e Empresa dividem o espaço igualmente (2 colunas cada) */
         @media (min-width: 993px) {
             .dashboard-cards {
                 grid-template-columns: repeat(4, 1fr);
             }
             .dashboard-cards .card-os-meta {
-                grid-column: span 3;
+                grid-column: span 2;
             }
             .dashboard-cards .card-info-loja {
-                grid-column: span 1;
+                grid-column: span 2;
             }
         }
 
@@ -17052,12 +17065,15 @@ tbody tr td{border:1.5px solid #000;padding:2mm;text-align:center;font-weight:70
                     </div>
                     <div class="card card-info-loja" style="--card-accent:#8b6b3d;">
                         <div class="card-header">
-                            <span class="card-title" style="font-size:0.8rem;font-weight:700;color:var(--dark);">${company.name || 'ÓticaVision Pro'}</span>
+                            <span class="card-title empresa-nome" style="font-weight:700;color:var(--dark);">${company.name || 'ÓticaVision Pro'}</span>
                             <div class="card-icon" style="background:#f4ede0;color:#8b6b3d;"><i class="fas fa-store"></i></div>
                         </div>
-                        <div style="font-size:0.8rem;color:var(--gray);display:flex;flex-wrap:wrap;gap:0.5rem 1.5rem;">
+                        <div class="dash-empresa-info-wrap" style="color:var(--gray);display:flex;flex-wrap:wrap;gap:0.5rem 1.5rem;">
                             <span class="dash-info-empresa"><i class="fas fa-map-marker-alt" style="color:#dc3545;margin-right:4px;width:14px;text-align:center;"></i>${companyAddress}</span>
                             ${company.phone ? `<span class="dash-info-empresa"><i class="fas fa-phone" style="color:#22c55e;margin-right:4px;width:14px;text-align:center;"></i>${company.phone}</span>` : ''}
+                            ${company.whatsapp ? `<span class="dash-info-empresa"><i class="fab fa-whatsapp" style="color:#25d366;margin-right:4px;width:14px;text-align:center;"></i>${company.whatsapp}</span>` : ''}
+                            ${company.email ? `<span class="dash-info-empresa"><i class="fas fa-envelope" style="color:#3b82f6;margin-right:4px;width:14px;text-align:center;"></i>${company.email}</span>` : ''}
+                            ${company.website ? `<span class="dash-info-empresa"><i class="fas fa-globe" style="color:#0ea5e9;margin-right:4px;width:14px;text-align:center;"></i>${company.website}</span>` : ''}
                             ${company.cnpj  ? `<span class="dash-info-empresa"><i class="fas fa-id-card" style="color:#8b6b3d;margin-right:4px;width:14px;text-align:center;"></i>CNPJ: ${company.cnpj}</span>` : ''}
                             ${company.pix   ? `<span class="dash-info-empresa"><i class="fas fa-qrcode" style="color:#8b5cf6;margin-right:4px;width:14px;text-align:center;"></i>PIX: ${company.pix}</span>` : ''}
                         </div>
