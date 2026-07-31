@@ -11388,7 +11388,19 @@ body.dark-mode,
             // Cada loja tem seu próprio arquivo no Drive para evitar sobreposição
             // de dados entre Barueri e Caucaia do Alto.
             function _fileName()  { return 'OticaVisionPro_sync_' + (window._currentStore || 'barueri') + '.json'; }
+            // ── FIX PERFORMANCE-SYNC (logo/fotos travando o sync rápido) ──────
+            // Arquivo SEPARADO só para imagens (logo da empresa + fotos de
+            // produtos). Motivo: o arquivo principal (_fileName) é baixado por
+            // inteiro a cada poll de 5s e reenviado por inteiro a cada push —
+            // se ele carregasse fotos em base64, cada ciclo do sync "rápido"
+            // ficaria pesado e lento (e mais sujeito a falha em conexão fraca,
+            // derrubando junto os dados pequenos como nome/meta da empresa).
+            // Imagens agora vivem neste arquivo à parte, sincronizado com menor
+            // frequência (não precisa ser instantâneo) — o arquivo principal
+            // nunca mais inclui base64, então fica leve e rápido sempre.
+            function _mediaFileName() { return 'OticaVisionPro_media_' + (window._currentStore || 'barueri') + '.json'; }
             function _lsFileIdKey(provider) { return 'cs_' + provider + '_file_id_' + (window._currentStore || 'barueri'); }
+            function _lsMediaFileIdKey(provider) { return 'cs_' + provider + '_media_file_id_' + (window._currentStore || 'barueri'); }
             function _lsPullTsKey()         { return 'cs_last_pull_ts_' + (window._currentStore || 'barueri'); }
             // REAL-TIME SYNC: polling adaptativo (5s ativo / 45s background)
             // ✅ FIX: a UI (aba Backup) anuncia "5s ⚡ REAL-TIME" mas o código
@@ -11400,6 +11412,11 @@ body.dark-mode,
             const POLL_BACKGROUND_MS      = 15000;  // ✅ REDUZIDO: 45s → 15s em background (aba oculta) — ainda evita gasto excessivo de bateria/dados, mas sincroniza bem mais rápido
             const POLL_INTERVAL_MS        = POLL_ACTIVE_MS;
             const PUSH_DEBOUNCE_MS        = 800;     // push 0.8s após última mudança
+            // Imagens mudam raramente — não precisam do poll de 5s. Um poll
+            // mais espaçado evita baixar fotos de produtos repetidamente sem
+            // necessidade, mas ainda propaga uma foto nova em menos de 1 minuto.
+            const MEDIA_POLL_ACTIVE_MS    = 45000;
+            const MEDIA_POLL_BACKGROUND_MS = 120000;
 
             let _gdriveToken    = null;
             let _onedriveToken  = null;
@@ -11408,6 +11425,14 @@ body.dark-mode,
             let _pulling        = false;
             let _pushTimer      = null;
             let _pollTimer      = null;
+            let _mediaPollTimer = null;
+            let _pushingMedia   = false;
+            let _pullingMedia   = false;
+            // Protege uma edição de logo/foto recém-feita de ser sobrescrita por
+            // um pull do arquivo de mídia que ainda estava "em trânsito" — mesma
+            // classe de proteção já usada para company/config (ver _lastLocalConfigEdit).
+            let _lastLocalMediaEdit      = 0;
+            let _lastLocalMediaEditStore = null;
             let _lastPushTime   = 0;
             let _lastPullTime   = 0;
             let _syncCount      = 0;
@@ -11605,6 +11630,23 @@ body.dark-mode,
                     else if (state._contasManuais) contasFinanceiras = state._contasManuais;
                 } catch(e) {}
                 const company = Object.assign({}, state.company || {});
+                // ✅ FIX PERFORMANCE-SYNC: o logo (base64) NUNCA vai neste pacote —
+                // ele viaja só pelo arquivo de mídia separado (ver _collectMediaData),
+                // que sincroniza com frequência menor. Isso mantém este pacote
+                // (baixado a cada poll de 5s + reenviado a cada push) leve, mesmo
+                // com um logo grande configurado.
+                delete company.logo;
+                // ✅ FIX PERFORMANCE-SYNC: mesma lógica para fotos de produtos —
+                // removidas aqui, sincronizadas à parte via _collectMediaData.
+                // Os demais campos do produto (preço, estoque, nome...) continuam
+                // no caminho rápido normalmente.
+                const productsLight = (state.products || []).map(p => {
+                    if (p && typeof p.image === 'string' && p.image.startsWith('data:')) {
+                        const { image, ...rest } = p;
+                        return rest;
+                    }
+                    return p;
+                });
                 // FIX DELETE-SYNC: coleta tombstones da loja ativa para propagar
                 // deleções para outros dispositivos/navegadores via Drive
                 const tombstones = Object.entries(_pendingDeletions)
@@ -11618,7 +11660,7 @@ body.dark-mode,
                     _store:             storeId,
                     _ts:                new Date().toISOString(),
                     clients:            state.clients            || [],
-                    products:           state.products           || [],
+                    products:           productsLight,
                     sales:              state.sales              || [],
                     expenses:           state.expenses           || [],
                     prescriptions:      state.prescriptions      || [],
@@ -11644,6 +11686,32 @@ body.dark-mode,
                     backupConfig:       state.backupConfig       || {},
                     contasFinanceiras:  contasFinanceiras,
                     tombstones:         tombstones   // ← deleções propagadas para outros navegadores
+                };
+            }
+
+            // ── FIX PERFORMANCE-SYNC: pacote SEPARADO só com imagens ──────────
+            // Logo da empresa + fotos de produtos, tudo em base64. Sincronizado
+            // à parte do pacote "quente" (clientes/vendas/produtos/empresa) para
+            // não deixar o sync rápido pesado. Sempre um arquivo COMPLETO (nunca
+            // parcial) — assim um dispositivo novo, ao puxar este arquivo pela
+            // primeira vez, recebe todas as imagens de uma vez, sem depender de
+            // nenhum outro dispositivo estar online.
+            function _collectMediaData() {
+                const storeId = window._currentStore || 'barueri';
+                const products = {};
+                (state.products || []).forEach(p => {
+                    if (p && p.id && typeof p.image === 'string' && p.image.startsWith('data:')) {
+                        products[p.id] = p.image;
+                    }
+                });
+                const logo = (state.company && typeof state.company.logo === 'string' && state.company.logo.startsWith('data:'))
+                    ? state.company.logo : null;
+                return {
+                    _rxdb:   'v17media',
+                    _store:  storeId,
+                    _ts:     new Date().toISOString(),
+                    logo:    logo,
+                    products: products
                 };
             }
 
@@ -11744,10 +11812,26 @@ body.dark-mode,
                             merged[remoteItem.id] = remoteItem;
                         } else {
                             // Ambos existem — ganha quem tem _updatedAt mais recente
-                            const remoteDate = new Date(remoteItem._updatedAt || remoteItem.updatedAt || remoteTs || 0).getTime();
-                            const localDate  = new Date(localItem._updatedAt  || localItem.updatedAt  || 0).getTime();
+                            // ✅ FIX SYNC: produtos gravam a data em "updated_at" (com
+                            // underscore), não "_updatedAt"/"updatedAt" — sem checar essa
+                            // variante, todo produto local caía no fallback "0" e perdia
+                            // a comparação pro remoto sempre, mesmo quando a edição local
+                            // era mais recente.
+                            const remoteDate = new Date(remoteItem._updatedAt || remoteItem.updatedAt || remoteItem.updated_at || remoteTs || 0).getTime();
+                            const localDate  = new Date(localItem._updatedAt  || localItem.updatedAt  || localItem.updated_at  || 0).getTime();
                             if (remoteDate > localDate) {
-                                merged[remoteItem.id] = remoteItem;
+                                // ✅ FIX PERFORMANCE-SYNC: desde que fotos de produtos
+                                // pararam de viajar neste arquivo (ver _collectAllData),
+                                // remoteItem nunca traz "image" — sem isso, aceitar o
+                                // remoto aqui apagaria a foto local do produto a cada
+                                // sync. Preserva a imagem local quando o remoto não
+                                // enviou nenhuma (a imagem é sincronizada à parte, ver
+                                // _collectMediaData/_applyMediaData).
+                                const winner = { ...remoteItem };
+                                if (winner.image === undefined && localItem.image !== undefined) {
+                                    winner.image = localItem.image;
+                                }
+                                merged[remoteItem.id] = winner;
                             }
                             // Se local for mais recente, mantém local (já está em merged)
                         }
@@ -11926,6 +12010,205 @@ body.dark-mode,
                 } catch(e) {}
                 if (!silent) Toast.show('✅ Dados sincronizados da nuvem!', 'success', 2500);
                 return true;
+            }
+
+            // ── FIX PERFORMANCE-SYNC: aplica o arquivo de mídia (logo + fotos) ──
+            // Sempre "última gravação vence" no nível do arquivo inteiro — como
+            // esse arquivo só existe pra imagens, não há necessidade do merge
+            // item-a-item fino usado nas coleções de dados.
+            async function _applyMediaData(remote, silent) {
+                if (!remote || (remote._rxdb !== 'v17media')) return false;
+                const storeId = window._currentStore || 'barueri';
+                if (remote._store && remote._store !== storeId) return false;
+
+                // Mesma proteção usada em company/config: se este dispositivo
+                // acabou de trocar o logo/uma foto há poucos segundos, não deixa
+                // um pull (que pode ter baixado uma versão anterior ainda em
+                // trânsito) desfazer essa edição.
+                const remoteTsMs = remote._ts ? new Date(remote._ts).getTime() : 0;
+                const recentLocalMediaEdit = _lastLocalMediaEdit
+                    && _lastLocalMediaEditStore === storeId
+                    && (_lastLocalMediaEdit > remoteTsMs);
+                if (recentLocalMediaEdit) {
+                    console.log('[CloudSync] mídia: edição local recente é mais nova que o arquivo remoto — mantendo logo/fotos locais.');
+                    return false;
+                }
+
+                if (typeof remote.logo === 'string' && remote.logo.startsWith('data:')) {
+                    state.company = state.company || {};
+                    if (state.company.logo !== remote.logo) {
+                        state.company.logo = remote.logo;
+                        try { App.updateCompanyDisplay?.(); } catch(e) {}
+                    }
+                } else if (remote.logo === null && state.company && state.company.logo) {
+                    // Logo removido em outro dispositivo — remove aqui também.
+                    delete state.company.logo;
+                    try { App.updateCompanyDisplay?.(); } catch(e) {}
+                }
+
+                if (remote.products && typeof remote.products === 'object') {
+                    let mudou = false;
+                    (state.products || []).forEach(p => {
+                        if (!p || !p.id) return;
+                        const img = remote.products[p.id];
+                        if (typeof img === 'string' && img.startsWith('data:') && p.image !== img) {
+                            p.image = img;
+                            mudou = true;
+                        }
+                    });
+                    if (mudou) { try { Products.renderTable?.(); } catch(e) {} }
+                }
+
+                try { if (window.LocalStorageBackup) LocalStorageBackup.save(); } catch(_e) {}
+                try { await LocalFirst.rewriteAll(true); } catch(e) {}
+                return true;
+            }
+
+            // ── FIX PERFORMANCE-SYNC: push/pull do arquivo de mídia (Google Drive) ──
+            async function _gdriveGetOrCreateMediaFileId() {
+                const cached = localStorage.getItem(_lsMediaFileIdKey('gdrive'));
+                if (cached) return cached;
+                try {
+                    const q = encodeURIComponent("name='" + _mediaFileName() + "' and trashed=false");
+                    const r = await _fetchTimeout('https://www.googleapis.com/drive/v3/files?q=' + q + '&fields=files(id,name)', {
+                        headers: { Authorization: 'Bearer ' + _gdriveToken.access_token }
+                    });
+                    const j = await r.json();
+                    if (j.files && j.files[0]) {
+                        localStorage.setItem(_lsMediaFileIdKey('gdrive'), j.files[0].id);
+                        return j.files[0].id;
+                    }
+                } catch(e) {}
+                return null;
+            }
+
+            async function gdrivePushMedia(silent) {
+                if (!_gdriveToken) return;
+                if (!(await _ensureValidGDriveToken(true))) return;
+                if (_pushingMedia) return;
+                _pushingMedia = true;
+                try {
+                    const data = JSON.stringify(_collectMediaData());
+                    const fileId = await _gdriveGetOrCreateMediaFileId();
+                    if (fileId) {
+                        await _fetchTimeout(
+                            'https://www.googleapis.com/upload/drive/v3/files/' + fileId + '?uploadType=media',
+                            { method: 'PATCH', headers: { Authorization: 'Bearer ' + _gdriveToken.access_token, 'Content-Type': 'application/json' }, body: data },
+                            45000
+                        );
+                    } else {
+                        const meta = JSON.stringify({ name: _mediaFileName(), mimeType: 'application/json' });
+                        const form = new FormData();
+                        form.append('metadata', new Blob([meta], { type: 'application/json' }));
+                        form.append('file',     new Blob([data], { type: 'application/json' }));
+                        const r = await _fetchTimeout(
+                            'https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id',
+                            { method: 'POST', headers: { Authorization: 'Bearer ' + _gdriveToken.access_token }, body: form }
+                        );
+                        const created = await r.json();
+                        if (created.id) localStorage.setItem(_lsMediaFileIdKey('gdrive'), created.id);
+                    }
+                } catch(e) {
+                    console.warn('[CloudSync] push de mídia (Drive) falhou:', e.message);
+                } finally {
+                    _pushingMedia = false;
+                }
+            }
+
+            async function gdrivePullMedia(silent) {
+                if (!_gdriveToken) return;
+                if (!(await _ensureValidGDriveToken(true))) return;
+                if (_pullingMedia) return;
+                _pullingMedia = true;
+                try {
+                    const fileId = await _gdriveGetOrCreateMediaFileId();
+                    if (!fileId) return;
+                    const r = await _fetchTimeout(
+                        'https://www.googleapis.com/drive/v3/files/' + fileId + '?alt=media',
+                        { headers: { Authorization: 'Bearer ' + _gdriveToken.access_token }, cache: 'no-store' },
+                        45000
+                    );
+                    const remote = await r.json();
+                    await _withSyncLock('cloud:gdrivePullMedia', () => _applyMediaData(remote, silent));
+                } catch(e) {
+                    console.warn('[CloudSync] pull de mídia (Drive) falhou:', e.message);
+                } finally {
+                    _pullingMedia = false;
+                }
+            }
+
+            async function _onedriveGetOrCreateMediaFileId() {
+                const cached = localStorage.getItem(_lsMediaFileIdKey('onedrive'));
+                if (cached) return cached;
+                try {
+                    const r = await _fetchTimeout(
+                        'https://graph.microsoft.com/v1.0/me/drive/root:/' + encodeURIComponent(_mediaFileName()),
+                        { headers: { Authorization: 'Bearer ' + _onedriveToken.access_token } }
+                    );
+                    if (r.ok) {
+                        const j = await r.json();
+                        if (j.id) { localStorage.setItem(_lsMediaFileIdKey('onedrive'), j.id); return j.id; }
+                    }
+                } catch(e) {}
+                return null;
+            }
+
+            async function onedrivePushMedia(silent) {
+                if (!_onedriveToken) return;
+                _pushingMedia = true;
+                try {
+                    const data = JSON.stringify(_collectMediaData());
+                    const r = await _fetchTimeout(
+                        'https://graph.microsoft.com/v1.0/me/drive/root:/' + encodeURIComponent(_mediaFileName()) + ':/content',
+                        { method: 'PUT', headers: { Authorization: 'Bearer ' + _onedriveToken.access_token, 'Content-Type': 'application/json' }, body: data },
+                        45000
+                    );
+                    if (r.ok) {
+                        const d = await r.json();
+                        if (d.id) localStorage.setItem(_lsMediaFileIdKey('onedrive'), d.id);
+                    }
+                } catch(e) {
+                    console.warn('[CloudSync] push de mídia (OneDrive) falhou:', e.message);
+                } finally {
+                    _pushingMedia = false;
+                }
+            }
+
+            async function onedrivePullMedia(silent) {
+                if (!_onedriveToken) return;
+                _pullingMedia = true;
+                try {
+                    const fileId = await _onedriveGetOrCreateMediaFileId();
+                    if (!fileId) return;
+                    const r = await _fetchTimeout(
+                        'https://graph.microsoft.com/v1.0/me/drive/items/' + fileId + '/content',
+                        { headers: { Authorization: 'Bearer ' + _onedriveToken.access_token }, cache: 'no-store' },
+                        45000
+                    );
+                    const remote = await r.json();
+                    await _withSyncLock('cloud:onedrivePullMedia', () => _applyMediaData(remote, silent));
+                } catch(e) {
+                    console.warn('[CloudSync] pull de mídia (OneDrive) falhou:', e.message);
+                } finally {
+                    _pullingMedia = false;
+                }
+            }
+
+            // Chamado logo após o logo da empresa ou a foto de um produto mudar
+            // localmente — envia só o arquivo de mídia (pequeno de disparar, já
+            // que o conteúdo pode ser grande, mas não trava o sync rápido dos
+            // outros dados). Também marca a proteção anti-race de mídia.
+            function pushMediaNow() {
+                const storeId = window._currentStore || 'barueri';
+                _lastLocalMediaEdit = Date.now();
+                _lastLocalMediaEditStore = storeId;
+                if (_activeProvider === 'gdrive'   && _gdriveToken)   gdrivePushMedia(true).catch(()=>{});
+                if (_activeProvider === 'onedrive' && _onedriveToken) onedrivePushMedia(true).catch(()=>{});
+            }
+
+            function _pullMediaNow(silent) {
+                if (_activeProvider === 'gdrive'   && _gdriveToken)   gdrivePullMedia(silent).catch(()=>{});
+                if (_activeProvider === 'onedrive' && _onedriveToken) onedrivePullMedia(silent).catch(()=>{});
             }
 
             // ════════════════════════════════════════════════════════════════
@@ -12203,13 +12486,21 @@ body.dark-mode,
                         console.warn('[CloudSync] merge pré-push (Drive) falhou — seguindo só com dados locais:', _mergeErr.message);
                     }
 
-                    const data = JSON.stringify(_collectAllData(), null, 2);
+                    // ✅ FIX PERFORMANCE-SYNC: removida a indentação (", null, 2") do JSON
+                    // enviado ao Drive. Esse payload inclui fotos de produtos/clientes e
+                    // logo em base64, e é baixado + reenviado por completo a cada ciclo de
+                    // sync (poll de 5s + pré-merge antes de todo push) — a indentação só
+                    // engordava cada transferência sem nenhum benefício, já que ninguém lê
+                    // esse arquivo manualmente. Reduz o tamanho do payload (~15-25%) em toda
+                    // sincronização, ajudando especialmente em conexões móveis mais lentas.
+                    const data = JSON.stringify(_collectAllData());
                     const fileId = await _gdriveGetOrCreateFileId();
                     if (fileId) {
                         // Atualiza arquivo existente
                         const r = await _fetchTimeout(
                             'https://www.googleapis.com/upload/drive/v3/files/' + fileId + '?uploadType=media',
-                            { method: 'PATCH', headers: { Authorization: 'Bearer ' + _gdriveToken.access_token, 'Content-Type': 'application/json' }, body: data }
+                            { method: 'PATCH', headers: { Authorization: 'Bearer ' + _gdriveToken.access_token, 'Content-Type': 'application/json' }, body: data },
+                            45000
                         );
                         // Se 404 (arquivo deletado externamente), limpa cache e recria
                         if (r.status === 404) {
@@ -12546,7 +12837,9 @@ body.dark-mode,
                         console.warn('[CloudSync] merge pré-push (OneDrive) falhou — seguindo só com dados locais:', _mergeErr.message);
                     }
 
-                    const data = JSON.stringify(_collectAllData(), null, 2);
+                    // ✅ FIX PERFORMANCE-SYNC: ver mesma correção em gdrivePush — remove
+                    // indentação desnecessária do JSON re-transmitido a cada ciclo de sync.
+                    const data = JSON.stringify(_collectAllData());
                     const r = await _fetchTimeout(
                         'https://graph.microsoft.com/v1.0/me/drive/root:/' + encodeURIComponent(_fileName()) + ':/content',
                         { method: 'PUT', headers: { Authorization: 'Bearer ' + _onedriveToken.access_token, 'Content-Type': 'application/json' }, body: data }
@@ -12626,10 +12919,25 @@ body.dark-mode,
                 }
                 _pollTimer = setTimeout(_tick, POLL_ACTIVE_MS);
                 console.log('[CloudSync] ✅ Polling adaptativo iniciado (ativo:' + POLL_ACTIVE_MS/1000 + 's / bg:' + POLL_BACKGROUND_MS/1000 + 's)');
+
+                // ✅ FIX PERFORMANCE-SYNC: poll separado e mais espaçado só pro
+                // arquivo de mídia (logo/fotos) — não faz sentido baixar imagens
+                // no mesmo ritmo de 5s dos dados, já que mudam raramente.
+                function _mediaTick() {
+                    if (document.visibilityState !== 'hidden') _pullMediaNow(true);
+                    const next = document.visibilityState === 'hidden' ? MEDIA_POLL_BACKGROUND_MS : MEDIA_POLL_ACTIVE_MS;
+                    _mediaPollTimer = setTimeout(_mediaTick, next);
+                }
+                _mediaPollTimer = setTimeout(_mediaTick, MEDIA_POLL_ACTIVE_MS);
+                // Puxa a mídia (logo/fotos) uma vez já no início, sem esperar o
+                // primeiro intervalo — importante para um dispositivo novo, que
+                // ainda não tem nenhuma imagem localmente.
+                setTimeout(() => _pullMediaNow(true), 2000);
             }
 
             function _stopPolling() {
-                if (_pollTimer) { clearTimeout(_pollTimer); _pollTimer = null; }
+                if (_pollTimer)      { clearTimeout(_pollTimer);      _pollTimer = null; }
+                if (_mediaPollTimer) { clearTimeout(_mediaPollTimer); _mediaPollTimer = null; }
             }
 
             function _silentPull() {
@@ -13046,6 +13354,10 @@ body.dark-mode,
                 },
                 connectGDrive, gdrivePush, gdrivePull, gdriveDisconnect,
                 connectOneDrive, onedrivePush, onedrivePull, onedriveDisconnect,
+                // ✅ FIX PERFORMANCE-SYNC: canal separado de sincronização de
+                // imagens (logo + fotos de produtos) — ver _collectMediaData.
+                pushMediaNow,
+                pullMediaNow: _pullMediaNow,
                 showTab, _updateUI,
                 autoSync() { _schedulePush(); },
                 // ✅ Chamado por AuthSystem depois que a loja correta do usuário logado
@@ -16547,6 +16859,10 @@ tbody tr td{border:1.5px solid #000;padding:2mm;text-align:center;font-weight:70
                         // App.updateLogo não chamava upsertConfig, logo o logo nunca era
                         // enviado para outros dispositivos após upload via sidebar.
                         SupaSync.upsertConfig().catch(() => {});
+                        // ✅ FIX PERFORMANCE-SYNC: o logo não viaja mais no pacote
+                        // principal (ver CloudSync._collectAllData) — precisa ser
+                        // enviado explicitamente pelo canal de mídia separado.
+                        try { window.CloudSync?.pushMediaNow?.(); } catch(_e) {}
                         // FIX BUG#4: atualiza preview de configurações para refletir o novo logo
                         try {
                             const prev = document.getElementById('configLogoPreview');
@@ -18809,6 +19125,10 @@ tbody tr td{border:1.5px solid #000;padding:2mm;text-align:center;font-weight:70
                 
                 App.saveData();
                 SupaSync.upsertProduto(product);
+                // ✅ FIX PERFORMANCE-SYNC: a foto do produto não viaja mais no
+                // pacote principal (ver CloudSync._collectAllData) — envia pelo
+                // canal de mídia separado só quando o produto tem imagem.
+                if (product.image) { try { window.CloudSync?.pushMediaNow?.(); } catch(_e) {} }
                 this.clearForm();
                 this.renderTable();
                 Sales.populateSaleSelects();
@@ -22480,6 +22800,8 @@ ${container.innerHTML}
                     state.products.push(product);
                     App.saveData();
                     SupaSync.upsertProduto(product);
+                    // ✅ FIX PERFORMANCE-SYNC: ver mesma correção em Products.save.
+                    if (product.image) { try { window.CloudSync?.pushMediaNow?.(); } catch(_e) {} }
                     if (typeof Products !== 'undefined') { try { Products.renderTable(); } catch (e) {} }
                     this.populateSaleSelects();
                     Modal.close('quickProductModal');
@@ -25509,7 +25831,8 @@ ${container.innerHTML}
             },
 
             // Dropdown de status profissional e clicável — usado no modal de detalhes e no histórico.
-            // Inclui a opção "Dar Baixa" ao final, sempre visível, separada visualmente das demais.
+            // A opção "Finalizado (Marcar como Pago)" foi removida deste seletor a pedido do
+            // usuário — dar baixa continua disponível pelo botão dedicado em Contas a Receber.
             renderStatusSelect(sale, stAtual, opts) {
                 opts = opts || {};
                 const size = opts.size === 'lg' ? 'lg' : 'sm';
@@ -25535,7 +25858,6 @@ ${container.innerHTML}
                         background-image:url('data:image/svg+xml,${arrow}');
                         background-repeat:no-repeat;background-position:right 10px center;">
                     ${options}
-                    <option value="__baixa__" style="background:#fff;color:#155724;font-weight:800;">💰 Finalizado (Marcar como Pago)</option>
                 </select>`;
             },
 
