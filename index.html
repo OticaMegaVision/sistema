@@ -4480,6 +4480,34 @@ tr:hover td { background: rgba(255,107,0,0.03) !important; }
     display: flex !important;
     flex-direction: column !important;
 }
+/* Modais rápidos de Vendas (Cliente / Produto): em telas estreitas, reduz o
+   "chrome" (padding do overlay + do corpo) para sobrar mais largura real
+   para a tabela do receituário e diminuir a necessidade de rolagem lateral. */
+@media (max-width: 480px) {
+    #quickClientModal,
+    #quickProductModal {
+        padding: 0.3rem !important;
+    }
+    #quickClientModal .modal-body,
+    #quickProductModal .modal-body {
+        padding: 0.65rem !important;
+    }
+    #quickClientModal .presc-container,
+    #quickProductModal .presc-container {
+        padding: 0.6rem 0.35rem !important;
+    }
+    #quickClientModal .presc-table-wrapper .presc-table {
+        min-width: 340px !important;
+    }
+    #quickClientModal .presc-field {
+        width: 36px !important;
+        padding: 0.2rem !important;
+    }
+    #quickClientModal .presc-table th,
+    #quickClientModal .presc-table td {
+        padding: 0.25rem 0.15rem !important;
+    }
+}
 .modal-body {
     overflow-y: auto !important;
     flex: 1 1 auto !important;
@@ -9185,30 +9213,260 @@ body.dark-mode,
     </div>
 
     <!-- Modal: Criar Cliente Rápido (usado dentro da tela de Vendas, sem perder o carrinho) -->
+    <!-- Contém os mesmos campos da aba Clientes (Dados Pessoais + Endereço + Receituário completo) -->
     <div class="modal" id="quickClientModal" role="dialog" aria-modal="true" aria-labelledby="quickClientTitle">
-        <div class="modal-content" style="max-width:420px;overflow:hidden;padding:0;">
-            <div style="background:linear-gradient(135deg,#ff6b00,#e55a00);padding:16px 20px;display:flex;justify-content:space-between;align-items:center;">
+        <div class="modal-content" style="max-width:720px;max-height:92vh;">
+            <div style="background:linear-gradient(135deg,#ff6b00,#e55a00);padding:16px 20px;display:flex;justify-content:space-between;align-items:center;flex:0 0 auto;">
                 <div id="quickClientTitle" style="color:#fff;font-weight:800;font-size:1rem;display:flex;align-items:center;gap:8px;"><i class="fas fa-user-plus"></i> Criar Cliente Rápido</div>
                 <button onclick="Modal.close('quickClientModal')" style="background:none;border:none;color:#fff;font-size:1.2rem;cursor:pointer;opacity:.85;">&times;</button>
             </div>
-            <div style="padding:20px;">
-                <div class="form-group">
-                    <label for="quickClientName" class="required">Nome</label>
-                    <input type="text" id="quickClientName" class="form-control" placeholder="Nome completo">
-                </div>
-                <div class="form-row">
-                    <div class="form-group">
-                        <label for="quickClientPhone">Telefone / WhatsApp</label>
-                        <input type="text" id="quickClientPhone" class="form-control" placeholder="(00) 00000-0000" oninput="Utils.maskPhone(this)">
+            <div class="modal-body">
+                <!-- Dados Pessoais -->
+                <div class="cliente-card" style="margin-bottom:16px;">
+                    <h3 class="ic-head"><span class="ic-badge"><i class="fas fa-id-card"></i></span>DADOS PESSOAIS</h3>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="qcClientCode">Código</label>
+                            <input type="text" id="qcClientCode" class="form-control" readonly placeholder="Gerado automaticamente">
+                        </div>
+                        <div class="form-group">
+                            <label for="qcClientBirthDate">Data de Nascimento</label>
+                            <input type="date" id="qcClientBirthDate" class="form-control">
+                        </div>
                     </div>
-                    <div class="form-group">
-                        <label for="quickClientCpf">CPF</label>
-                        <input type="text" id="quickClientCpf" class="form-control" placeholder="000.000.000-00" oninput="Utils.maskCpfCnpj(this)">
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="qcClientName" class="required">Nome</label>
+                            <input type="text" id="qcClientName" class="form-control" required placeholder="Nome completo">
+                        </div>
+                        <div class="form-group">
+                            <label for="qcClientPhone">Telefone / WhatsApp</label>
+                            <input type="text" id="qcClientPhone" class="form-control" placeholder="(00) 00000-0000" oninput="Utils.maskPhone(this)">
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="qcClientEmail">Email</label>
+                            <input type="email" id="qcClientEmail" class="form-control">
+                        </div>
+                        <div class="form-group">
+                            <label for="qcClientCpf">CPF/CNPJ</label>
+                            <input type="text" id="qcClientCpf" class="form-control" placeholder="000.000.000-00" oninput="Utils.maskCpfCnpj(this)">
+                        </div>
                     </div>
                 </div>
-                <p style="font-size:0.78rem;color:#6c757d;margin:6px 0 0;">Dados completos (endereço, receita, etc.) podem ser preenchidos depois, na tela de Clientes.</p>
+
+                <!-- Endereço -->
+                <div class="cliente-card" style="margin-bottom:16px;">
+                    <h3 class="ic-head"><span class="ic-badge"><i class="fas fa-map-marker-alt"></i></span>ENDEREÇO</h3>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="qcClientCep">CEP</label>
+                            <input type="text" id="qcClientCep" class="form-control" oninput="Utils.maskCep(this)" onblur="Utils.buscarCepCompleto(this, 'qcClient')" maxlength="9" placeholder="00000-000">
+                        </div>
+                        <div class="form-group">
+                            <label for="qcClientAddress">Logradouro</label>
+                            <input type="text" id="qcClientAddress" class="form-control">
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="qcClientNumber">Número</label>
+                            <input type="text" id="qcClientNumber" class="form-control">
+                        </div>
+                        <div class="form-group">
+                            <label for="qcClientComplement">Complemento</label>
+                            <input type="text" id="qcClientComplement" class="form-control">
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="qcClientNeighborhood">Bairro</label>
+                            <input type="text" id="qcClientNeighborhood" class="form-control">
+                        </div>
+                        <div class="form-group">
+                            <label for="qcClientCity">Cidade</label>
+                            <input type="text" id="qcClientCity" class="form-control">
+                        </div>
+                        <div class="form-group">
+                            <label for="qcClientState">Estado (UF)</label>
+                            <input type="text" id="qcClientState" class="form-control" maxlength="2" style="text-transform:uppercase">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Receituário -->
+                <div class="presc-container">
+                    <div class="presc-header">
+                        <div>
+                            <div class="presc-title">RECEITUÁRIO</div>
+                            <div class="presc-subtitle">Prescrição de Lentes Corretivas</div>
+                        </div>
+                    </div>
+
+                    <div class="presc-profissionais">
+                        <div>
+                            <label style="font-weight: 600; color: var(--primary);"><i class="fas fa-user-md"></i> Optometrista</label>
+                            <input type="text" id="qcPrescOptometrist" class="form-control" placeholder="Nome do optometrista">
+                        </div>
+                        <div>
+                            <label style="font-weight: 600; color: var(--primary);"><i class="fas fa-calendar"></i> Data da Consulta</label>
+                            <input type="date" id="qcPrescDate" class="form-control">
+                        </div>
+                    </div>
+
+                    <!-- Tabela LONGE -->
+                    <div style="margin-bottom: 30px;">
+                        <h4 style="color: var(--primary);">LONGE</h4>
+                        <div class="presc-scroll-hint"><i class="fas fa-arrows-left-right"></i> Deslize para ver mais</div>
+                        <div class="presc-table-wrapper">
+                        <table class="presc-table">
+                            <thead>
+                                <tr>
+                                    <th></th>
+                                    <th>ESF</th>
+                                    <th>CIL</th>
+                                    <th>EIXO</th>
+                                    <th>ADIÇÃO</th>
+                                    <th>DNP</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td style="font-weight: bold;">OD</td>
+                                    <td>
+                                        <div class="presc-stepper">
+                                            <button type="button" onclick="Presc.stepValue('qcOdSph', -20, 20, 0.25, -1)" data-tooltip="Diminuir">−</button>
+                                            <input type="text" id="qcOdSph" value="0.00" readonly class="presc-field" ondblclick="Presc.resetField('qcOdSph')" onchange="Presc.updateQcPertoOD()">
+                                            <button type="button" onclick="Presc.stepValue('qcOdSph', -20, 20, 0.25, 1)" data-tooltip="Aumentar">+</button>
+                                        </div>
+                                    </td>
+                                    <td>
+                                        <div class="presc-stepper">
+                                            <button type="button" onclick="Presc.stepValue('qcOdCyl', -6, 0, 0.25, -1)" style="background: var(--danger);" data-tooltip="Diminuir">−</button>
+                                            <input type="text" id="qcOdCyl" value="0.00" readonly class="presc-field negative" ondblclick="Presc.resetField('qcOdCyl')" onchange="Presc.updateQcPertoOD()">
+                                        </div>
+                                    </td>
+                                    <td>
+                                        <input type="text" id="qcOdAxis" class="presc-field" onblur="Presc.formatAxis(this)" onchange="Presc.updateQcPertoOD()" placeholder="0°" ondblclick="this.value='0°'" data-tooltip="Duplo clique para zerar">
+                                    </td>
+                                    <td>
+                                        <div class="presc-stepper">
+                                            <input type="text" id="qcOdAdd" value="0.00" readonly class="presc-field positive" ondblclick="Presc.resetField('qcOdAdd')" onchange="Presc.updateQcPertoOD()">
+                                            <button type="button" onclick="Presc.stepValue('qcOdAdd', 0, 4, 0.25, 1)" style="background: var(--success);" data-tooltip="Aumentar">+</button>
+                                        </div>
+                                    </td>
+                                    <td>
+                                        <input type="text" id="qcOdDnp" class="presc-field" onblur="Presc.validateDnp(this); Presc.updateQcPertoOD(); Presc.updateQcDP()" placeholder="20-40mm" ondblclick="this.value=''" data-tooltip="Duplo clique para limpar">
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td style="font-weight: bold;">OE</td>
+                                    <td>
+                                        <div class="presc-stepper">
+                                            <button type="button" onclick="Presc.stepValue('qcOeSph', -20, 20, 0.25, -1)" data-tooltip="Diminuir">−</button>
+                                            <input type="text" id="qcOeSph" value="0.00" readonly class="presc-field" ondblclick="Presc.resetField('qcOeSph')" onchange="Presc.updateQcPertoOE()">
+                                            <button type="button" onclick="Presc.stepValue('qcOeSph', -20, 20, 0.25, 1)" data-tooltip="Aumentar">+</button>
+                                        </div>
+                                    </td>
+                                    <td>
+                                        <div class="presc-stepper">
+                                            <button type="button" onclick="Presc.stepValue('qcOeCyl', -6, 0, 0.25, -1)" style="background: var(--danger);" data-tooltip="Diminuir">−</button>
+                                            <input type="text" id="qcOeCyl" value="0.00" readonly class="presc-field negative" ondblclick="Presc.resetField('qcOeCyl')" onchange="Presc.updateQcPertoOE()">
+                                        </div>
+                                    </td>
+                                    <td>
+                                        <input type="text" id="qcOeAxis" class="presc-field" onblur="Presc.formatAxis(this)" onchange="Presc.updateQcPertoOE()" placeholder="0°" ondblclick="this.value='0°'" data-tooltip="Duplo clique para zerar">
+                                    </td>
+                                    <td>
+                                        <div class="presc-stepper">
+                                            <input type="text" id="qcOeAdd" value="0.00" readonly class="presc-field positive" ondblclick="Presc.resetField('qcOeAdd')" onchange="Presc.updateQcPertoOE()">
+                                            <button type="button" onclick="Presc.stepValue('qcOeAdd', 0, 4, 0.25, 1)" style="background: var(--success);" data-tooltip="Aumentar">+</button>
+                                        </div>
+                                    </td>
+                                    <td>
+                                        <input type="text" id="qcOeDnp" class="presc-field" onblur="Presc.validateDnp(this); Presc.updateQcPertoOE(); Presc.updateQcDP()" placeholder="20-40mm" ondblclick="this.value=''" data-tooltip="Duplo clique para limpar">
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                        </div>
+                    </div>
+
+                    <!-- Tabela PERTO -->
+                    <div style="margin-bottom: 30px;">
+                        <h4 style="color: var(--success);">PERTO</h4>
+                        <div class="presc-scroll-hint"><i class="fas fa-arrows-left-right"></i> Deslize para ver mais</div>
+                        <div class="presc-table-wrapper">
+                        <table class="presc-table">
+                            <thead>
+                                <tr>
+                                    <th style="background: var(--success);"></th>
+                                    <th style="background: var(--success);">ESF</th>
+                                    <th style="background: var(--success);">CIL</th>
+                                    <th style="background: var(--success);">EIXO</th>
+                                    <th style="background: var(--success);">DNP</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td style="font-weight: bold;">OD</td>
+                                    <td><input type="text" id="qcOdNearSph" readonly value="0.00" class="presc-field" style="background: #f0f9f0;"></td>
+                                    <td><input type="text" id="qcOdNearCyl" readonly value="0.00" class="presc-field negative" style="background: #f0f9f0;"></td>
+                                    <td><input type="text" id="qcOdNearAxis" readonly value="0°" class="presc-field" style="background: #f0f9f0;"></td>
+                                    <td><input type="text" id="qcOdNearDnp" readonly value="0.0" class="presc-field" style="background: #e7f3ff;"></td>
+                                </tr>
+                                <tr>
+                                    <td style="font-weight: bold;">OE</td>
+                                    <td><input type="text" id="qcOeNearSph" readonly value="0.00" class="presc-field" style="background: #f0f9f0;"></td>
+                                    <td><input type="text" id="qcOeNearCyl" readonly value="0.00" class="presc-field negative" style="background: #f0f9f0;"></td>
+                                    <td><input type="text" id="qcOeNearAxis" readonly value="0°" class="presc-field" style="background: #f0f9f0;"></td>
+                                    <td><input type="text" id="qcOeNearDnp" readonly value="0.0" class="presc-field" style="background: #e7f3ff;"></td>
+                                </tr>
+                            </tbody>
+                        </table>
+                        </div>
+                    </div>
+
+                    <!-- Medidas -->
+                    <div class="presc-medidas">
+                        <div class="medida-card">
+                            <div class="medida-icon primary"><i class="fas fa-ruler"></i></div>
+                            <div class="medida-content">
+                                <div class="medida-label">DP Longe</div>
+                                <div class="medida-value">
+                                    <input type="text" id="qcPrescDp" readonly value="0.0" class="form-control" style="width: 80px;"> <span class="medida-unit">mm</span>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="medida-card">
+                            <div class="medida-icon success"><i class="fas fa-arrows-alt-v"></i></div>
+                            <div class="medida-content">
+                                <div class="medida-label">Altura</div>
+                                <div class="medida-value">
+                                    <input type="text" id="qcPrescHeight" class="presc-field" onblur="Presc.validateNumber(this, 10, 35)" placeholder="0.0" style="width: 80px;" ondblclick="this.value=''" data-tooltip="Duplo clique para limpar">
+                                    <span class="medida-unit">mm</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Observações -->
+                    <div style="margin-top: 20px; background: #fff3cd; border-left: 4px solid #ffc107; padding: 15px; border-radius: 8px;">
+                        <label style="font-weight: 600; color: #856404; margin-bottom: 10px;">
+                            <i class="fas fa-sticky-note"></i> Observações
+                        </label>
+                        <textarea id="qcPrescNotes" class="presc-obs" rows="3" placeholder="Anotações sobre a prescrição, observações do cliente, recomendações especiais..."></textarea>
+                    </div>
+
+                    <div style="display: flex; gap: 10px; justify-content: flex-end; margin-top: 20px;">
+                        <button type="button" class="btn btn-secondary" onclick="Sales.clearQuickClientPresc()">
+                            <i class="fas fa-eraser"></i> LIMPAR RECEITUÁRIO
+                        </button>
+                    </div>
+                </div>
             </div>
-            <div class="modal-footer">
+            <div class="modal-footer" style="flex:0 0 auto;">
                 <button class="btn btn-secondary" onclick="Modal.close('quickClientModal')">Cancelar</button>
                 <button class="btn btn-primary" onclick="Sales.quickSaveClient()"><i class="fas fa-save"></i> Salvar e Selecionar</button>
             </div>
@@ -9216,31 +9474,115 @@ body.dark-mode,
     </div>
 
     <!-- Modal: Cadastrar Produto/Serviço Rápido (usado dentro da tela de Vendas, sem perder o carrinho) -->
+    <!-- Contém os mesmos campos das abas Produtos / Serviços, adaptados conforme a categoria -->
     <div class="modal" id="quickProductModal" role="dialog" aria-modal="true" aria-labelledby="quickProductTitle">
-        <div class="modal-content" style="max-width:420px;overflow:hidden;padding:0;">
-            <div style="background:linear-gradient(135deg,#ff6b00,#e55a00);padding:16px 20px;display:flex;justify-content:space-between;align-items:center;">
+        <div class="modal-content" style="max-width:640px;max-height:92vh;">
+            <div style="background:linear-gradient(135deg,#ff6b00,#e55a00);padding:16px 20px;display:flex;justify-content:space-between;align-items:center;flex:0 0 auto;">
                 <div id="quickProductTitle" style="color:#fff;font-weight:800;font-size:1rem;display:flex;align-items:center;gap:8px;"><i class="fas fa-plus-circle"></i> Cadastrar Item Rápido</div>
                 <button onclick="Modal.close('quickProductModal')" style="background:none;border:none;color:#fff;font-size:1.2rem;cursor:pointer;opacity:.85;">&times;</button>
             </div>
-            <div style="padding:20px;">
+            <div class="modal-body">
                 <input type="hidden" id="quickProductTab" value="">
-                <div class="form-group">
-                    <label for="quickProductName" class="required">Nome do produto/serviço</label>
-                    <input type="text" id="quickProductName" class="form-control" placeholder="Ex: Lente Multifocal Anti-Reflexo">
+
+                <!-- ── Bloco Produto (Lente / Armação / Tratamento) — mesmos campos da aba Produtos ── -->
+                <div id="qpProductFields">
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="qpCode">Código</label>
+                            <input type="text" id="qpCode" class="form-control" placeholder="Ex: PROD-001">
+                        </div>
+                        <div class="form-group">
+                            <label for="qpCategory" class="required">Categoria</label>
+                            <select id="qpCategory" class="form-control" required onchange="Sales.toggleQuickArmacaoFields()">
+                                <option value="lentes">Lentes</option>
+                                <option value="armacoes">Armações</option>
+                                <option value="oculos_sol">Óculos de Sol</option>
+                                <option value="tratamentos">Tratamentos</option>
+                                <option value="coloracao">Coloração</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="qpName" class="required">Nome</label>
+                            <input type="text" id="qpName" class="form-control" required placeholder="Ex: Lente Multifocal Anti-Reflexo">
+                        </div>
+                        <div class="form-group">
+                            <label for="qpCostPrice">Preço de Custo (R$)</label>
+                            <input type="text" inputmode="numeric" id="qpCostPrice" class="form-control" placeholder="0,00" oninput="Utils.maskMoney(this)">
+                        </div>
+                        <div class="form-group">
+                            <label for="qpPrice" class="required">Preço de Venda (R$)</label>
+                            <input type="text" inputmode="numeric" id="qpPrice" class="form-control" placeholder="0,00" oninput="Utils.maskMoney(this)">
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="qpQty">Estoque</label>
+                            <input type="number" id="qpQty" class="form-control" value="0" min="0">
+                        </div>
+                        <div class="form-group">
+                            <label for="qpMinQty">Estoque Mínimo</label>
+                            <input type="number" id="qpMinQty" class="form-control" value="5" min="0">
+                        </div>
+                        <div class="form-group">
+                            <label for="qpImageInput">Imagem</label>
+                            <div style="display: flex; align-items: center; gap: 1rem;">
+                                <div class="image-preview" id="qpImagePreview" onclick="document.getElementById('qpImageInput').click()">
+                                    <img id="qpImageImg" src="" style="display: none;">
+                                    <i id="qpImagePlaceholder" class="fas fa-camera"></i>
+                                </div>
+                                <input type="file" id="qpImageInput" accept="image/*" class="d-none" onchange="Sales.quickUploadImage(event)">
+                                <button type="button" class="btn-remove-photo" onclick="Sales.quickRemoveImage()">🗑 Remover foto</button>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="form-row" id="qpArmacaoFields" style="display:none;">
+                        <div class="form-group">
+                            <label for="qpColor">Cor</label>
+                            <input type="text" id="qpColor" class="form-control" placeholder="Ex: Havana / Marrom">
+                        </div>
+                        <div class="form-group">
+                            <label for="qpFrameType">Tipo de Armação</label>
+                            <select id="qpFrameType" class="form-control">
+                                <option value="">Selecione...</option>
+                                <option value="Acetato">Acetato</option>
+                                <option value="Metal">Metal</option>
+                                <option value="Mista (Metal + Acetato)">Mista (Metal + Acetato)</option>
+                                <option value="Nylon / TR90">Nylon / TR90</option>
+                                <option value="3 Peças">3 Peças</option>
+                                <option value="Fio de Aço">Fio de Aço</option>
+                                <option value="Outro">Outro</option>
+                            </select>
+                        </div>
+                    </div>
                 </div>
-                <div class="form-row">
+
+                <!-- ── Bloco Serviço — mesmos campos da aba Serviços ── -->
+                <div id="qpServiceFields" style="display:none;">
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="qpServiceCode">Código</label>
+                            <input type="text" id="qpServiceCode" class="form-control" readonly placeholder="Gerado automaticamente">
+                        </div>
+                        <div class="form-group">
+                            <label for="qpServiceName" class="required">Nome</label>
+                            <input type="text" id="qpServiceName" class="form-control" required>
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="qpServiceValue" class="required">Valor (R$)</label>
+                            <input type="text" inputmode="numeric" id="qpServiceValue" class="form-control" placeholder="0,00" oninput="Utils.maskMoney(this)">
+                        </div>
+                    </div>
                     <div class="form-group">
-                        <label for="quickProductPrice" class="required">Preço de venda (R$)</label>
-                        <input type="text" inputmode="numeric" id="quickProductPrice" class="form-control" placeholder="0,00" oninput="Utils.maskMoney(this)">
-                    </div>
-                    <div class="form-group" id="quickProductQtyGroup">
-                        <label for="quickProductQty">Estoque inicial</label>
-                        <input type="number" id="quickProductQty" class="form-control" placeholder="0" min="0" value="0">
+                        <label for="qpServiceDesc">Descrição</label>
+                        <textarea id="qpServiceDesc" class="form-control" rows="3"></textarea>
                     </div>
                 </div>
-                <p id="quickProductHint" style="font-size:0.78rem;color:#6c757d;margin:6px 0 0;"></p>
             </div>
-            <div class="modal-footer">
+            <div class="modal-footer" style="flex:0 0 auto;">
                 <button class="btn btn-secondary" onclick="Modal.close('quickProductModal')">Cancelar</button>
                 <button class="btn btn-primary" onclick="Sales.quickSaveProduct()"><i class="fas fa-save"></i> Salvar e Adicionar à Venda</button>
             </div>
@@ -15230,6 +15572,8 @@ body.dark-mode,
                 }
                 if (id.startsWith('clientOd')) this.updateClientPertoOD();
                 if (id.startsWith('clientOe')) this.updateClientPertoOE();
+                if (id.startsWith('qcOd')) { this.updateQcPertoOD(); this.updateQcDP(); }
+                if (id.startsWith('qcOe')) { this.updateQcPertoOE(); this.updateQcDP(); }
             },
 
             resetField(id) {
@@ -15416,6 +15760,63 @@ body.dark-mode,
                 const oeDnp = parseFloat(document.getElementById('clientOeDnp')?.value) || 0;
                 const dp = odDnp + oeDnp;
                 const dpEl = document.getElementById('clientPrescDp');
+                if (dpEl) dpEl.value = dp.toFixed(1);
+            },
+
+            // ── Receituário do modal "Criar Cliente Rápido" (tela de Vendas) ────
+            updateQcPertoOD() {
+                const sph = parseFloat(document.getElementById('qcOdSph')?.value) || 0;
+                const cyl = parseFloat(document.getElementById('qcOdCyl')?.value) || 0;
+                const axis = document.getElementById('qcOdAxis')?.value || '0°';
+                const addRaw = document.getElementById('qcOdAdd')?.value || '';
+                const add = parseFloat(addRaw) || 0;
+                const dnp = parseFloat(document.getElementById('qcOdDnp')?.value) || 0;
+
+                if (!addRaw || addRaw.trim() === '' || addRaw === '0.00' || add === 0) return;
+
+                const nearSph = sph + add;
+                const nearDnp = dnp > 0 ? (dnp - 2.5).toFixed(1) : '';
+
+                const nearSphEl = document.getElementById('qcOdNearSph');
+                const nearCylEl = document.getElementById('qcOdNearCyl');
+                const nearAxisEl = document.getElementById('qcOdNearAxis');
+                const nearDnpEl = document.getElementById('qcOdNearDnp');
+
+                if (nearSphEl) { nearSphEl.value = nearSph.toFixed(2); this.updateColor(nearSphEl, 'nearSph'); }
+                if (nearCylEl) { nearCylEl.value = cyl.toFixed(2); this.updateColor(nearCylEl, 'nearCyl'); }
+                if (nearAxisEl) nearAxisEl.value = axis;
+                if (nearDnpEl) nearDnpEl.value = nearDnp;
+            },
+
+            updateQcPertoOE() {
+                const sph = parseFloat(document.getElementById('qcOeSph')?.value) || 0;
+                const cyl = parseFloat(document.getElementById('qcOeCyl')?.value) || 0;
+                const axis = document.getElementById('qcOeAxis')?.value || '0°';
+                const addRaw = document.getElementById('qcOeAdd')?.value || '';
+                const add = parseFloat(addRaw) || 0;
+                const dnp = parseFloat(document.getElementById('qcOeDnp')?.value) || 0;
+
+                if (!addRaw || addRaw.trim() === '' || addRaw === '0.00' || add === 0) return;
+
+                const nearSph = sph + add;
+                const nearDnp = dnp > 0 ? (dnp - 2.5).toFixed(1) : '';
+
+                const nearSphEl = document.getElementById('qcOeNearSph');
+                const nearCylEl = document.getElementById('qcOeNearCyl');
+                const nearAxisEl = document.getElementById('qcOeNearAxis');
+                const nearDnpEl = document.getElementById('qcOeNearDnp');
+
+                if (nearSphEl) { nearSphEl.value = nearSph.toFixed(2); this.updateColor(nearSphEl, 'nearSph'); }
+                if (nearCylEl) { nearCylEl.value = cyl.toFixed(2); this.updateColor(nearCylEl, 'nearCyl'); }
+                if (nearAxisEl) nearAxisEl.value = axis;
+                if (nearDnpEl) nearDnpEl.value = nearDnp;
+            },
+
+            updateQcDP() {
+                const odDnp = parseFloat(document.getElementById('qcOdDnp')?.value) || 0;
+                const oeDnp = parseFloat(document.getElementById('qcOeDnp')?.value) || 0;
+                const dp = odDnp + oeDnp;
+                const dpEl = document.getElementById('qcPrescDp');
                 if (dpEl) dpEl.value = dp.toFixed(1);
             },
 
@@ -21669,25 +22070,59 @@ ${container.innerHTML}
             // permanecem intactos.
             openQuickClient() {
                 const termo = (document.getElementById('searchClientSale')?.value || '').trim();
-                const nameEl = document.getElementById('quickClientName');
+                const nameEl = document.getElementById('qcClientName');
                 if (nameEl) nameEl.value = /^[0-9\s()+-]+$/.test(termo) ? '' : termo;
-                const phoneEl = document.getElementById('quickClientPhone');
-                if (phoneEl) phoneEl.value = '';
-                const cpfEl = document.getElementById('quickClientCpf');
-                if (cpfEl) cpfEl.value = '';
+
+                // Limpa Dados Pessoais + Endereço
+                ['qcClientBirthDate','qcClientPhone','qcClientEmail','qcClientCpf',
+                 'qcClientCep','qcClientAddress','qcClientNumber','qcClientComplement',
+                 'qcClientNeighborhood','qcClientCity','qcClientState'].forEach(id => {
+                    const el = document.getElementById(id); if (el) el.value = '';
+                });
+
+                // Código previsto (mesmo padrão do cadastro completo)
+                const codeEl = document.getElementById('qcClientCode');
+                if (codeEl) {
+                    const existingCodes = (state.clients || []).map(c => c.code || c.id).filter(Boolean);
+                    let n = (state.clients || []).length + 1;
+                    let code = 'CLI-' + String(n).padStart(3, '0');
+                    while (existingCodes.includes(code)) { n++; code = 'CLI-' + String(n).padStart(3, '0'); }
+                    codeEl.value = code;
+                }
+
+                this.clearQuickClientPresc();
                 Modal.show('quickClientModal');
-                setTimeout(() => { document.getElementById('quickClientName')?.focus(); }, 150);
+                setTimeout(() => { document.getElementById('qcClientName')?.focus(); }, 150);
+            },
+
+            // Zera o receituário do modal de Cliente Rápido
+            clearQuickClientPresc() {
+                ['qcPrescOptometrist','qcPrescDate','qcOdAxis','qcOeAxis',
+                 'qcOdDnp','qcOeDnp','qcPrescHeight','qcPrescNotes'].forEach(id => {
+                    const el = document.getElementById(id); if (el) el.value = '';
+                });
+                ['qcOdSph','qcOdCyl','qcOdAdd','qcOeSph','qcOeCyl','qcOeAdd'].forEach(id => {
+                    const el = document.getElementById(id); if (el) { el.value = '0.00'; Presc.updateColor(el, id); }
+                });
+                ['qcOdNearSph','qcOeNearSph','qcOdNearCyl','qcOeNearCyl'].forEach(id => {
+                    const el = document.getElementById(id); if (el) el.value = '0.00';
+                });
+                ['qcOdNearAxis','qcOeNearAxis'].forEach(id => {
+                    const el = document.getElementById(id); if (el) el.value = '0°';
+                });
+                ['qcOdNearDnp','qcOeNearDnp','qcPrescDp'].forEach(id => {
+                    const el = document.getElementById(id); if (el) el.value = '0.0';
+                });
             },
 
             quickSaveClient() {
-                const name = (document.getElementById('quickClientName').value || '').trim();
+                const name = (document.getElementById('qcClientName').value || '').trim();
                 if (!name) {
                     Toast.show('Informe o nome do cliente', 'warning');
-                    document.getElementById('quickClientName').focus();
+                    document.getElementById('qcClientName').focus();
                     return;
                 }
-                const phone = (document.getElementById('quickClientPhone').value || '').trim();
-                const cpf = (document.getElementById('quickClientCpf').value || '').trim();
+                const cpf = (document.getElementById('qcClientCpf').value || '').trim();
                 const cpfDigits = cpf.replace(/\D/g, '');
 
                 // Mesmas verificações de duplicata do cadastro completo de clientes
@@ -21704,6 +22139,7 @@ ${container.innerHTML}
                     }
                 }
 
+                const _normPhone = v => (v || '').replace(/^\+55\s?/, '').trim();
                 // Gera código sequencial único no mesmo padrão do cadastro completo
                 const existingCodes = (state.clients || []).map(c => c.code || c.id).filter(Boolean);
                 let nextNum = (state.clients || []).length + 1;
@@ -21713,18 +22149,62 @@ ${container.innerHTML}
                 const client = {
                     id: Utils.generateId('CLI'),
                     code,
-                    birthDate: '',
+                    birthDate: document.getElementById('qcClientBirthDate').value,
                     name,
-                    phone,
-                    email: '',
+                    phone: _normPhone(document.getElementById('qcClientPhone').value),
+                    email: document.getElementById('qcClientEmail').value,
                     cpf,
-                    cep: '', address: '', number: '', complement: '', neighborhood: '', city: '', state: '',
+                    cep: document.getElementById('qcClientCep').value,
+                    address: document.getElementById('qcClientAddress').value,
+                    number: document.getElementById('qcClientNumber').value,
+                    complement: document.getElementById('qcClientComplement').value,
+                    neighborhood: document.getElementById('qcClientNeighborhood').value,
+                    city: document.getElementById('qcClientCity').value,
+                    state: document.getElementById('qcClientState').value,
                     updated_at: new Date().toISOString()
                 };
 
                 state.clients.push(client);
+
+                // Receituário — só salva se houver dados reais preenchidos
+                const presc = {
+                    id: 'PRESC-' + client.id,
+                    clientId: client.id,
+                    date: document.getElementById('qcPrescDate').value,
+                    optometrist: document.getElementById('qcPrescOptometrist').value,
+                    od: {
+                        sph: document.getElementById('qcOdSph').value,
+                        cyl: document.getElementById('qcOdCyl').value,
+                        axis: document.getElementById('qcOdAxis').value,
+                        add: document.getElementById('qcOdAdd').value,
+                        dnp: document.getElementById('qcOdDnp').value
+                    },
+                    oe: {
+                        sph: document.getElementById('qcOeSph').value,
+                        cyl: document.getElementById('qcOeCyl').value,
+                        axis: document.getElementById('qcOeAxis').value,
+                        add: document.getElementById('qcOeAdd').value,
+                        dnp: document.getElementById('qcOeDnp').value
+                    },
+                    dp: document.getElementById('qcPrescDp').value,
+                    height: document.getElementById('qcPrescHeight').value,
+                    notes: document.getElementById('qcPrescNotes').value
+                };
+
+                const hasRealPrescData = presc.optometrist ||
+                    (presc.od.sph && presc.od.sph !== '0.00') ||
+                    (presc.oe.sph && presc.oe.sph !== '0.00') ||
+                    (presc.od.cyl && presc.od.cyl !== '0.00') ||
+                    (presc.oe.cyl && presc.oe.cyl !== '0.00');
+
+                if (hasRealPrescData) {
+                    state.prescriptions = state.prescriptions.filter(p => p.clientId !== client.id);
+                    state.prescriptions.push(presc);
+                }
+
                 App.saveData();
                 SupaSync.upsertCliente(client);
+                if (hasRealPrescData) SupaSync.upsertPrescricao(presc);
                 if (typeof Clients !== 'undefined') { try { Clients.renderTable(); } catch (e) {} }
 
                 Modal.close('quickClientModal');
@@ -21881,35 +22361,89 @@ ${container.innerHTML}
             // para as seções de Produtos/Serviços — o carrinho atual não é afetado.
             openQuickProduct(tab) {
                 const cfg = {
-                    lente:      { title: 'Cadastrar Lente Rápida',      hint: 'Categoria: Lentes. Detalhes extras (custo, código, imagem) podem ser preenchidos depois na tela de Produtos.', showQty: true },
-                    armacao:    { title: 'Cadastrar Armação Rápida',    hint: 'Categoria: Armações. Detalhes extras (cor, medidas, imagem) podem ser preenchidos depois na tela de Produtos.', showQty: true },
-                    servico:    { title: 'Cadastrar Serviço Rápido',    hint: 'Será salvo na tela de Serviços.', showQty: false },
-                    tratamento: { title: 'Cadastrar Tratamento Rápido', hint: 'Categoria: Tratamentos. Detalhes extras podem ser preenchidos depois na tela de Produtos.', showQty: true }
+                    lente:      { title: 'Cadastrar Lente Rápida',      category: 'lentes' },
+                    armacao:    { title: 'Cadastrar Armação Rápida',    category: 'armacoes' },
+                    servico:    { title: 'Cadastrar Serviço Rápido',    category: null },
+                    tratamento: { title: 'Cadastrar Tratamento Rápido', category: 'tratamentos' }
                 };
                 const c = cfg[tab] || cfg.lente;
                 document.getElementById('quickProductTab').value = tab;
                 document.getElementById('quickProductTitle').innerHTML = '<i class="fas fa-plus-circle"></i> ' + c.title;
-                document.getElementById('quickProductHint').textContent = c.hint;
-                document.getElementById('quickProductQtyGroup').style.display = c.showQty ? '' : 'none';
-                document.getElementById('quickProductName').value = '';
-                document.getElementById('quickProductPrice').value = '';
-                document.getElementById('quickProductQty').value = 0;
+
+                const isServico = tab === 'servico';
+                document.getElementById('qpProductFields').style.display = isServico ? 'none' : '';
+                document.getElementById('qpServiceFields').style.display = isServico ? '' : 'none';
+
+                if (isServico) {
+                    document.getElementById('qpServiceCode').value = 'SERV-' + (state.services.length + 1).toString().padStart(3, '0');
+                    document.getElementById('qpServiceName').value = '';
+                    document.getElementById('qpServiceValue').value = '';
+                    document.getElementById('qpServiceDesc').value = '';
+                } else {
+                    document.getElementById('qpCode').value = 'PROD-' + (state.products.length + 1).toString().padStart(3, '0');
+                    document.getElementById('qpCategory').value = c.category;
+                    document.getElementById('qpName').value = '';
+                    document.getElementById('qpCostPrice').value = '';
+                    document.getElementById('qpPrice').value = '';
+                    document.getElementById('qpQty').value = 0;
+                    document.getElementById('qpMinQty').value = 5;
+                    document.getElementById('qpColor').value = '';
+                    document.getElementById('qpFrameType').value = '';
+                    this.quickRemoveImage();
+                    this.toggleQuickArmacaoFields();
+                }
+
                 Modal.show('quickProductModal');
-                setTimeout(() => { document.getElementById('quickProductName')?.focus(); }, 150);
+                setTimeout(() => { document.getElementById(isServico ? 'qpServiceName' : 'qpName')?.focus(); }, 150);
+            },
+
+            // Mostra/oculta Cor + Tipo de Armação apenas quando a categoria for "Armações"
+            toggleQuickArmacaoFields() {
+                const wrap = document.getElementById('qpArmacaoFields');
+                if (!wrap) return;
+                const cat = document.getElementById('qpCategory')?.value;
+                wrap.style.display = (cat === 'armacoes') ? 'grid' : 'none';
+            },
+
+            quickUploadImage(event) {
+                const file = event.target.files[0];
+                if (file) {
+                    const reader = new FileReader();
+                    reader.onload = async (e) => {
+                        const compressed = await Utils.compressImageDataUrl(e.target.result, 800, 0.75);
+                        document.getElementById('qpImageImg').src = compressed;
+                        document.getElementById('qpImageImg').style.display = 'block';
+                        document.getElementById('qpImagePlaceholder').style.display = 'none';
+                        document.getElementById('qpImageInput').dataset.image = compressed;
+                    };
+                    reader.readAsDataURL(file);
+                }
+            },
+
+            quickRemoveImage() {
+                const img = document.getElementById('qpImageImg');
+                const ph = document.getElementById('qpImagePlaceholder');
+                const input = document.getElementById('qpImageInput');
+                if (img) { img.src = ''; img.style.display = 'none'; }
+                if (ph) ph.style.display = 'flex';
+                if (input) { input.value = ''; delete input.dataset.image; }
             },
 
             quickSaveProduct() {
                 const tab = document.getElementById('quickProductTab').value || 'lente';
-                const name = (document.getElementById('quickProductName').value || '').trim();
-                const price = Utils.parseMoney(document.getElementById('quickProductPrice').value);
-                const qty = parseInt(document.getElementById('quickProductQty').value) || 0;
-
-                if (!name) { Toast.show('Informe o nome', 'warning'); document.getElementById('quickProductName').focus(); return; }
-                if (!price || price <= 0) { Toast.show('Informe um preço de venda maior que zero', 'warning'); document.getElementById('quickProductPrice').focus(); return; }
 
                 if (tab === 'servico') {
-                    const id = 'SERV-' + (state.services.length + 1).toString().padStart(3, '0');
-                    const service = { id, code: id, name, value: price, desc: '', updated_at: new Date().toISOString() };
+                    const name = (document.getElementById('qpServiceName').value || '').trim();
+                    const value = Utils.parseMoney(document.getElementById('qpServiceValue').value);
+                    if (!name) { Toast.show('Informe o nome do serviço', 'warning'); document.getElementById('qpServiceName').focus(); return; }
+                    if (!value || value <= 0) { Toast.show('Informe um valor maior que zero', 'warning'); document.getElementById('qpServiceValue').focus(); return; }
+
+                    const id = document.getElementById('qpServiceCode').value || ('SERV-' + (state.services.length + 1).toString().padStart(3, '0'));
+                    const service = {
+                        id, code: id, name, value,
+                        desc: document.getElementById('qpServiceDesc').value || '',
+                        updated_at: new Date().toISOString()
+                    };
                     state.services.push(service);
                     App.saveData();
                     SupaSync.upsertServico(service);
@@ -21919,18 +22453,28 @@ ${container.innerHTML}
                     Toast.show(`Serviço "${name}" cadastrado!`, 'success');
                     const sel = document.getElementById('servicoSelect');
                     if (sel) {
-                        sel.value = id + '|' + price;
+                        sel.value = id + '|' + value;
                         const srch = document.getElementById('servicoSearch');
                         if (srch) { srch.value = name; srch.classList.add('ss-has-value'); }
                     }
                 } else {
-                    const categoryMap = { lente: 'lentes', armacao: 'armacoes', tratamento: 'tratamentos' };
-                    const category = categoryMap[tab] || 'lentes';
-                    const id = 'PROD-' + (state.products.length + 1).toString().padStart(3, '0');
+                    const name = (document.getElementById('qpName').value || '').trim();
+                    const price = Utils.parseMoney(document.getElementById('qpPrice').value);
+                    const costPrice = Utils.parseMoney(document.getElementById('qpCostPrice').value) || 0;
+                    const qty = parseInt(document.getElementById('qpQty').value) || 0;
+                    const minQty = parseInt(document.getElementById('qpMinQty').value) || 5;
+                    const category = document.getElementById('qpCategory').value || 'lentes';
+
+                    if (!name) { Toast.show('Informe o nome', 'warning'); document.getElementById('qpName').focus(); return; }
+                    if (!price || price <= 0) { Toast.show('Informe um preço de venda maior que zero', 'warning'); document.getElementById('qpPrice').focus(); return; }
+
+                    const id = document.getElementById('qpCode').value || ('PROD-' + (state.products.length + 1).toString().padStart(3, '0'));
                     const product = {
                         id, code: id, category, name,
-                        costPrice: 0, price, qty, minQty: 5,
-                        color: '', frameType: '', image: null,
+                        costPrice, price, qty, minQty,
+                        color: document.getElementById('qpColor')?.value || '',
+                        frameType: document.getElementById('qpFrameType')?.value || '',
+                        image: document.getElementById('qpImageInput').dataset.image || null,
                         updated_at: new Date().toISOString()
                     };
                     state.products.push(product);
