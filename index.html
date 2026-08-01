@@ -14084,14 +14084,14 @@ body.dark-mode,
                 const contas = await this.getAll();
                 const conta = contas.find(c => c.id === id);
                 if (!conta) return;
-                const defaultVal = parseFloat(conta.valor || 0).toFixed(2).replace('.', ',');
+                const defaultVal = parseFloat(conta.valor || 0).toLocaleString('pt-BR', {minimumFractionDigits:2, maximumFractionDigits:2});
                 const overlay = document.createElement('div');
                 overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:99999;display:flex;align-items:center;justify-content:center;';
                 overlay.innerHTML = `<div style="background:#fff;border-radius:14px;padding:24px;width:340px;box-shadow:0 8px 32px rgba(0,0,0,0.25);font-family:inherit;">
                     <h3 style="margin:0 0 6px;font-size:1rem;color:#28a745;">💰 Registrar Baixa</h3>
                     <p style="font-size:0.8rem;color:#666;margin:0 0 14px;">${conta.descricao || 'Conta'} — Valor original: <strong>R$ ${defaultVal}</strong></p>
                     <label style="font-size:0.8rem;font-weight:700;color:#333;display:block;margin-bottom:4px;">Valor recebido (R$)</label>
-                    <input type="number" id="_bxVal" value="${parseFloat(conta.valor||0).toFixed(2)}" step="0.01" min="0"
+                    <input type="text" inputmode="numeric" id="_bxVal" value="${defaultVal}" oninput="Utils.maskMoney(this)"
                         style="width:100%;padding:10px;border:2px solid #28a745;border-radius:8px;font-size:1rem;box-sizing:border-box;margin-bottom:12px;">
                     <label style="font-size:0.8rem;font-weight:700;color:#333;display:block;margin-bottom:4px;">Forma de pagamento</label>
                     <select id="_bxForma" style="width:100%;padding:10px;border:2px solid #ddd;border-radius:8px;font-size:0.9rem;box-sizing:border-box;margin-bottom:14px;">
@@ -14116,7 +14116,7 @@ body.dark-mode,
                 overlay.onclick = e => { if (e.target === overlay) overlay.remove(); };
                 overlay.querySelector('#_bxConfirm').onclick = async function() {
                     if (this._bxExecuting) return;
-                    const paidVal    = parseFloat(overlay.querySelector('#_bxVal').value) || 0;
+                    const paidVal    = Utils.parseMoney(overlay.querySelector('#_bxVal').value) || 0;
                     const forma      = overlay.querySelector('#_bxForma').value;
                     const obs        = overlay.querySelector('#_bxObs').value.trim();
                     if (paidVal <= 0) { Toast.show('Informe um valor válido', 'warning'); return; }
@@ -14156,6 +14156,20 @@ body.dark-mode,
                             overlay.remove();
                             ContasManager.saveAll(contasAgora).then(() => { ContasManager.renderAll().catch(()=>{}); Dashboard.update().catch(()=>{}); }).catch(()=>{});
                             Toast.show(`💰 Pagamento parcial de R$ ${paidVal.toFixed(2).replace('.',',')} registrado. Saldo restante: R$ ${saldo.toFixed(2).replace('.',',')}`, 'warning', 5000);
+                            // ✅ Comprovante do pagamento parcial — mostra o valor efetivamente
+                            // pago nesta baixa (não o saldo remanescente) e informa quanto falta.
+                            ContasManager._exibirComprovanteModal({
+                                tipo: 'receber',
+                                descricao: conta.descricao,
+                                valor: paidVal,
+                                parte: conta.parte,
+                                categoria: conta.categoria,
+                                vencimento: conta.vencimento,
+                                pago: true,
+                                dataPagamento: new Date().toISOString(),
+                                formaPagamento: forma || '—',
+                                obs: (obs ? obs + ' — ' : '') + `Pagamento parcial. Saldo restante: R$ ${saldo.toFixed(2).replace('.',',')}`
+                            });
                         } else {
                             contasAgora[idx2].pago           = true;
                             contasAgora[idx2].dataPagamento  = new Date().toISOString();
@@ -14201,14 +14215,14 @@ body.dark-mode,
                 const itemVencimento = cachedItem.vencimento || '';
 
                 // Modal de baixa com valor recebido + forma pagamento
-                const defaultVal = itemValor.toFixed(2).replace('.', ',');
+                const defaultVal = itemValor.toLocaleString('pt-BR', {minimumFractionDigits:2, maximumFractionDigits:2});
                 const overlay = document.createElement('div');
                 overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:99999;display:flex;align-items:center;justify-content:center;';
                 overlay.innerHTML = `<div style="background:#fff;border-radius:14px;padding:24px;width:340px;box-shadow:0 8px 32px rgba(0,0,0,0.25);font-family:inherit;">
                     <h3 style="margin:0 0 6px;font-size:1rem;color:#28a745;">💰 Dar Baixa</h3>
                     <p style="font-size:0.8rem;color:#666;margin:0 0 14px;">${itemDescricao} — Valor original: <strong>R$ ${defaultVal}</strong></p>
                     <label style="font-size:0.8rem;font-weight:700;color:#333;display:block;margin-bottom:4px;">Valor recebido (R$) *</label>
-                    <input type="number" id="_vbxVal" value="${itemValor.toFixed(2)}" step="0.01" min="0"
+                    <input type="text" inputmode="numeric" id="_vbxVal" value="${defaultVal}" oninput="Utils.maskMoney(this)"
                         style="width:100%;padding:10px;border:2px solid #28a745;border-radius:8px;font-size:1rem;box-sizing:border-box;margin-bottom:12px;">
                     <label style="font-size:0.8rem;font-weight:700;color:#333;display:block;margin-bottom:4px;">Forma de pagamento</label>
                     <select id="_vbxForma" style="width:100%;padding:10px;border:2px solid #ddd;border-radius:8px;font-size:0.9rem;box-sizing:border-box;margin-bottom:12px;">
@@ -14232,7 +14246,7 @@ body.dark-mode,
                 overlay.onclick = e => { if (e.target === overlay) overlay.remove(); };
                 overlay.querySelector('#_vbxConfirm').onclick = function() {
                     if (this._vbxExecuting) return;
-                    const paidVal = parseFloat(overlay.querySelector('#_vbxVal').value) || 0;
+                    const paidVal = Utils.parseMoney(overlay.querySelector('#_vbxVal').value) || 0;
                     const forma   = overlay.querySelector('#_vbxForma').value || '—';
                     const obs     = overlay.querySelector('#_vbxObs')?.value?.trim() || '';
                     if (paidVal <= 0) { Toast.show('Informe um valor válido','warning'); return; }
@@ -14289,6 +14303,9 @@ body.dark-mode,
                                     sale._updatedAt = new Date().toISOString();
                                     (window.LocalFirst ? LocalFirst.pushItem('sales',sale) : Promise.resolve()).catch(()=>{}).finally(()=>{ ContasManager.renderAll().catch(()=>{}); Dashboard.update().catch(()=>{}); });
                                     Toast.show(`💰 Pagamento parcial de R$ ${paidVal.toFixed(2).replace('.',',')} registrado. Saldo: R$ ${saldo.toFixed(2).replace('.',',')}`, 'warning', 5000);
+                                    // ✅ Comprovante do valor efetivamente pago nesta baixa parcial
+                                    this.gerarComprovanteVenda(itemId, itemDescricao||`Parcela ${num}`, paidVal, itemCliente, itemCategoria, itemVencimento, forma,
+                                        (obs ? obs + ' — ' : '') + `Pagamento parcial. Saldo restante: R$ ${saldo.toFixed(2).replace('.',',')}`);
                                 } else {
                                     parc.paid = true; parc.status = 'pago';
                                     parc.paidDate = new Date().toISOString().slice(0,10);
@@ -14334,6 +14351,10 @@ body.dark-mode,
                                 sale._updatedAt = new Date().toISOString();
                                 (window.LocalFirst ? LocalFirst.pushItem('sales',sale) : Promise.resolve()).catch(()=>{}).finally(()=>{ ContasManager.renderAll().catch(()=>{}); Dashboard.update().catch(()=>{}); });
                                 Toast.show(`💰 Pagamento parcial de R$ ${paidVal.toFixed(2).replace('.',',')} registrado. Saldo: R$ ${saldo.toFixed(2).replace('.',',')}`, 'warning', 5000);
+                                // ✅ Comprovante do valor efetivamente pago nesta baixa parcial —
+                                // a parcela continua pendente pelo saldo restante até ser quitada.
+                                this.gerarComprovanteVenda(itemId, itemDescricao||`Parcela ${num}`, paidVal, itemCliente, itemCategoria, itemVencimento, forma,
+                                    (obs ? obs + ' — ' : '') + `Pagamento parcial. Saldo restante: R$ ${saldo.toFixed(2).replace('.',',')}`);
                             } else {
                                 parc.paid = true; parc.status = 'pago';
                                 parc.paidDate = new Date().toISOString().slice(0,10);
