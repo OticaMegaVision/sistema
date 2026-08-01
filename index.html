@@ -5482,6 +5482,7 @@ body.dark-mode,
                     <span class="dash-period-label"><i class="fas fa-calendar-alt"></i> Período:</span>
                     <button class="dash-period-btn" data-period="today" onclick="Dashboard.setPeriod('today',this)">Hoje</button>
                     <button class="dash-period-btn active" data-period="month" onclick="Dashboard.setPeriod('month',this)">Este Mês</button>
+                    <button class="dash-period-btn" data-period="lastMonth" onclick="Dashboard.setPeriod('lastMonth',this)">Mês Anterior</button>
                     <button class="dash-period-btn" data-period="year" onclick="Dashboard.setPeriod('year',this)">Este Ano</button>
                     <button class="dash-period-btn" data-period="all" onclick="Dashboard.setPeriod('all',this)">Tudo</button>
                     <button class="dash-period-btn" data-period="custom" onclick="Dashboard.setPeriod('custom',this)">Personalizado</button>
@@ -17315,6 +17316,9 @@ tbody tr td{border:1.5px solid #000;padding:2mm;text-align:center;font-weight:70
                         return d >= startOfWeek;
                     } else if (p === 'month') {
                         return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
+                    } else if (p === 'lastMonth') {
+                        const lm = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+                        return d.getMonth() === lm.getMonth() && d.getFullYear() === lm.getFullYear();
                     } else if (p === 'year') {
                         return d.getFullYear() === now.getFullYear();
                     } else if (p === 'custom' && this._from && this._to) {
@@ -17334,6 +17338,7 @@ tbody tr td{border:1.5px solid #000;padding:2mm;text-align:center;font-weight:70
                     if (p === 'today')  return d.toDateString() === now.toDateString();
                     if (p === 'week')   { const s=new Date(now); s.setDate(now.getDate()-now.getDay()); s.setHours(0,0,0,0); return d>=s; }
                     if (p === 'month')  return d.getMonth()===now.getMonth() && d.getFullYear()===now.getFullYear();
+                    if (p === 'lastMonth') { const lm=new Date(now.getFullYear(), now.getMonth()-1, 1); return d.getMonth()===lm.getMonth() && d.getFullYear()===lm.getFullYear(); }
                     if (p === 'year')   return d.getFullYear()===now.getFullYear();
                     if (p === 'custom' && this._from && this._to) { return d>=new Date(this._from+'T00:00:00') && d<=new Date(this._to+'T23:59:59'); }
                     return true;
@@ -17351,7 +17356,7 @@ tbody tr td{border:1.5px solid #000;padding:2mm;text-align:center;font-weight:70
             },
 
             _periodLabel() {
-                const labels = { today:'Hoje', week:'Esta Semana', month:'Este Mês', year:'Este Ano', all:'Total Histórico', custom:'Período Personalizado' };
+                const labels = { today:'Hoje', week:'Esta Semana', month:'Este Mês', lastMonth:'Mês Anterior', year:'Este Ano', all:'Total Histórico', custom:'Período Personalizado' };
                 return labels[this._period] || '';
             },
 
