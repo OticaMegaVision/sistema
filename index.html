@@ -26662,10 +26662,23 @@ ${container.innerHTML}
 <!-- ═══ MOBILE OVERRIDE — aplicado por último ═══ -->
 <style>
 @media screen and (max-width: 640px) {
-    /* Esconde relógio e botões Sync/Migrar */
-    .datetime-widget      { display:none !important; }
+    /* Relógio/data fixado no canto superior direito do cabeçalho */
+    .header               { position:relative !important; padding:.5rem .75rem !important; }
+    .datetime-widget      {
+        position:absolute !important;
+        top:.15rem !important;
+        right:0 !important;
+        padding:.25rem .55rem !important;
+        gap:6px !important;
+        border-radius:8px !important;
+        z-index:5 !important;
+    }
+    .datetime-widget .clock-ring { width:24px !important; height:24px !important; }
+    .datetime-widget .clock-ring i { width:18px !important; height:18px !important; font-size:.55rem !important; }
+    .datetime-widget .time { font-size:.85rem !important; line-height:1.1 !important; }
+    .datetime-widget .date { font-size:.62rem !important; line-height:1.1 !important; }
+    .header-left          { padding-right:100px !important; }
     .backup-buttons       { display:none !important; }
-    .header               { padding:.5rem .75rem !important; }
     .header-left h1       { font-size:1rem !important; }
 
     /* Grid 1 coluna */
@@ -26710,7 +26723,7 @@ ${container.innerHTML}
             var el = document.querySelector(sel);
             if(el) el.style.display = show ? '' : 'none';
         };
-        fn('.datetime-widget', !m);
+        fn('.datetime-widget', true);
         fn('.backup-buttons', !m);
         fn('.nfe-side-panel', !m);
         fn('.nfe-mobile-bar', m ? 'flex' : false);
