@@ -2218,6 +2218,25 @@
         }
         .btn-remove-photo:hover { background: #fdeeee; border-color: #e8a49e; }
 
+        /* ===== CLIENTE - FOTO (avatar circular, mesmo padrão do upload de produto) ===== */
+        .client-photo-preview {
+            width: 78px;
+            height: 78px;
+            border-radius: 50%;
+            border: 1.5px solid var(--light-gray, #e9ecef);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: #fff;
+            box-shadow: 0 1px 3px rgba(16,24,40,.06);
+            overflow: hidden;
+            cursor: pointer;
+            transition: box-shadow .2s, border-color .2s;
+        }
+        .client-photo-preview:hover { border-color: var(--primary); box-shadow: 0 4px 14px rgba(255,107,0,.18); }
+        .client-photo-preview img { width: 100%; height: 100%; object-fit: cover; }
+        .client-photo-preview i { font-size: 1.6rem; color: var(--gray); }
+
         /* ===== NOTIFICAÇÕES & BACKUP — VISUAL PROFISSIONAL (aprovado em amostra) ===== */
         .cfg-card {
             background: #fff; border-radius: var(--r-lg, 14px);
@@ -5346,7 +5365,7 @@ body.dark-mode,
     background: linear-gradient(135deg, #fff3e2, #ffe3bf); color: var(--orange-2, #e85500);
     font-size: 1rem; border: 1px solid #ffdead;
 }
-.ss-thumb.ss-thumb-photo { background: #111; }
+.ss-thumb.ss-thumb-photo { background: #fff; box-shadow: 0 1px 2px rgba(16,24,40,.08); }
 .ss-thumb img { width: 100%; height: 100%; object-fit: contain; }
 .ss-item-info { flex: 1; min-width: 0; }
 .ss-item-name { font-weight: 600; font-size: 0.85rem; color: #333; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -5368,6 +5387,8 @@ body.dark-mode,
     width: 42px; height: 42px; border-radius: 50%; flex: none; display: flex; align-items: center; justify-content: center;
     color: #fff; font-weight: 800; font-size: 0.85rem; box-shadow: 0 2px 8px rgba(0,0,0,0.15);
 }
+.cr-avatar.cr-avatar-photo { background: #fff; border: 1px solid #f1e4d0; overflow: hidden; }
+.cr-avatar.cr-avatar-photo img { width: 100%; height: 100%; object-fit: cover; }
 .cr-info { flex: 1; min-width: 0; }
 .cr-name { font-weight: 700; font-size: 0.88rem; color: #333; }
 .cr-meta { font-size: 0.75rem; color: #999; margin-top: 2px; display: flex; gap: 12px; flex-wrap: wrap; }
@@ -6998,6 +7019,19 @@ body.dark-mode,
                 <div class="cliente-card">
                     <h3 class="ic-head"><span class="ic-badge"><i class="fas fa-id-card"></i></span>DADOS PESSOAIS</h3>
                     <form id="clientForm">
+                        <div class="form-row">
+                            <div class="form-group" style="flex:none;">
+                                <label>Foto</label>
+                                <div style="display:flex;align-items:center;gap:0.9rem;">
+                                    <div class="client-photo-preview" id="clientPhotoPreview" onclick="document.getElementById('clientPhotoInput').click()">
+                                        <img id="clientPhotoImg" src="" style="display:none;">
+                                        <i id="clientPhotoPlaceholder" class="fas fa-camera"></i>
+                                    </div>
+                                    <input type="file" id="clientPhotoInput" accept="image/*" class="d-none" onchange="Clients.uploadPhoto(event)">
+                                    <button type="button" class="btn-remove-photo" onclick="Clients.removePhoto()">🗑 Remover foto</button>
+                                </div>
+                            </div>
+                        </div>
                         <div class="form-row">
                             <div class="form-group">
                                 <label for="clientCode">Código</label>
@@ -17961,6 +17995,31 @@ tbody tr td{border:1.5px solid #000;padding:2mm;text-align:center;font-weight:70
 
         // ==================== CLIENTES ====================
         const Clients = {
+            // Upload/remoção da foto do cliente (mesmo padrão de Products.uploadImage/removeImage)
+            uploadPhoto(event) {
+                const file = event.target.files[0];
+                if (file) {
+                    const reader = new FileReader();
+                    reader.onload = async (e) => {
+                        const compressed = await Utils.compressImageDataUrl(e.target.result, 500, 0.75);
+                        document.getElementById('clientPhotoImg').src = compressed;
+                        document.getElementById('clientPhotoImg').style.display = 'block';
+                        document.getElementById('clientPhotoPlaceholder').style.display = 'none';
+                        document.getElementById('clientPhotoInput').dataset.image = compressed;
+                    };
+                    reader.readAsDataURL(file);
+                }
+            },
+
+            removePhoto() {
+                const img = document.getElementById('clientPhotoImg');
+                const placeholder = document.getElementById('clientPhotoPlaceholder');
+                const input = document.getElementById('clientPhotoInput');
+                if (img) { img.src = ''; img.style.display = 'none'; }
+                if (placeholder) placeholder.style.display = 'flex';
+                if (input) { input.value = ''; delete input.dataset.image; }
+            },
+
             updateQuickStats() {
                 try {
                     const list = state.clients || [];
@@ -18205,6 +18264,7 @@ tbody tr td{border:1.5px solid #000;padding:2mm;text-align:center;font-weight:70
                     code: document.getElementById('clientCode').value,
                     birthDate: document.getElementById('clientBirthDate').value,
                     name: nomeTipado,
+                    photo: document.getElementById('clientPhotoInput')?.dataset.image || null,
                     phone: _normPhone(document.getElementById('clientPhone').value),
                     email: document.getElementById('clientEmail').value,
                     cpf: document.getElementById('clientCpf').value,
@@ -18308,6 +18368,14 @@ tbody tr td{border:1.5px solid #000;padding:2mm;text-align:center;font-weight:70
                 if (!client) return;
                 
                 state.editingId = id;
+                if (client.photo) {
+                    document.getElementById('clientPhotoImg').src = client.photo;
+                    document.getElementById('clientPhotoImg').style.display = 'block';
+                    document.getElementById('clientPhotoPlaceholder').style.display = 'none';
+                    document.getElementById('clientPhotoInput').dataset.image = client.photo;
+                } else {
+                    this.removePhoto();
+                }
                 document.getElementById('clientCode').value = client.code || id;
                 document.getElementById('clientBirthDate').value = client.birthDate || '';
                 document.getElementById('clientName').value = client.name;
@@ -18459,6 +18527,7 @@ tbody tr td{border:1.5px solid #000;padding:2mm;text-align:center;font-weight:70
                 const form = document.getElementById('clientForm');
                 if (form) form.reset();
                 state.editingId = null;
+                this.removePhoto();
                 // Limpa explicitamente todos os campos de texto do cliente
                 ['clientName','clientPhone','clientWhatsapp','clientEmail','clientCpf','clientCep',
                  'clientAddress','clientNumber','clientComplement','clientNeighborhood',
@@ -22435,9 +22504,12 @@ ${container.innerHTML}
                     const color = palette[i % palette.length];
                     const doc = c.cpf ? `<span><i class="fas fa-id-card"></i> ${Utils.sanitizeHTML(c.cpf)}</span>` : '';
                     const phone = (c.phone || c.whatsapp) ? `<span><i class="fas fa-phone"></i> ${Utils.sanitizeHTML(c.phone || c.whatsapp)}</span>` : '';
+                    const avatarHtml = c.photo
+                        ? `<div class="cr-avatar cr-avatar-photo"><img src="${c.photo}" alt=""></div>`
+                        : `<div class="cr-avatar" style="background:${color}">${Utils.sanitizeHTML(initials)}</div>`;
                     return `
                         <div class="client-result-card" onmousedown="event.preventDefault(); Sales.selectClient('${c.id}')">
-                            <div class="cr-avatar" style="background:${color}">${Utils.sanitizeHTML(initials)}</div>
+                            ${avatarHtml}
                             <div class="cr-info">
                                 <div class="cr-name">${Utils.sanitizeHTML(c.name || '')}</div>
                                 <div class="cr-meta">${doc}${phone}</div>
