@@ -7301,9 +7301,11 @@ body.dark-mode,
                 <!-- Tabela de Clientes (com coluna Receita) -->
                 <div class="table-container tf-ready">
                     <div class="table-filtros" style="display:flex;align-items:center;gap:0.75rem;flex-wrap:wrap;">
-                        <div style="flex:1;min-width:200px;position:relative;">
-                            <i class="fas fa-search" style="position:absolute;left:12px;top:50%;transform:translateY(-50%);color:var(--gray);"></i>
-                            <input type="text" id="searchClient" class="form-control" placeholder="Buscar por nome, CPF, telefone..." oninput="Clients.searchDebounced()" style="padding-left:36px;">
+                        <div class="ss-wrapper" style="flex:1;min-width:200px;">
+                            <i class="fas fa-search" style="position:absolute;left:12px;top:50%;transform:translateY(-50%);color:var(--gray);z-index:1;"></i>
+                            <input type="text" id="searchClient" class="form-control" placeholder="Buscar por nome, CPF, telefone..." autocomplete="off"
+                                oninput="Clients.searchDebounced()" onfocus="Clients.searchDebounced()" style="padding-left:36px;">
+                            <div id="clientQuickDropdown" class="ss-dropdown" style="display:none;"></div>
                         </div>
                         <select id="filterClientCity" class="form-control" style="max-width:160px;font-size:0.85rem;" onchange="Clients.search()">
                             <option value="">Todas as cidades</option>
@@ -10675,10 +10677,27 @@ body.dark-mode,
                         MAIN_TABLES.forEach(k => {
                             if (Array.isArray(backup[k]) && backup[k].length > 0) state[k] = backup[k];
                         });
-                        // Re-escreve no IDB para recuperar persistência nativa
+                        // ✅ FIX "fotos de produto/logo somem": o backup do localStorage NUNCA
+                        // guarda imagens em base64 (removidas de propósito em
+                        // LocalStorageBackup.save para não estourar a quota de ~5-10MB).
+                        // Antes, rewriteAll(true) era disparado logo em seguida e GRAVAVA essa
+                        // cópia sem imagens por cima do cache local (IndexedDB). Sozinho isso já
+                        // apagava as fotos deste dispositivo; e se depois o usuário salvasse
+                        // qualquer produto/logo com foto nova, pushMediaNow() reenviaria o
+                        // arquivo de mídia do Drive/OneDrive (que é sempre um arquivo COMPLETO,
+                        // nunca parcial) SEM as fotos dos demais produtos — apagando-as também
+                        // na nuvem para os outros dispositivos. Agora: os dados restaurados
+                        // ficam só em memória (a tela não fica em branco nesta sessão) e o
+                        // IndexedDB local não é regravado por aqui. Em vez disso, tentamos
+                        // buscar os dados reais de novo em alguns segundos — se a leitura vazia
+                        // acima foi só uma falha temporária, a cópia completa (com imagens)
+                        // volta sozinha e nada é perdido. Como reforço extra, pushMediaNow()
+                        // agora também verifica essa situação e faz um pull do arquivo de mídia
+                        // antes de reenviar (ver CloudSync.pushMediaNow).
                         setTimeout(() => {
-                            try { LocalFirst.rewriteAll(true).catch(() => {}); } catch(_e) {}
-                        }, 800);
+                            console.log('[LocalFirst] 🔄 Tentando buscar os dados reais novamente após restauração de emergência (sem imagens)...');
+                            LocalFirst._fetchAllData().catch(() => {});
+                        }, 4000);
                         window._lsBackupRestored = true;
                         window._lsBackupTs = backup._ts;
                     }
@@ -12278,6 +12297,27 @@ body.dark-mode,
                 const storeId = window._currentStore || 'barueri';
                 _lastLocalMediaEdit = Date.now();
                 _lastLocalMediaEditStore = storeId;
+                // ✅ FIX PERDA DE FOTOS: o arquivo de mídia no Drive/OneDrive é sempre
+                // reenviado por INTEIRO (nunca parcial — ver _collectMediaData). Se este
+                // dispositivo usou a restauração de emergência sem fotos (backup local
+                // sem imagens, ver LocalStorageBackup/window._lsBackupRestored) e ainda
+                // não recebeu de volta o arquivo de mídia completo da nuvem, um push
+                // agora enviaria um arquivo faltando a foto de TODOS os outros produtos
+                // (e o logo) — apagando-as para todo mundo. Nesse caso, primeiro puxa o
+                // arquivo de mídia mais recente da nuvem para reidratar o que falta
+                // localmente, e só então envia.
+                if (window._lsBackupRestored) {
+                    (async () => {
+                        try {
+                            if (_activeProvider === 'gdrive'   && _gdriveToken)   await gdrivePullMedia(true);
+                            if (_activeProvider === 'onedrive' && _onedriveToken) await onedrivePullMedia(true);
+                        } catch(_e) {}
+                        window._lsBackupRestored = false;
+                        if (_activeProvider === 'gdrive'   && _gdriveToken)   gdrivePushMedia(true).catch(()=>{});
+                        if (_activeProvider === 'onedrive' && _onedriveToken) onedrivePushMedia(true).catch(()=>{});
+                    })();
+                    return;
+                }
                 if (_activeProvider === 'gdrive'   && _gdriveToken)   gdrivePushMedia(true).catch(()=>{});
                 if (_activeProvider === 'onedrive' && _onedriveToken) onedrivePushMedia(true).catch(()=>{});
             }
@@ -18204,7 +18244,66 @@ tbody tr td{border:1.5px solid #000;padding:2mm;text-align:center;font-weight:70
 
             searchDebounced() {
                 clearTimeout(this._searchTimer);
-                this._searchTimer = setTimeout(() => { this._page = 1; this.renderTable(); }, 200);
+                this._searchTimer = setTimeout(() => {
+                    this._page = 1;
+                    this.renderTable();
+                    this.renderQuickDropdown();
+                }, 200);
+            },
+
+            // ── Busca moderna (mesmo padrão visual da tela de Vendas) ──────────
+            // Mostra, em um dropdown flutuante abaixo do campo, cards com foto/avatar,
+            // nome, CPF e telefone dos clientes que combinam com o termo digitado.
+            // A tabela abaixo continua filtrando normalmente; o dropdown é só um
+            // atalho rápido para abrir a ficha do cliente (Clients.view).
+            renderQuickDropdown() {
+                const box = document.getElementById('clientQuickDropdown');
+                const input = document.getElementById('searchClient');
+                if (!box || !input) return;
+                const term = input.value.trim().toLowerCase();
+                if (term.length < 2) { box.style.display = 'none'; return; }
+
+                const results = (state.clients || []).filter(c =>
+                    (c.name || '').toLowerCase().includes(term) ||
+                    (c.cpf || '').includes(term) ||
+                    (c.phone || '').includes(term) ||
+                    (c.whatsapp || '').includes(term) ||
+                    (c.code || '').toLowerCase().includes(term)
+                ).slice(0, 8);
+
+                if (results.length === 0) {
+                    box.innerHTML = '<div class="cr-empty">Nenhum cliente encontrado</div>';
+                    box.style.display = 'block';
+                    return;
+                }
+
+                const palette = ['#ff6b00', '#e85500', '#ffaa00', '#cc4400', '#ff8c42'];
+                box.innerHTML = '<div class="client-results-list" style="padding:8px;">' + results.map((c, i) => {
+                    const initials = (c.name || '?').trim().split(/\s+/).slice(0, 2).map(w => w[0]).join('').toUpperCase();
+                    const color = palette[i % palette.length];
+                    const doc = c.cpf ? `<span><i class="fas fa-id-card"></i> ${Utils.sanitizeHTML(c.cpf)}</span>` : '';
+                    const phone = (c.phone || c.whatsapp) ? `<span><i class="fas fa-phone"></i> ${Utils.sanitizeHTML(c.phone || c.whatsapp)}</span>` : '';
+                    const avatarHtml = c.photo
+                        ? `<div class="cr-avatar cr-avatar-photo"><img src="${c.photo}" alt=""></div>`
+                        : `<div class="cr-avatar" style="background:${color}">${Utils.sanitizeHTML(initials)}</div>`;
+                    return `
+                        <div class="client-result-card" onmousedown="event.preventDefault(); Clients.selectQuickResult('${c.id}')">
+                            ${avatarHtml}
+                            <div class="cr-info">
+                                <div class="cr-name">${Utils.sanitizeHTML(c.name || '')}</div>
+                                <div class="cr-meta">${doc}${phone}</div>
+                            </div>
+                            <i class="fas fa-chevron-right cr-chev"></i>
+                        </div>`;
+                }).join('') + '</div>';
+                box.style.display = 'block';
+            },
+
+            // Ao clicar num card do dropdown: fecha o dropdown e abre a ficha do cliente
+            selectQuickResult(id) {
+                const box = document.getElementById('clientQuickDropdown');
+                if (box) box.style.display = 'none';
+                this.view(id);
             },
 
             _checkDuplicateName(input) {
