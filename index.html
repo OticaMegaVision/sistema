@@ -5337,6 +5337,45 @@ body.dark-mode,
 .ss-item.ss-disabled { color: #bbb; cursor: not-allowed; background: #fafafa; }
 .ss-item.ss-disabled:hover { background: #fafafa; }
 .ss-empty { padding: 12px; font-size: 0.82rem; color: #999; text-align: center; }
+
+/* ── Item rico do dropdown (foto/código/estoque) — lente/armação/serviço/tratamento ── */
+.ss-item.ss-item-rich { display: flex; align-items: center; gap: 10px; padding: 8px 10px; }
+.ss-thumb {
+    width: 40px; height: 40px; border-radius: 9px; flex: none; overflow: hidden;
+    display: flex; align-items: center; justify-content: center;
+    background: linear-gradient(135deg, #fff3e2, #ffe3bf); color: var(--orange-2, #e85500);
+    font-size: 1rem; border: 1px solid #ffdead;
+}
+.ss-thumb.ss-thumb-photo { background: #111; }
+.ss-thumb img { width: 100%; height: 100%; object-fit: contain; }
+.ss-item-info { flex: 1; min-width: 0; }
+.ss-item-name { font-weight: 600; font-size: 0.85rem; color: #333; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ss-item-meta { font-size: 0.72rem; color: #999; margin-top: 2px; display: flex; gap: 10px; }
+.ss-item-meta .ss-stock-ok { color: #16a34a; font-weight: 600; }
+.ss-item-meta .ss-stock-low { color: #d97706; font-weight: 600; }
+.ss-item-meta .ss-stock-out { color: #dc2626; font-weight: 600; }
+.ss-item-price { font-weight: 800; color: var(--orange-2, #e85500); font-size: 0.85rem; white-space: nowrap; flex: none; }
+.dark-mode .ss-item-name { color: #eee; }
+
+/* ── Cards de resultado de cliente (busca na tela de venda) ── */
+.client-results-list { display: flex; flex-direction: column; gap: 7px; margin-top: 4px; }
+.client-result-card {
+    display: flex; align-items: center; gap: 12px; padding: 10px 12px; border-radius: 12px;
+    border: 1px solid #f1e4d0; background: #fff; cursor: pointer; transition: 0.15s;
+}
+.client-result-card:hover { border-color: var(--orange-1, #ff6b00); background: #fff8f0; box-shadow: 0 4px 16px rgba(255,107,0,0.15); }
+.cr-avatar {
+    width: 42px; height: 42px; border-radius: 50%; flex: none; display: flex; align-items: center; justify-content: center;
+    color: #fff; font-weight: 800; font-size: 0.85rem; box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+}
+.cr-info { flex: 1; min-width: 0; }
+.cr-name { font-weight: 700; font-size: 0.88rem; color: #333; }
+.cr-meta { font-size: 0.75rem; color: #999; margin-top: 2px; display: flex; gap: 12px; flex-wrap: wrap; }
+.cr-meta i { margin-right: 3px; }
+.cr-chev { color: #d8c6a8; font-size: 0.8rem; }
+.cr-empty { padding: 12px; font-size: 0.82rem; color: #999; text-align: center; }
+.dark-mode .client-result-card { background: #1e1e1e; border-color: #444; }
+.dark-mode .cr-name { color: #eee; }
 .dark-mode .ss-dropdown { background: #1e1e1e; border-color: #444; }
 .dark-mode .ss-item { color: #eee; border-bottom-color: #333; }
 .dark-mode .ss-item:hover, .dark-mode .ss-item.ss-active { background: #2a2a2a; }
@@ -5657,7 +5696,7 @@ body.dark-mode,
                             <div class="form-row">
                                 <div class="form-group">
                                     <label>Valor (R$) *</label>
-                                    <input type="number" id="contaValor" class="form-control" placeholder="0,00" step="0.01" min="0">
+                                    <input type="text" inputmode="numeric" id="contaValor" class="form-control" placeholder="0,00" oninput="Utils.maskMoney(this)">
                                 </div>
                                 <div class="form-group">
                                     <label>Vencimento *</label>
@@ -5917,9 +5956,11 @@ body.dark-mode,
                         </div>
                         <div id="clientSearchResults" class="form-group" style="display: none;">
                             <label>Resultados da busca:</label>
-                            <select id="clientSelect" class="form-control" onchange="Sales.loadClientData()">
+                            <!-- Select original mantido oculto: outras funções do sistema (loadClientData, reset de venda, etc.) continuam lendo/escrevendo nele normalmente -->
+                            <select id="clientSelect" class="form-control" onchange="Sales.loadClientData()" style="display:none;">
                                 <option value="">Selecione um cliente</option>
                             </select>
+                            <div id="clientResultsList" class="client-results-list"></div>
                         </div>
                         <div id="selectedClientData" class="form-group" style="background: #e8f4fd; padding: 15px; border-radius: 8px; margin-top: 10px; display: none;">
                             <div style="display: flex; justify-content: space-between; align-items: flex-start;">
@@ -13963,7 +14004,7 @@ body.dark-mode,
 
             async saveConta() {
                 const desc = document.getElementById('contaDescricao').value.trim();
-                const valor = parseFloat(document.getElementById('contaValor').value);
+                const valor = Utils.parseMoney(document.getElementById('contaValor').value);
                 const venc  = document.getElementById('contaVencimento').value;
                 if(!desc) { Toast.show('Informe a descrição','warning'); return; }
                 if(!valor || valor <= 0) { Toast.show('Informe um valor válido','warning'); return; }
@@ -14535,7 +14576,7 @@ body.dark-mode,
                 document.getElementById('contaEditId').value = id;
                 document.getElementById('contaTipo').value = c.tipo;
                 document.getElementById('contaDescricao').value = c.descricao||'';
-                document.getElementById('contaValor').value = c.valor||'';
+                document.getElementById('contaValor').value = c.valor ? (parseFloat(c.valor)||0).toFixed(2).replace('.', ',').replace(/\B(?=(\d{3})+(?!\d))/g, '.') : '';
                 document.getElementById('contaVencimento').value = c.vencimento||'';
                 document.getElementById('contaParte').value = c.parte||'';
                 document.getElementById('contaCategoria').value = c.categoria||'';
@@ -21909,9 +21950,7 @@ ${container.innerHTML}
                     dropdown.innerHTML = '<div class="ss-empty">Nenhum resultado encontrado</div>';
                 } else {
                     matches.forEach(o => {
-                        const item = document.createElement('div');
-                        item.className = 'ss-item' + (o.disabled ? ' ss-disabled' : '');
-                        item.textContent = o.textContent;
+                        const item = this._ssBuildItem(selectId, o);
                         if (!o.disabled) {
                             item.onmousedown = (ev) => {
                                 ev.preventDefault(); // evita perder o foco antes do click
@@ -21924,6 +21963,48 @@ ${container.innerHTML}
                 dropdown.style.display = 'block';
                 // fecha outras listas abertas
                 document.querySelectorAll('.ss-dropdown').forEach(d => { if (d !== dropdown) d.style.display = 'none'; });
+            },
+
+            // Monta visualmente um item do dropdown de itens da venda (lente/armação/serviço/
+            // tratamento). Quando encontra o produto/serviço real no state (foto, código,
+            // estoque), mostra um card ilustrado; senão cai no texto simples de sempre.
+            _ssBuildItem(selectId, o) {
+                const item = document.createElement('div');
+                item.className = 'ss-item' + (o.disabled ? ' ss-disabled' : '');
+
+                const rawId = (o.value || '').split('|')[0];
+                let src = rawId ? (state.products || []).find(p => p.id === rawId) : null;
+                if (!src && rawId) src = (state.services || []).find(s => s.id === rawId);
+
+                if (!src) {
+                    item.textContent = o.textContent;
+                    return item;
+                }
+
+                const price = src.price != null ? src.price : (src.value || 0);
+                const priceFmt = 'R$ ' + (price || 0).toLocaleString('pt-BR', {minimumFractionDigits:2, maximumFractionDigits:2});
+                const hasQty = src.qty !== undefined && src.qty !== null;
+                const qty = src.qty || 0;
+                const stockClass = !hasQty ? '' : (qty <= 0 ? 'ss-stock-out' : (qty <= (src.minQty||5) ? 'ss-stock-low' : 'ss-stock-ok'));
+                const stockText = !hasQty ? '' : (qty <= 0 ? 'Esgotado' : qty + ' em estoque');
+                const codeText = src.code ? 'Cód: ' + Utils.sanitizeHTML(src.code) : '';
+                const fallbackIcon = selectId.startsWith('lente') ? 'fa-eye'
+                    : selectId.startsWith('armacao') ? 'fa-glasses'
+                    : selectId.startsWith('servico') ? 'fa-screwdriver-wrench'
+                    : 'fa-flask';
+                const thumbHtml = src.image
+                    ? `<div class="ss-thumb ss-thumb-photo"><img src="${src.image}" alt=""></div>`
+                    : `<div class="ss-thumb"><i class="fas ${fallbackIcon}"></i></div>`;
+
+                item.classList.add('ss-item-rich');
+                item.innerHTML = `
+                    ${thumbHtml}
+                    <div class="ss-item-info">
+                        <div class="ss-item-name">${Utils.sanitizeHTML(src.name || '')}</div>
+                        <div class="ss-item-meta">${codeText ? `<span>${codeText}</span>` : ''}${stockText ? `<span class="${stockClass}">${stockText}</span>` : ''}</div>
+                    </div>
+                    <div class="ss-item-price">${priceFmt}</div>`;
+                return item;
             },
 
             // Aplica a seleção: atualiza o select oculto (compatível com o resto do código) e o campo de busca
@@ -22329,12 +22410,41 @@ ${container.innerHTML}
                     optHtml += `<option value="${c.id}">${Utils.sanitizeHTML(c.name)} - ${c.cpf || c.phone || ''}</option>`;
                 });
                 select.innerHTML = optHtml;
+                this._renderClientCards(results);
                 
                 document.getElementById('clientSearchResults').style.display = results.length > 0 ? 'block' : 'none';
                 if (results.length === 0 && term.length >= 2) {
                     select.innerHTML = '<option value="">Nenhum cliente encontrado</option>';
                     document.getElementById('clientSearchResults').style.display = 'block';
                 }
+            },
+
+            // Renderiza os resultados de busca de cliente como cards (avatar, CPF, telefone).
+            // Visual apenas — a seleção continua chamando Sales.selectClient(id), que já
+            // preenche o select oculto e os dados do cliente normalmente.
+            _renderClientCards(results) {
+                const box = document.getElementById('clientResultsList');
+                if (!box) return;
+                if (!results || results.length === 0) {
+                    box.innerHTML = '<div class="cr-empty">Nenhum cliente encontrado</div>';
+                    return;
+                }
+                const palette = ['#ff6b00', '#e85500', '#ffaa00', '#cc4400', '#ff8c42'];
+                box.innerHTML = results.map((c, i) => {
+                    const initials = (c.name || '?').trim().split(/\s+/).slice(0, 2).map(w => w[0]).join('').toUpperCase();
+                    const color = palette[i % palette.length];
+                    const doc = c.cpf ? `<span><i class="fas fa-id-card"></i> ${Utils.sanitizeHTML(c.cpf)}</span>` : '';
+                    const phone = (c.phone || c.whatsapp) ? `<span><i class="fas fa-phone"></i> ${Utils.sanitizeHTML(c.phone || c.whatsapp)}</span>` : '';
+                    return `
+                        <div class="client-result-card" onmousedown="event.preventDefault(); Sales.selectClient('${c.id}')">
+                            <div class="cr-avatar" style="background:${color}">${Utils.sanitizeHTML(initials)}</div>
+                            <div class="cr-info">
+                                <div class="cr-name">${Utils.sanitizeHTML(c.name || '')}</div>
+                                <div class="cr-meta">${doc}${phone}</div>
+                            </div>
+                            <i class="fas fa-chevron-right cr-chev"></i>
+                        </div>`;
+                }).join('');
             },
 
             // Limpa o cliente selecionado e permite buscar um novo
@@ -22351,6 +22461,8 @@ ${container.innerHTML}
                 if (resultsEl) resultsEl.style.display = 'none';
                 const selectEl = document.getElementById('clientSelect');
                 if (selectEl) selectEl.innerHTML = '<option value="">Selecione um cliente</option>';
+                const resultsListEl = document.getElementById('clientResultsList');
+                if (resultsListEl) resultsListEl.innerHTML = '';
                 ['clientNameDisplay','clientDocDisplay'].forEach(id => {
                     const el = document.getElementById(id); if (el) el.innerText = '';
                 });
@@ -22373,8 +22485,11 @@ ${container.innerHTML}
                 if (select) {
                     select.innerHTML = `<option value="">Selecione um cliente</option>
                         <option value="${client.id}" selected>${Utils.sanitizeHTML(client.name)} - ${client.cpf || ''}</option>`;
-                    document.getElementById('clientSearchResults').style.display = 'block';
                 }
+                const resultsListEl = document.getElementById('clientResultsList');
+                if (resultsListEl) resultsListEl.innerHTML = '';
+                const resultsBoxEl = document.getElementById('clientSearchResults');
+                if (resultsBoxEl) resultsBoxEl.style.display = 'none';
                 // Carrega os dados do cliente
                 state.currentSale.clientId = clientId;
                 const nameEl = document.getElementById('clientNameDisplay');
@@ -25409,6 +25524,8 @@ ${container.innerHTML}
                 if (typeof professionalEl !== 'undefined' && professionalEl) professionalEl.value = '';
                 const clientSelectEl = document.getElementById('clientSelect');
                 if (clientSelectEl) clientSelectEl.innerHTML = '<option value="">Selecione um cliente</option>';
+                const clientResultsListEl = document.getElementById('clientResultsList');
+                if (clientResultsListEl) clientResultsListEl.innerHTML = '';
                 // Limpa os campos de busca e selects ocultos dos itens (lente/armação/serviço/tratamento)
                 ['lente','armacao','servico','tratamento'].forEach(k => {
                     const sel = document.getElementById(k + 'Select');
@@ -25500,6 +25617,8 @@ ${container.innerHTML}
                 if (_scEl) _scEl.value = '';
                 const _csEl = document.getElementById('clientSelect');
                 if (_csEl) _csEl.innerHTML = '<option value="">Selecione um cliente</option>';
+                const _crEl = document.getElementById('clientResultsList');
+                if (_crEl) _crEl.innerHTML = '';
                 this.generateOsNumber();
                 this.setDefaultDates();
                 this.renderItems();
