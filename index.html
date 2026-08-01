@@ -19151,9 +19151,16 @@ tbody tr td{border:1.5px solid #000;padding:2mm;text-align:center;font-weight:70
                 // então grupos como Braslab (cujos nomes de produto não contêm a palavra
                 // "BRASLAB") ficavam sempre sem logo. Agora usamos essa coluna quando o
                 // laboratório mapeia 1:1 para uma marca.
+                // BUG FIX 2: a comparação era por igualdade exata (lab === 'braslab'),
+                // então qualquer variação no texto da coluna (espaço extra, sufixo tipo
+                // "Braslab Óptica", "BRASLAB LTDA" etc.) fazia o produto ficar sem logo.
+                // Agora comparamos por "contém", que é tolerante a essas variações.
                 const lab = (laboratorio || '').trim().toLowerCase();
-                if (lab && this._LAB_COLUNA_MARCA[lab]) {
-                    return this._LOGOS_MARCA[this._LAB_COLUNA_MARCA[lab]];
+                if (lab) {
+                    const labKey = Object.keys(this._LAB_COLUNA_MARCA).find(k => lab.includes(k));
+                    if (labKey) {
+                        return this._LOGOS_MARCA[this._LAB_COLUNA_MARCA[labKey]];
+                    }
                 }
                 const cod = (codigo || '').toUpperCase();
                 if (this._VISCO_CODE_PREFIXES.some(p => cod.startsWith(p))) {
