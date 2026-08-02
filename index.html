@@ -11513,7 +11513,12 @@ body.dark-mode,
             // Imagens mudam raramente — não precisam do poll de 5s. Um poll
             // mais espaçado evita baixar fotos de produtos repetidamente sem
             // necessidade, mas ainda propaga uma foto nova em menos de 1 minuto.
-            const MEDIA_POLL_ACTIVE_MS    = 45000;
+            // FIX PERFORMANCE-SYNC 3: antes 45s. Como o pull de mídia agora checa
+            // só metadados (modifiedTime/eTag) antes de baixar o arquivo inteiro,
+            // um intervalo mais curto passa a ser barato — a maioria dos ciclos
+            // faz apenas uma consulta pequena, sem baixar nada. 15s alinha com o
+            // intervalo do sync "quente" (clientes/vendas/produtos).
+            const MEDIA_POLL_ACTIVE_MS    = 15000;
             const MEDIA_POLL_BACKGROUND_MS = 120000;
 
             let _gdriveToken    = null;
