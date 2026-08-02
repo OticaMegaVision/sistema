@@ -8,9 +8,6 @@
     <meta name="application-name" content="ÓticaMegaVision Pro">
     <meta name="description" content="Sistema Profissional de Gestão para Óticas">
     <meta name="theme-color" content="#ff6b00">
-    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
-    <meta http-equiv="Pragma" content="no-cache">
-    <meta http-equiv="Expires" content="0">
     <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -2530,69 +2527,49 @@
             50%       { box-shadow: 0 2px 20px rgba(255,193,7,0.7); }
         }
 
-        /* ===== BUSCA/FILTROS DOS HISTÓRICOS (Vendas / Clientes / Produtos) =====
-           Visual único e moderno, reaproveitado nas 3 telas. Não afeta nenhum
-           botão de ação (Ações, O.S./PDF, WhatsApp) — só a barra de busca/filtro. */
+        /* ===== BUSCA NO HISTÓRICO DE VENDAS ===== */
         .sales-search-bar {
             display: flex;
-            gap: 0.65rem;
+            gap: 0.75rem;
             margin-bottom: 1rem;
             flex-wrap: wrap;
             align-items: center;
         }
-        .sales-search-bar .ss-field {
-            position: relative;
-            flex: 1;
-            min-width: 210px;
-        }
-        .sales-search-bar .ss-field i.ss-ic {
-            position: absolute;
-            left: 14px;
-            top: 50%;
-            transform: translateY(-50%);
-            color: var(--gray);
-            font-size: 0.85rem;
-            pointer-events: none;
-        }
         .sales-search-bar input {
-            width: 100%;
-            padding: 0.62rem 0.9rem 0.62rem 2.35rem;
+            flex: 1;
+            min-width: 200px;
+            padding: 0.5rem 0.85rem;
             border: 1.5px solid var(--light-gray);
-            border-radius: 24px;
+            border-radius: var(--border-radius);
             font-size: 0.9rem;
-            background: #fbfaf7;
-            transition: border-color 0.2s, box-shadow 0.2s, background 0.2s;
+            transition: border-color 0.2s;
         }
         .sales-search-bar input:focus {
             outline: none;
             border-color: var(--primary);
-            background: #fff;
             box-shadow: 0 0 0 3px rgba(255,107,0,0.12);
         }
         .sales-search-bar select {
-            padding: 0.55rem 0.9rem;
+            padding: 0.5rem 0.75rem;
             border: 1.5px solid var(--light-gray);
-            border-radius: 20px;
-            font-size: 0.83rem;
-            background: #fbfaf7;
+            border-radius: var(--border-radius);
+            font-size: 0.85rem;
+            background: white;
             cursor: pointer;
-            transition: border-color 0.2s, background 0.2s;
+            transition: border-color 0.2s;
         }
         .sales-search-bar select:focus {
             outline: none;
             border-color: var(--primary);
-            background: #fff;
         }
         .sales-count-badge {
-            font-size: 0.78rem;
-            font-weight: 700;
-            color: #fff;
+            font-size: 0.8rem;
+            color: var(--gray);
             white-space: nowrap;
-            padding: 5px 14px;
-            background: linear-gradient(135deg, var(--primary), var(--secondary));
+            padding: 4px 10px;
+            background: var(--light);
             border-radius: 20px;
-            border: none;
-            box-shadow: 0 3px 10px rgba(255,107,0,0.25);
+            border: 1px solid var(--light-gray);
         }
         .dark-mode .sales-search-bar input,
         .dark-mode .sales-search-bar select {
@@ -2601,55 +2578,98 @@
             color: #e0e0e0;
         }
 
-        /* ===== TABELAS DOS HISTÓRICOS — visual mais profissional =====
-           Aplica-se ao container/cabeçalho/linhas das tabelas; as células e
-           botões de ação (view/edit/delete, PDF, WhatsApp) permanecem 100%
-           inalterados — apenas herdam o novo espaçamento/hover da linha. */
-        .table-container.tf-ready {
-            border-radius: var(--r-lg, 14px);
-            overflow: hidden;
+        /* ══════════════════════════════════════
+           HISTÓRICO DE VENDAS — REDESIGN MODERNO (aprovado)
+           Tudo escopado a #salesHistoryPanel: não altera nenhuma
+           outra tabela/tela do sistema. Ícones não foram tocados.
+        ══════════════════════════════════════ */
+        #salesHistoryPanel {
+            border-radius: 14px !important;
+            border: 1px solid #eef0f3 !important;
+            box-shadow: 0 1px 2px rgba(16,24,40,.04), 0 10px 28px -12px rgba(16,24,40,.10) !important;
         }
-        .table-container.tf-ready h3 {
-            display: flex;
-            align-items: center;
-            gap: 8px;
+        #salesHistoryPanel .table-filtros { padding: 20px 24px 16px !important; }
+        #salesHistoryPanel .sh-head {
+            display: flex; align-items: center; justify-content: space-between;
+            gap: 12px; flex-wrap: wrap; margin-bottom: 16px;
         }
-        .table-container.tf-ready h3::before {
-            content: '';
-            display: inline-block;
-            width: 8px;
-            height: 8px;
-            border-radius: 50%;
-            background: linear-gradient(135deg, var(--primary), var(--secondary));
-            flex-shrink: 0;
+        #salesHistoryPanel .sh-title { display: flex; align-items: center; gap: 10px; }
+        #salesHistoryPanel .sh-title .sh-ico {
+            width: 34px; height: 34px; border-radius: 10px;
+            display: flex; align-items: center; justify-content: center;
+            background: linear-gradient(135deg, var(--primary), #ff9a3d); color: #fff;
+            font-size: .85rem; flex-shrink: 0;
+            box-shadow: 0 4px 10px rgba(255,107,0,.28);
         }
-        .table-container.tf-ready table thead th {
-            background: #fff7ee;
-            color: var(--primary-dark);
-            text-transform: uppercase;
-            font-size: 0.72rem;
-            letter-spacing: 0.4px;
-            font-weight: 800;
-            border-bottom: 2px solid var(--primary-light);
-            padding: 12px 10px;
+        #salesHistoryPanel .sh-title h3 {
+            margin: 0 !important; padding: 0 !important;
+            font-size: 1.05rem !important; font-weight: 800 !important;
+            letter-spacing: -.01em !important; color: #1c2129 !important;
         }
-        .table-container.tf-ready table tbody td {
-            padding: 11px 10px;
+        #salesHistoryPanel .sh-title .sh-sub {
+            display: block; font-size: .76rem; font-weight: 500; color: #5b6472; margin-top: 1px;
         }
-        .table-container.tf-ready table tbody tr {
-            transition: background 0.15s;
+        #salesHistoryPanel .sales-count-badge {
+            font-size: .78rem !important; font-weight: 700 !important; color: #e55a00 !important;
+            background: #fff2e6 !important; border: 1px solid #ffddb8 !important;
+            padding: 5px 12px !important; border-radius: 20px !important;
         }
-        .table-container.tf-ready table tbody tr:hover {
-            background: #fffaf3;
+        #salesHistoryPanel .sales-search-bar { margin-bottom: 0 !important; }
+        #salesHistoryPanel .sh-search-field { position: relative; flex: 1; min-width: 220px; }
+        #salesHistoryPanel .sh-search-field i {
+            position: absolute; left: 13px; top: 50%; transform: translateY(-50%);
+            color: #a8afba; font-size: .82rem; pointer-events: none;
         }
-        .dark-mode .table-container.tf-ready table thead th {
-            background: #241a0c;
-            color: var(--secondary);
-            border-bottom-color: #3a2a12;
+        #salesHistoryPanel .sh-search-field input {
+            width: 100% !important; padding: 9px 12px 9px 34px !important;
+            border: 1.5px solid #eef0f3 !important; border-radius: 10px !important;
+            font-size: .86rem !important; background: #f6f7f9 !important;
         }
-        .dark-mode .table-container.tf-ready table tbody tr:hover {
-            background: #241a0c;
+        #salesHistoryPanel .sh-search-field input:focus {
+            background: #fff !important; border-color: var(--primary) !important;
         }
+        #salesHistoryPanel .sales-search-bar select {
+            padding: 9px 30px 9px 12px !important;
+            border: 1.5px solid #eef0f3 !important; border-radius: 10px !important;
+            font-size: .82rem !important; font-weight: 600 !important;
+            background-color: #f6f7f9 !important;
+        }
+        #salesHistoryPanel .sh-btn-clear {
+            display: inline-flex; align-items: center; gap: 6px;
+            padding: 9px 14px; border-radius: 10px; border: 1.5px solid #eef0f3;
+            background: #fff; color: #5b6472; font-size: .82rem; font-weight: 700;
+            cursor: pointer; white-space: nowrap; transition: border-color .15s, color .15s, background .15s;
+        }
+        #salesHistoryPanel .sh-btn-clear:hover { border-color: #d8dce2; color: #1c2129; background: #f6f7f9; }
+
+        /* Cabeçalho da tabela congelado (usa o mesmo mecanismo sticky já existente) */
+        #salesHistoryPanel thead { background: #fbfbfc !important; }
+        #salesHistoryPanel thead tr th {
+            background: #fbfbfc !important; color: #8992a0 !important;
+            font-size: .68rem !important; font-weight: 800 !important; letter-spacing: .06em !important;
+            padding: 12px 16px !important; border-bottom: 1.5px solid #eef0f3 !important;
+        }
+        #salesHistoryPanel tbody tr td { padding: 13px 16px !important; border-bottom: 1px solid #eef0f3 !important; }
+        #salesHistoryPanel tbody tr:hover td { background: #fbf8f5 !important; }
+        #salesHistoryPanel tbody tr:last-child td { border-bottom: none !important; }
+        #salesHistoryPanel .btn-icon { border-radius: 9px !important; }
+        #salesHistoryPanel .action-buttons { gap: 6px !important; }
+
+        .dark-mode #salesHistoryPanel { border-color: rgba(255,107,0,0.12) !important; }
+        .dark-mode #salesHistoryPanel .sh-title h3 { color: #f0f0f0 !important; }
+        .dark-mode #salesHistoryPanel .sh-title .sh-sub { color: #b0b0b0 !important; }
+        .dark-mode #salesHistoryPanel .sales-count-badge {
+            background: rgba(255,107,0,.14) !important; border-color: rgba(255,107,0,.3) !important; color: #ffb066 !important;
+        }
+        .dark-mode #salesHistoryPanel .sh-search-field input,
+        .dark-mode #salesHistoryPanel .sales-search-bar select,
+        .dark-mode #salesHistoryPanel .sh-btn-clear {
+            background: #2d2d2d !important; border-color: #444 !important; color: #e0e0e0 !important;
+        }
+        .dark-mode #salesHistoryPanel thead,
+        .dark-mode #salesHistoryPanel thead tr th { background: #241a10 !important; color: #c7a97a !important; }
+        .dark-mode #salesHistoryPanel tbody tr td { border-bottom-color: rgba(255,107,0,.08) !important; }
+        .dark-mode #salesHistoryPanel tbody tr:hover td { background: rgba(255,107,0,.06) !important; }
 
         /* ===== FILTRO PERÍODO DASHBOARD ===== */
         .dash-period-bar {
@@ -5943,27 +5963,22 @@ body.dark-mode,
                     </div>
                 </div>
                 <div class="table-container tf-ready">
-                    <div class="table-filtros">
-                    <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:0.75rem;margin-bottom:1rem;">
+                    <div class="table-filtros" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:0.5rem;">
                         <h3 style="margin:0;">Últimas Vendas</h3>
-                    </div>
-                    <div class="sales-search-bar">
-                        <div class="ss-field">
-                            <i class="fas fa-search ss-ic"></i>
-                            <input type="text" id="filterRecentClient" placeholder="Cliente..." oninput="Dashboard.filterRecentSales()">
+                        <div style="display:flex;gap:0.5rem;flex-wrap:wrap;">
+                            <input type="text" id="filterRecentClient" class="form-control" placeholder="🔍 Cliente..." oninput="Dashboard.filterRecentSales()" style="max-width:160px;font-size:0.82rem;">
+                            <select id="filterRecentStatus" class="form-control" onchange="Dashboard.filterRecentSales()" style="max-width:150px;font-size:0.82rem;">
+                                <option value="">Todos os status</option>
+                                <option value="orcamento">Orçamento</option>
+                                <option value="pendente">Pendente</option>
+                                <option value="producao">Em Produção</option>
+                                <option value="laboratorio">Laboratório</option>
+                                <option value="tratamento">Tratamento</option>
+                                <option value="pronto">Pronto</option>
+                                <option value="entregue">Entregue</option>
+                                <option value="cancelado">Cancelado</option>
+                            </select>
                         </div>
-                        <select id="filterRecentStatus" onchange="Dashboard.filterRecentSales()">
-                            <option value="">Todos os status</option>
-                            <option value="orcamento">Orçamento</option>
-                            <option value="pendente">Pendente</option>
-                            <option value="producao">Em Produção</option>
-                            <option value="laboratorio">Laboratório</option>
-                            <option value="tratamento">Tratamento</option>
-                            <option value="pronto">Pronto</option>
-                            <option value="entregue">Entregue</option>
-                            <option value="cancelado">Cancelado</option>
-                        </select>
-                    </div>
                     </div>
                     <table id="recentSalesTable">
                         <thead><tr><th>Nº O.S</th><th>Cliente</th><th>Valor</th><th>Status</th><th>Data</th></tr></thead>
@@ -7001,15 +7016,21 @@ body.dark-mode,
                 </div>
 
                 <!-- Histórico de Vendas -->
-                <div class="table-container no-print tf-ready">
+                <div class="table-container no-print tf-ready" id="salesHistoryPanel">
                     <div class="table-filtros">
-                    <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:0.75rem;margin-bottom:1rem;">
-                        <h3 style="margin:0;">Histórico de Vendas</h3>
+                    <div class="sh-head">
+                        <div class="sh-title">
+                            <span class="sh-ico"><i class="fas fa-clock-rotate-left"></i></span>
+                            <div>
+                                <h3 style="margin:0;">Histórico de Vendas</h3>
+                                <span class="sh-sub">Ordens de serviço registradas no sistema</span>
+                            </div>
+                        </div>
                         <span class="sales-count-badge" id="salesCountBadge">0 OS</span>
                     </div>
                     <div class="sales-search-bar">
-                        <div class="ss-field">
-                            <i class="fas fa-search ss-ic"></i>
+                        <div class="sh-search-field">
+                            <i class="fas fa-magnifying-glass"></i>
                             <input type="text" id="searchSaleHistory" placeholder="Buscar por OS, cliente, valor..." oninput="Sales.filterHistory()" autocomplete="off">
                         </div>
                         <select id="filterSaleStatus" onchange="Sales.filterHistory()">
@@ -7041,7 +7062,7 @@ body.dark-mode,
                             <option value="installment">Crediário</option>
                             <option value="dual">Duplo</option>
                         </select>
-                        <button class="btn btn-secondary btn-sm" onclick="Sales.clearHistoryFilter()" title="Limpar filtros"><i class="fas fa-times"></i> Limpar</button>
+                        <button class="sh-btn-clear" onclick="Sales.clearHistoryFilter()" title="Limpar filtros"><i class="fas fa-times"></i> Limpar</button>
                     </div>
                     </div>
                     <table id="salesHistoryTable">
@@ -7381,28 +7402,23 @@ body.dark-mode,
 
                 <!-- Tabela de Clientes (com coluna Receita) -->
                 <div class="table-container tf-ready">
-                    <div class="table-filtros">
-                    <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:0.75rem;margin-bottom:1rem;">
-                        <h3 style="margin:0;">Histórico de Clientes</h3>
-                        <span class="sales-count-badge" id="clientsCountBadge">0 clientes</span>
-                    </div>
-                    <div class="sales-search-bar">
-                        <div class="ss-field ss-wrapper">
-                            <i class="fas fa-search ss-ic"></i>
-                            <input type="text" id="searchClient" placeholder="Buscar por nome, CPF, telefone..." autocomplete="off"
-                                oninput="Clients.searchDebounced()" onfocus="Clients.searchDebounced()">
+                    <div class="table-filtros" style="display:flex;align-items:center;gap:0.75rem;flex-wrap:wrap;">
+                        <div class="ss-wrapper" style="flex:1;min-width:200px;">
+                            <i class="fas fa-search" style="position:absolute;left:12px;top:50%;transform:translateY(-50%);color:var(--gray);z-index:1;"></i>
+                            <input type="text" id="searchClient" class="form-control" placeholder="Buscar por nome, CPF, telefone..." autocomplete="off"
+                                oninput="Clients.searchDebounced()" onfocus="Clients.searchDebounced()" style="padding-left:36px;">
                             <div id="clientQuickDropdown" class="ss-dropdown" style="display:none;"></div>
                         </div>
-                        <select id="filterClientCity" onchange="Clients.search()">
+                        <select id="filterClientCity" class="form-control" style="max-width:160px;font-size:0.85rem;" onchange="Clients.search()">
                             <option value="">Todas as cidades</option>
                         </select>
-                        <select id="filterClientPresc" onchange="Clients.search()">
+                        <select id="filterClientPresc" class="form-control" style="max-width:150px;font-size:0.85rem;" onchange="Clients.search()">
                             <option value="">Com ou sem receita</option>
                             <option value="com">Com receita</option>
                             <option value="sem">Sem receita</option>
                         </select>
-                        <button class="btn btn-secondary btn-sm" onclick="Clients.clearFilter()" title="Limpar filtros"><i class="fas fa-times"></i> Limpar</button>
-                    </div>
+                        <button class="btn btn-secondary btn-sm" onclick="Clients.clearFilter()" title="Limpar filtros"><i class="fas fa-times"></i></button>
+                        <span id="clientsCountBadge" style="background:var(--primary);color:white;padding:4px 14px;border-radius:20px;font-size:0.82rem;font-weight:700;white-space:nowrap;"></span>
                     </div>
                     <table id="clientsTable">
                         <thead>
@@ -7805,16 +7821,9 @@ body.dark-mode,
                     </form>
                 </div>
                 <div class="table-container tf-ready">
-                    <div class="table-filtros">
-                    <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:0.75rem;margin-bottom:1rem;">
-                        <h3 style="margin:0;">Histórico de Produtos</h3>
-                        <span class="sales-count-badge" id="productsCountBadge">0 produtos</span>
-                    </div>
-                    <div class="sales-search-bar">
-                        <div class="ss-field">
-                            <i class="fas fa-search ss-ic"></i>
-                            <input type="text" id="searchProduct" placeholder="Buscar produto..." onkeyup="Products.search()">
-                        </div>
+                    <div class="table-filtros" style="display:flex;align-items:center;gap:0.5rem;flex-wrap:wrap;">
+                        <input type="text" id="searchProduct" class="form-control" placeholder="🔍 Buscar produto..." onkeyup="Products.search()" style="flex:1;min-width:180px;margin:0;">
+                        <span id="productsCountBadge" style="background:#ff6b00;color:#fff;border-radius:20px;padding:3px 12px;font-size:0.78rem;font-weight:700;white-space:nowrap;">0 produtos</span>
                         <button class="btn btn-secondary btn-sm" onclick="document.getElementById('importProductsFile').click()" title="Importar produtos via Excel/CSV">
                             <i class="fas fa-upload"></i> Importar
                         </button>
@@ -7831,7 +7840,6 @@ body.dark-mode,
                             <i class="fas fa-trash-alt"></i> Remover Tudo
                         </button>
                         <input type="file" id="importProductsFile" accept=".xlsx,.csv" class="d-none" onchange="Products.importFromFile(event)">
-                    </div>
                     </div>
                     <table id="productsTable">
                         <thead>
@@ -23034,7 +23042,7 @@ ${container.innerHTML}
                         <td>${s.number}</td>
                         <td>${Utils.sanitizeHTML(clientName)}</td>
                         <td>${Utils.formatCurrency(s.total)}</td>
-                        <td><span style="background:${payBadgeColor};color:#fff;border-radius:10px;padding:2px 8px;font-size:0.72rem;font-weight:700;white-space:nowrap;">${payLbl}</span></td>
+                        <td><span style="background:${payBadgeColor};color:#fff;border-radius:20px;padding:4px 10px;font-size:0.72rem;font-weight:700;white-space:nowrap;">${payLbl}</span></td>
                         <td style="color:${saldo.cls};font-weight:700;font-size:0.82rem;">${saldo.txt}</td>
                         <td>${(() => {
                             const stAtual2 = Sales._STATUS_LIST.find(x => x.v === Sales._normStatus(s.status)) || {e:'❓', l:s.status || '—', c:'#6c757d'};
