@@ -11784,6 +11784,41 @@ body.dark-mode,
                 };
             }
 
+            // ── FIX PERFORMANCE-SYNC 2: referência curta para logos de marca ──
+            // Logos de marca (Technopark, Kodak, Essilor, Braslab, Pro Design,
+            // Visco) são os MESMOS bytes repetidos em centenas de produtos depois
+            // de uma importação grande. Em vez de duplicar esse base64 (às vezes
+            // dezenas de KB) em cada entrada do arquivo de mídia — o que deixa o
+            // JSON enorme e o sync lento —, guardamos só uma referência curta
+            // ("$brand:kodak") quando a imagem do produto é EXATAMENTE um logo
+            // de marca conhecido. Quem recebe o arquivo já tem os mesmos logos
+            // embutidos no próprio código (Products._LOGOS_MARCA) e resolve a
+            // referência localmente, sem baixar nenhum byte de imagem extra.
+            // Fotos reais tiradas pelo usuário não têm correspondência nesse
+            // mapa e continuam indo em base64 completo, exatamente como antes —
+            // nada muda para elas.
+            let _brandLogoReverseCache = null;
+            function _brandKeyForImage(img) {
+                try {
+                    if (!_brandLogoReverseCache) {
+                        _brandLogoReverseCache = {};
+                        const logos = (typeof Products !== 'undefined' && Products._LOGOS_MARCA) || null;
+                        if (logos) {
+                            Object.keys(logos).forEach(k => { _brandLogoReverseCache[logos[k]] = k; });
+                        }
+                    }
+                    return _brandLogoReverseCache[img] || null;
+                } catch(_e) { return null; }
+            }
+            function _resolveBrandRef(ref) {
+                if (typeof ref !== 'string' || !ref.startsWith('$brand:')) return ref;
+                try {
+                    const logos = (typeof Products !== 'undefined' && Products._LOGOS_MARCA) || null;
+                    const key = ref.slice(7);
+                    return (logos && logos[key]) || null;
+                } catch(_e) { return null; }
+            }
+
             // ── FIX PERFORMANCE-SYNC: pacote SEPARADO só com imagens ──────────
             // Logo da empresa + fotos de produtos, tudo em base64. Sincronizado
             // à parte do pacote "quente" (clientes/vendas/produtos/empresa) para
@@ -11796,7 +11831,8 @@ body.dark-mode,
                 const products = {};
                 (state.products || []).forEach(p => {
                     if (p && p.id && typeof p.image === 'string' && p.image.startsWith('data:')) {
-                        products[p.id] = p.image;
+                        const brandKey = _brandKeyForImage(p.image);
+                        products[p.id] = brandKey ? ('$brand:' + brandKey) : p.image;
                     }
                 });
                 const logo = (state.company && typeof state.company.logo === 'string' && state.company.logo.startsWith('data:'))
@@ -12145,7 +12181,10 @@ body.dark-mode,
                     let mudou = false;
                     (state.products || []).forEach(p => {
                         if (!p || !p.id) return;
-                        const img = remote.products[p.id];
+                        // FIX PERFORMANCE-SYNC 2: o remoto pode trazer uma referência
+                        // curta ("$brand:kodak") em vez do base64 completo — resolve
+                        // para a imagem real usando os logos já embutidos no código.
+                        const img = _resolveBrandRef(remote.products[p.id]);
                         if (typeof img === 'string' && img.startsWith('data:') && p.image !== img) {
                             p.image = img;
                             mudou = true;
@@ -19185,6 +19224,17 @@ tbody tr td{border:1.5px solid #000;padding:2mm;text-align:center;font-weight:70
                     if (rows.length < 2) { Toast.show('Arquivo inválido ou sem dados', 'error'); return; }
                     // Cabeçalho esperado: Código | Categoria | Nome | Custo | Preço | Estoque | EstoqueMin
                     let imported = 0, updated = 0, errors = 0;
+                    // ── FIX SYNC DE LOGO NA IMPORTAÇÃO EM LOTE ──────────────────────
+                    // pushMediaNow() (que envia o arquivo separado de mídia p/ Drive/
+                    // OneDrive) já era chamado toda vez que o usuário trocava a foto de
+                    // UM produto manualmente (ver Products.saveProductImage), mas nunca
+                    // era chamado aqui na importação em massa por CSV/Excel. Resultado:
+                    // o logo aparecia certinho no aparelho que importou (state local já
+                    // tinha a imagem), mas nunca chegava aos outros dispositivos/loja,
+                    // porque o arquivo de mídia no Drive/OneDrive nunca era atualizado.
+                    // Esta flag registra se algum produto recebeu logo/imagem nesta
+                    // importação, para disparar o push de mídia no final.
+                    let anyImageSet = false;
                     const toSync = [];
                     // Mapa código -> produto existente (referência direta, para atualizar em vez de duplicar)
                     const byCode = new Map();
@@ -19220,11 +19270,13 @@ tbody tr td{border:1.5px solid #000;padding:2mm;text-align:center;font-weight:70
                             // a cada importação e só preservamos o logo atual quando a regra não
                             // conseguir determinar nenhuma marca para o produto.
                             const logoDet = self._escolherLogoMarca(name, code, r[7]);
-                            if (logoDet) existing.image = logoDet;
+                            if (logoDet && existing.image !== logoDet) { existing.image = logoDet; anyImageSet = true; }
                             existing.updated_at = new Date().toISOString();
                             toSync.push(existing);
                             updated++;
                         } else {
+                            const novoLogo = self._escolherLogoMarca(name, code, r[7]);
+                            if (novoLogo) anyImageSet = true;
                             const prod = {
                                 id: 'PROD-' + Date.now() + '-' + Math.random().toString(36).slice(2,6),
                                 code,
@@ -19234,7 +19286,7 @@ tbody tr td{border:1.5px solid #000;padding:2mm;text-align:center;font-weight:70
                                 price,
                                 qty,
                                 minQty,
-                                image:     self._escolherLogoMarca(name, code, r[7]),
+                                image:     novoLogo,
                                 updated_at: new Date().toISOString()
                             };
                             state.products.push(prod);
@@ -19271,6 +19323,15 @@ tbody tr td{border:1.5px solid #000;padding:2mm;text-align:center;font-weight:70
                         } finally {
                             LocalFirst._resumeRealtime();
                         }
+                    }
+                    // ── FIX SYNC DE LOGO NA IMPORTAÇÃO EM LOTE ──────────────────────
+                    // Envia o arquivo de mídia (logos/fotos) para a nuvem depois da
+                    // importação, do mesmo jeito que já acontece ao trocar a foto de
+                    // um produto manualmente. Sem isso, os logos atribuídos pela
+                    // importação (Technopark, Kodak, Essilor, Braslab...) nunca
+                    // saíam deste aparelho.
+                    if (anyImageSet) {
+                        try { window.CloudSync?.pushMediaNow?.(); } catch(_e) {}
                     }
                     self._importingProducts = false;
                 };
