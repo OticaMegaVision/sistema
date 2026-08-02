@@ -12356,23 +12356,35 @@ body.dark-mode,
                 _pushingMedia = true;
                 try {
                     const data = JSON.stringify(_collectMediaData());
-                    const fileId = await _gdriveGetOrCreateMediaFileId();
+                    let fileId = await _gdriveGetOrCreateMediaFileId();
                     if (fileId) {
-                        await _fetchTimeout(
+                        const r = await _fetchTimeout(
                             'https://www.googleapis.com/upload/drive/v3/files/' + fileId + '?uploadType=media',
                             { method: 'PATCH', headers: { Authorization: 'Bearer ' + _gdriveToken.access_token, 'Content-Type': 'application/json' }, body: data },
                             45000
                         );
-                    } else {
+                        // ✅ FIX SYNC-MEDIA: se o arquivo foi apagado no Drive (manualmente
+                        // ou por engano), o PATCH volta 404 mas _fetchTimeout não rejeita —
+                        // sem isso o push "funcionava" pra sempre sem salvar nada. Limpa o
+                        // ID cacheado e cai no fluxo de criação abaixo pra recriar o arquivo.
+                        if (r.status === 404) {
+                            console.warn('[CloudSync] Arquivo de mídia (Drive) não existe mais — recriando.');
+                            localStorage.removeItem(_lsMediaFileIdKey('gdrive'));
+                            fileId = null;
+                        } else if (!r.ok) {
+                            console.warn('[CloudSync] push de mídia (Drive) falhou com status ' + r.status);
+                        }
+                    }
+                    if (!fileId) {
                         const meta = JSON.stringify({ name: _mediaFileName(), mimeType: 'application/json' });
                         const form = new FormData();
                         form.append('metadata', new Blob([meta], { type: 'application/json' }));
                         form.append('file',     new Blob([data], { type: 'application/json' }));
-                        const r = await _fetchTimeout(
+                        const r2 = await _fetchTimeout(
                             'https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id',
                             { method: 'POST', headers: { Authorization: 'Bearer ' + _gdriveToken.access_token }, body: form }
                         );
-                        const created = await r.json();
+                        const created = await r2.json();
                         if (created.id) localStorage.setItem(_lsMediaFileIdKey('gdrive'), created.id);
                     }
                 } catch(e) {
@@ -12403,6 +12415,17 @@ body.dark-mode,
                             { headers: { Authorization: 'Bearer ' + _gdriveToken.access_token }, cache: 'no-store' },
                             15000
                         );
+                        // ✅ FIX SYNC-MEDIA: se o arquivo foi apagado no Drive, esse
+                        // metadado volta 404. Antes o código ignorava isso e continuava
+                        // usando o mesmo ID morto pra sempre (arquivo apagado nunca
+                        // "reaparecia"). Agora limpa o cache pra que o próximo push
+                        // recrie o arquivo do zero.
+                        if (metaR.status === 404) {
+                            console.warn('[CloudSync] Arquivo de mídia (Drive) não existe mais — limpando cache.');
+                            localStorage.removeItem(_lsMediaFileIdKey('gdrive'));
+                            localStorage.removeItem(_lsMediaFingerprintKey('gdrive'));
+                            return;
+                        }
                         const meta = await metaR.json();
                         const fpKey = _lsMediaFingerprintKey('gdrive');
                         if (meta && meta.modifiedTime) {
@@ -12417,6 +12440,16 @@ body.dark-mode,
                         { headers: { Authorization: 'Bearer ' + _gdriveToken.access_token }, cache: 'no-store' },
                         45000
                     );
+                    // ✅ FIX SYNC-MEDIA: nunca aplica uma resposta de erro (ex.: JSON de
+                    // erro 404 do Drive) como se fossem dados de mídia reais.
+                    if (!r.ok) {
+                        if (r.status === 404) {
+                            localStorage.removeItem(_lsMediaFileIdKey('gdrive'));
+                            localStorage.removeItem(_lsMediaFingerprintKey('gdrive'));
+                        }
+                        console.warn('[CloudSync] pull de mídia (Drive) falhou com status ' + r.status);
+                        return;
+                    }
                     const remote = await r.json();
                     await _withSyncLock('cloud:gdrivePullMedia', () => _applyMediaData(remote, silent));
                 } catch(e) {
@@ -12479,6 +12512,17 @@ body.dark-mode,
                             { headers: { Authorization: 'Bearer ' + _onedriveToken.access_token } },
                             15000
                         );
+                        // ✅ FIX SYNC-MEDIA: se o arquivo foi apagado no OneDrive, esse
+                        // metadado volta 404. Antes o código simplesmente ignorava
+                        // (só entrava no if metaR.ok) e seguia usando o mesmo ID morto
+                        // pra sempre — arquivo apagado nunca "reaparecia". Agora limpa
+                        // o cache pra o próximo push recriar o arquivo do zero.
+                        if (metaR.status === 404) {
+                            console.warn('[CloudSync] Arquivo de mídia (OneDrive) não existe mais — limpando cache.');
+                            localStorage.removeItem(_lsMediaFileIdKey('onedrive'));
+                            localStorage.removeItem(_lsMediaFingerprintKey('onedrive'));
+                            return;
+                        }
                         if (metaR.ok) {
                             const meta = await metaR.json();
                             const fpKey = _lsMediaFingerprintKey('onedrive');
@@ -12495,6 +12539,16 @@ body.dark-mode,
                         { headers: { Authorization: 'Bearer ' + _onedriveToken.access_token }, cache: 'no-store' },
                         45000
                     );
+                    // ✅ FIX SYNC-MEDIA: nunca aplica uma resposta de erro (ex.: JSON de
+                    // erro 404) como se fossem dados de mídia reais.
+                    if (!r.ok) {
+                        if (r.status === 404) {
+                            localStorage.removeItem(_lsMediaFileIdKey('onedrive'));
+                            localStorage.removeItem(_lsMediaFingerprintKey('onedrive'));
+                        }
+                        console.warn('[CloudSync] pull de mídia (OneDrive) falhou com status ' + r.status);
+                        return;
+                    }
                     const remote = await r.json();
                     await _withSyncLock('cloud:onedrivePullMedia', () => _applyMediaData(remote, silent));
                 } catch(e) {
