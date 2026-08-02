@@ -12341,19 +12341,58 @@ body.dark-mode,
             }
 
             // ── FIX PERFORMANCE-SYNC: push/pull do arquivo de mídia (Google Drive) ──
+            // ✅ FIX SYNC-MEDIA DUPLICATAS: mesma proteção que já existe em
+            // _gdriveGetOrCreateFileId (arquivo de dados principal) — se a busca
+            // por nome encontrar MAIS DE UM arquivo de mídia (pode acontecer se
+            // dois navegadores/dispositivos conectaram ao Drive quase ao mesmo
+            // tempo, antes de qualquer um deles ter o ID em cache), a escolha
+            // deixa de ser "o primeiro que a API retornar" (ordem não garantida,
+            // podia divergir entre chamadas/dispositivos) e passa a ser sempre
+            // "o arquivo com modifiedTime mais recente" — critério determinístico
+            // que qualquer dispositivo calcula da mesma forma. Sem isso, dois
+            // dispositivos podiam ficar cada um lendo/escrevendo num arquivo de
+            // mídia diferente indefinidamente, com fotos/logos nunca convergindo
+            // entre eles (é exatamente o que causava as fotos de produtos e o
+            // logo de marca não sincronizarem/atualizarem para uma loja específica).
             async function _gdriveGetOrCreateMediaFileId() {
                 const cached = localStorage.getItem(_lsMediaFileIdKey('gdrive'));
                 if (cached) return cached;
                 try {
                     const q = encodeURIComponent("name='" + _mediaFileName() + "' and trashed=false");
-                    const r = await _fetchTimeout('https://www.googleapis.com/drive/v3/files?q=' + q + '&fields=files(id,name)', {
+                    const r = await _fetchTimeout('https://www.googleapis.com/drive/v3/files?q=' + q + '&fields=files(id,name,modifiedTime)', {
                         headers: { Authorization: 'Bearer ' + _gdriveToken.access_token }
                     });
                     const j = await r.json();
-                    if (j.files && j.files[0]) {
-                        localStorage.setItem(_lsMediaFileIdKey('gdrive'), j.files[0].id);
-                        return j.files[0].id;
+                    const files = Array.isArray(j.files) ? j.files : [];
+                    if (files.length === 0) return null;
+
+                    if (files.length === 1) {
+                        localStorage.setItem(_lsMediaFileIdKey('gdrive'), files[0].id);
+                        return files[0].id;
                     }
+
+                    // Mais de um arquivo de mídia com o mesmo nome — escolhe o mais
+                    // recente de forma determinística e manda os outros pra lixeira.
+                    const sorted = files.slice().sort((a, b) => {
+                        const ta = a.modifiedTime ? new Date(a.modifiedTime).getTime() : 0;
+                        const tb = b.modifiedTime ? new Date(b.modifiedTime).getTime() : 0;
+                        return tb - ta; // mais recente primeiro
+                    });
+                    const winner = sorted[0];
+                    console.warn('[CloudSync] ⚠️ ' + files.length + ' arquivos de mídia duplicados encontrados no Drive para "' +
+                        _mediaFileName() + '" — usando o mais recente (' + winner.modifiedTime + ') e movendo os outros para a lixeira.');
+                    sorted.slice(1).forEach(dup => {
+                        fetch('https://www.googleapis.com/drive/v3/files/' + dup.id, {
+                            method: 'PATCH',
+                            headers: {
+                                Authorization: 'Bearer ' + _gdriveToken.access_token,
+                                'Content-Type': 'application/json'
+                            },
+                            body: JSON.stringify({ trashed: true })
+                        }).catch(() => {});
+                    });
+                    localStorage.setItem(_lsMediaFileIdKey('gdrive'), winner.id);
+                    return winner.id;
                 } catch(e) {}
                 return null;
             }
@@ -13766,12 +13805,23 @@ body.dark-mode,
                 // que limpa o cache em memória E o localStorage para a loja informada,
                 // forçando a próxima sincronização a rebuscar (e, com o fix de
                 // duplicatas acima, deduplicar) o arquivo correto no Drive.
+                // ✅ FIX SYNC-MEDIA: clearFileIdCache só limpava o cache do arquivo
+                // de dados principal, nunca o do arquivo de mídia (fotos/logos) nem
+                // o "fingerprint" usado pra pular downloads repetidos. Resultado: se
+                // o ID de mídia em cache estivesse errado (ex.: apontando pra um dos
+                // arquivos duplicados do fix acima), trocar de loja e voltar nunca
+                // corrigia isso sozinho — o ID errado ficava preso pra sempre. Agora
+                // limpa os quatro caches (dados + mídia, Drive + OneDrive) juntos.
                 clearFileIdCache(storeId) {
                     if (!storeId) return;
                     delete _gdriveFileIds[storeId];
                     delete _odFileIds[storeId];
                     try { localStorage.removeItem('cs_gdrive_file_id_' + storeId); } catch(_e) {}
                     try { localStorage.removeItem('cs_onedrive_file_id_' + storeId); } catch(_e) {}
+                    try { localStorage.removeItem('cs_gdrive_media_file_id_' + storeId); } catch(_e) {}
+                    try { localStorage.removeItem('cs_onedrive_media_file_id_' + storeId); } catch(_e) {}
+                    try { localStorage.removeItem('cs_gdrive_media_fp_' + storeId); } catch(_e) {}
+                    try { localStorage.removeItem('cs_onedrive_media_fp_' + storeId); } catch(_e) {}
                 },
                 // ✅ Exposto para uso fora deste módulo (ver ContasManager.saveAll):
                 // permite que qualquer gravação local respeite os mesmos tombstones
