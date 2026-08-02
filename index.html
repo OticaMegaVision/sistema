@@ -10629,6 +10629,14 @@ body.dark-mode,
                         const provider = window.CloudSync.provider;
                         if (provider === 'gdrive')        window.CloudSync.gdrivePull(true).catch(()=>{});
                         else if (provider === 'onedrive') window.CloudSync.onedrivePull(true).catch(()=>{});
+                        // FIX SYNC-LOGO-LENTO: antes o logo só chegava depois, via o
+                        // polling separado iniciado por CloudSync.resumeAutoConnect()
+                        // (chamado só depois que App.init() termina). Isso fazia o
+                        // logo aparecer visivelmente depois do nome/dados da empresa
+                        // no boot. Agora pedimos o arquivo de mídia (logo/fotos) no
+                        // mesmo instante que os dados principais, para os dois
+                        // chegarem juntos — sem esperar a etapa de polling seguinte.
+                        try { window.CloudSync.pullMediaNow?.(true); } catch(_e) {}
                     } catch(e) {}
                 }, 2000); // 2s: garante que a UI já está completamente carregada antes do pull
             },
@@ -11640,14 +11648,21 @@ body.dark-mode,
             const PUSH_DEBOUNCE_MS        = 800;     // push 0.8s após última mudança
             // Imagens mudam raramente — não precisam do poll de 5s. Um poll
             // mais espaçado evita baixar fotos de produtos repetidamente sem
-            // necessidade, mas ainda propaga uma foto nova em menos de 1 minuto.
+            // necessidade, mas ainda propaga uma foto nova rapidamente.
             // FIX PERFORMANCE-SYNC 3: antes 45s. Como o pull de mídia agora checa
             // só metadados (modifiedTime/eTag) antes de baixar o arquivo inteiro,
             // um intervalo mais curto passa a ser barato — a maioria dos ciclos
-            // faz apenas uma consulta pequena, sem baixar nada. 15s alinha com o
-            // intervalo do sync "quente" (clientes/vendas/produtos).
-            const MEDIA_POLL_ACTIVE_MS    = 15000;
-            const MEDIA_POLL_BACKGROUND_MS = 120000;
+            // faz apenas uma consulta pequena, sem baixar nada.
+            // FIX SYNC-LOGO-LENTO: reduzido de 15s → 7s (ativo) e de 120s → 45s
+            // (segundo plano). Motivo: o logo/fotos ficavam perceptivelmente
+            // atrasados em relação aos dados "quentes" (empresa/clientes/vendas,
+            // que sincronizam a cada 5s) — o nome da empresa atualizava quase na
+            // hora, mas o logo demorava até 15s (ou 2 minutos com a aba em
+            // segundo plano) para aparecer no outro aparelho. Como o pull de
+            // mídia continua barato (checa só metadados antes de baixar o
+            // arquivo inteiro), esse intervalo menor não pesa no tráfego.
+            const MEDIA_POLL_ACTIVE_MS    = 7000;
+            const MEDIA_POLL_BACKGROUND_MS = 45000;
 
             let _gdriveToken    = null;
             let _onedriveToken  = null;
@@ -13371,7 +13386,11 @@ body.dark-mode,
                 // Puxa a mídia (logo/fotos) uma vez já no início, sem esperar o
                 // primeiro intervalo — importante para um dispositivo novo, que
                 // ainda não tem nenhuma imagem localmente.
-                setTimeout(() => _pullMediaNow(true), 2000);
+                // FIX SYNC-LOGO-LENTO: reduzido de 2000ms → 800ms, para chegar
+                // mais perto do tempo em que os dados "quentes" (empresa/nome)
+                // já apareceram — antes o logo sempre ficava visivelmente atrás
+                // do resto da tela mesmo num primeiro carregamento.
+                setTimeout(() => _pullMediaNow(true), 800);
             }
 
             function _stopPolling() {
