@@ -2881,6 +2881,102 @@
         .dark-mode #recentSalesPanel tbody tr td { border-bottom-color: rgba(255,107,0,.08) !important; }
         .dark-mode #recentSalesPanel tbody tr:hover td { background: rgba(255,107,0,.06) !important; }
 
+        /* ══════════════════════════════════════
+           AJUSTES DE FILTROS — busca + filtro numa linha só
+           (celular e computador) + status coloridos + toolbar
+           compacta do Histórico de Produtos.
+           Tudo com classes próprias (prefixo mv-) para não colidir
+           com nenhum estilo já existente no sistema.
+        ══════════════════════════════════════ */
+        .mv-filter-row { display: flex !important; align-items: stretch !important; gap: 6px !important; flex-wrap: nowrap !important; }
+        .mv-filter-row .sh-search-field,
+        .mv-filter-row .ss-wrapper { flex: 1 1 auto !important; min-width: 0 !important; }
+        .mv-filter-row .sh-search-field input,
+        .mv-filter-row .ss-wrapper input { width: 100% !important; }
+        .mv-select {
+            flex: 0 0 auto !important; max-width: 46% !important; min-width: 0 !important;
+            padding: 9px 26px 9px 10px !important; border: 1.5px solid #eef0f3 !important; border-radius: 10px !important;
+            font-size: .8rem !important; font-weight: 700 !important; background-color: #f6f7f9 !important;
+            color: #1c2129; cursor: pointer;
+            text-overflow: ellipsis; white-space: nowrap; overflow: hidden;
+        }
+        .mv-select:focus { outline: none !important; background: #fff !important; border-color: var(--primary) !important; }
+        .mv-clear-btn {
+            flex: 0 0 auto !important; width: 36px !important; height: 36px !important;
+            display: flex !important; align-items: center !important; justify-content: center !important;
+            border: 1.5px solid #eef0f3 !important; border-radius: 10px !important; background: #fff !important;
+            color: #5b6472 !important; cursor: pointer !important; font-size: .82rem !important; padding: 0 !important;
+        }
+        .mv-clear-btn:hover { border-color: #d8dce2 !important; color: #1c2129 !important; background: #f6f7f9 !important; }
+        .dark-mode .mv-select,
+        .dark-mode .mv-clear-btn { background: #2d2d2d !important; border-color: #444 !important; color: #e0e0e0 !important; }
+        @media (max-width: 380px) {
+            .mv-select { font-size: .72rem !important; padding: 9px 20px 9px 8px !important; }
+            .mv-filter-row .sh-search-field input,
+            .mv-filter-row .ss-wrapper input { font-size: .78rem !important; padding-left: 28px !important; }
+        }
+
+        /* Status colorido (badge por tipo) — usado em Últimas Vendas */
+        .mv-status-pill {
+            display: inline-flex; align-items: center; gap: 5px; padding: 4px 10px;
+            border-radius: 20px; font-size: .72rem; font-weight: 800; white-space: nowrap;
+        }
+        .mv-status-pill .mv-dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; flex-shrink: 0; }
+        .mv-st-orcamento   { background: #eef1f5; color: #5b6472; }
+        .mv-st-pendente    { background: #fff6e0; color: #a97300; }
+        .mv-st-producao    { background: #e8f0fe; color: #1a56db; }
+        .mv-st-laboratorio { background: #f2e9fe; color: #7c3aed; }
+        .mv-st-tratamento  { background: #e2f9fa; color: #0891b2; }
+        .mv-st-atrasado    { background: #ffe9d6; color: #c2540a; }
+        .mv-st-pronto      { background: #e6faf0; color: #0f9d58; }
+        .mv-st-entregue    { background: #e2f8ea; color: #1a7f37; }
+        .mv-st-cancelado   { background: #fde9ea; color: #d92d3f; }
+        .dark-mode .mv-st-orcamento   { background: rgba(148,163,184,.18); color: #cbd5e1; }
+        .dark-mode .mv-st-pendente    { background: rgba(245,158,11,.18); color: #fbbf24; }
+        .dark-mode .mv-st-producao    { background: rgba(59,130,246,.18); color: #93c5fd; }
+        .dark-mode .mv-st-laboratorio { background: rgba(139,92,246,.18); color: #c4b5fd; }
+        .dark-mode .mv-st-tratamento  { background: rgba(6,182,212,.18); color: #67e8f9; }
+        .dark-mode .mv-st-atrasado    { background: rgba(234,88,12,.18); color: #fdba74; }
+        .dark-mode .mv-st-pronto      { background: rgba(16,185,129,.18); color: #6ee7b7; }
+        .dark-mode .mv-st-entregue    { background: rgba(34,197,94,.18); color: #86efac; }
+        .dark-mode .mv-st-cancelado   { background: rgba(239,68,68,.18); color: #fca5a5; }
+
+        /* Toolbar compacta — Histórico de Produtos */
+        .mv-toolbar { display: flex !important; align-items: center !important; gap: 8px !important; flex-wrap: nowrap !important; }
+        .mv-icon-btn {
+            flex: 0 0 auto; width: 36px; height: 36px; display: flex; align-items: center; justify-content: center;
+            border: 1.5px solid #eef0f3; border-radius: 10px; background: #fff; color: #5b6472; cursor: pointer; font-size: .85rem;
+        }
+        .mv-icon-btn:hover { border-color: #d8dce2; color: #1c2129; }
+        .mv-icon-btn.mv-import { color: #1a56db; border-color: #dbe6fd; background: #f3f7ff; }
+        .mv-icon-btn.mv-export { color: #0f9d58; border-color: #d6f3e4; background: #f2fbf6; }
+        .mv-menu-wrap { position: relative; flex: 0 0 auto; }
+        .mv-menu-btn {
+            display: flex; align-items: center; gap: 6px; height: 36px; padding: 0 12px 0 12px;
+            border: 1.5px solid #eef0f3; border-radius: 10px; background: #fff; color: #1c2129;
+            font-size: .8rem; font-weight: 700; cursor: pointer; white-space: nowrap;
+        }
+        .mv-menu-btn:hover { border-color: #d8dce2; }
+        .mv-menu-drop {
+            display: none; position: absolute; top: 42px; right: 0; background: #fff;
+            border: 1px solid #eef0f3; border-radius: 12px; box-shadow: 0 10px 28px -8px rgba(16,24,40,.22);
+            min-width: 210px; padding: 6px; z-index: 40;
+        }
+        .mv-menu-drop.mv-open { display: block; }
+        .mv-menu-drop .mv-menu-item {
+            display: flex; align-items: center; gap: 9px; padding: 10px 10px; border-radius: 8px;
+            font-size: .82rem; font-weight: 600; color: #1c2129; cursor: pointer;
+        }
+        .mv-menu-drop .mv-menu-item i { width: 16px; text-align: center; color: #8992a0; font-size: .82rem; }
+        .mv-menu-drop .mv-menu-item:hover { background: #f6f7f9; }
+        .mv-menu-drop .mv-menu-item.mv-danger { color: #d92d3f; }
+        .mv-menu-drop .mv-menu-item.mv-danger i { color: #d92d3f; }
+        .dark-mode .mv-icon-btn,
+        .dark-mode .mv-menu-btn,
+        .dark-mode .mv-menu-drop { background: #2d2d2d; border-color: #444; color: #e0e0e0; }
+        .dark-mode .mv-menu-drop .mv-menu-item { color: #e0e0e0; }
+        .dark-mode .mv-menu-drop .mv-menu-item:hover { background: #3a3a3a; }
+
         /* ===== FILTRO PERÍODO DASHBOARD ===== */
         .dash-period-bar {
             display: flex;
@@ -6229,12 +6325,12 @@ body.dark-mode,
                         </div>
                         <span class="sales-count-badge" id="recentSalesCountBadge">0 vendas</span>
                     </div>
-                    <div style="display:flex;align-items:center;gap:0.75rem;flex-wrap:wrap;">
+                    <div class="mv-filter-row">
                         <div class="sh-search-field">
                             <i class="fas fa-magnifying-glass"></i>
                             <input type="text" id="filterRecentClient" placeholder="Cliente..." oninput="Dashboard.filterRecentSales()" autocomplete="off">
                         </div>
-                        <select id="filterRecentStatus" onchange="Dashboard.filterRecentSales()">
+                        <select id="filterRecentStatus" class="mv-select" onchange="Dashboard.filterRecentSales()">
                             <option value="">Todos os status</option>
                             <option value="orcamento">Orçamento</option>
                             <option value="pendente">Pendente</option>
@@ -7295,12 +7391,43 @@ body.dark-mode,
                         </div>
                         <span class="sales-count-badge" id="salesCountBadge">0 OS</span>
                     </div>
-                    <div class="sales-search-bar">
+                    <div class="sales-search-bar mv-filter-row">
                         <div class="sh-search-field">
                             <i class="fas fa-magnifying-glass"></i>
                             <input type="text" id="searchSaleHistory" placeholder="Buscar por OS, cliente, valor..." oninput="Sales.filterHistory()" autocomplete="off">
                         </div>
-                        <select id="filterSaleStatus" onchange="Sales.filterHistory()">
+                        <select id="filterSaleUnified" class="mv-select" onchange="Sales.applyUnifiedFilter(this.value)">
+                            <option value="">Filtrar por...</option>
+                            <optgroup label="Status">
+                                <option value="status:orcamento">📋 Orçamento</option>
+                                <option value="status:andamento">⏳ Em Andamento</option>
+                                <option value="status:pendente">⏳ Pendente (antigo)</option>
+                                <option value="status:producao">🔧 Em Produção (antigo)</option>
+                                <option value="status:laboratorio">🔬 Laboratório</option>
+                                <option value="status:tratamento">🧪 Tratamento (antigo)</option>
+                                <option value="status:atrasado">⚠️ Atrasado (antigo)</option>
+                                <option value="status:pronto">📦 Pronto p/ Retirada</option>
+                                <option value="status:entregue">✅ Entregue</option>
+                                <option value="status:cancelado">❌ Cancelado</option>
+                            </optgroup>
+                            <optgroup label="Período">
+                                <option value="period:today">Hoje</option>
+                                <option value="period:week">Esta semana</option>
+                                <option value="period:month">Este mês</option>
+                                <option value="period:year">Este ano</option>
+                            </optgroup>
+                            <optgroup label="Pagamento">
+                                <option value="payment:pix">PIX</option>
+                                <option value="payment:cash">Dinheiro</option>
+                                <option value="payment:debit">Débito</option>
+                                <option value="payment:credit">Crédito</option>
+                                <option value="payment:installment">Crediário</option>
+                                <option value="payment:dual">Duplo</option>
+                            </optgroup>
+                        </select>
+                        <button class="mv-clear-btn" onclick="Sales.clearHistoryFilter()" title="Limpar filtros"><i class="fas fa-times"></i></button>
+                        <!-- Selects reais mantidos ocultos: a lógica de filtro existente lê estes IDs -->
+                        <select id="filterSaleStatus" style="display:none;">
                             <option value="">Todos os status</option>
                             <option value="orcamento">📋 Orçamento</option>
                             <option value="andamento">⏳ Em Andamento</option>
@@ -7313,14 +7440,14 @@ body.dark-mode,
                             <option value="entregue">✅ Entregue</option>
                             <option value="cancelado">❌ Cancelado</option>
                         </select>
-                        <select id="filterSalePeriod" onchange="Sales.filterHistory()">
+                        <select id="filterSalePeriod" style="display:none;">
                             <option value="">Qualquer período</option>
                             <option value="today">Hoje</option>
                             <option value="week">Esta semana</option>
                             <option value="month">Este mês</option>
                             <option value="year">Este ano</option>
                         </select>
-                        <select id="filterSalePayment" onchange="Sales.filterHistory()">
+                        <select id="filterSalePayment" style="display:none;">
                             <option value="">Qualquer pagamento</option>
                             <option value="pix">PIX</option>
                             <option value="cash">Dinheiro</option>
@@ -7329,7 +7456,6 @@ body.dark-mode,
                             <option value="installment">Crediário</option>
                             <option value="dual">Duplo</option>
                         </select>
-                        <button class="sh-btn-clear" onclick="Sales.clearHistoryFilter()" title="Limpar filtros"><i class="fas fa-times"></i> Limpar</button>
                     </div>
                     </div>
                     <table id="salesHistoryTable">
@@ -7680,22 +7806,31 @@ body.dark-mode,
                         </div>
                         <span id="clientsCountBadge"></span>
                     </div>
-                    <div style="display:flex;align-items:center;gap:0.75rem;flex-wrap:wrap;">
-                        <div class="ss-wrapper" style="flex:1;min-width:200px;">
+                    <div class="mv-filter-row">
+                        <div class="ss-wrapper" style="flex:1;min-width:0;">
                             <i class="fas fa-search" style="position:absolute;left:12px;top:50%;transform:translateY(-50%);color:var(--gray);z-index:1;"></i>
                             <input type="text" id="searchClient" class="form-control" placeholder="Buscar por nome, CPF, telefone..." autocomplete="off"
                                 oninput="Clients.searchDebounced()" onfocus="Clients.searchDebounced()" style="padding-left:36px;">
                             <div id="clientQuickDropdown" class="ss-dropdown" style="display:none;"></div>
                         </div>
-                        <select id="filterClientCity" class="form-control" style="max-width:160px;font-size:0.85rem;" onchange="Clients.search()">
+                        <select id="filterClientUnified" class="mv-select" onchange="Clients.applyUnifiedFilter(this.value)">
+                            <option value="">Filtrar por...</option>
+                            <optgroup label="Receita" id="filterClientUnifiedPrescGroup">
+                                <option value="presc:com">Com receita</option>
+                                <option value="presc:sem">Sem receita</option>
+                            </optgroup>
+                            <optgroup label="Cidade" id="filterClientUnifiedCityGroup"></optgroup>
+                        </select>
+                        <button class="mv-clear-btn" onclick="Clients.clearFilter()" title="Limpar filtros"><i class="fas fa-times"></i></button>
+                        <!-- Selects reais mantidos ocultos: a lógica de filtro existente lê estes IDs -->
+                        <select id="filterClientCity" class="form-control" style="display:none;">
                             <option value="">Todas as cidades</option>
                         </select>
-                        <select id="filterClientPresc" class="form-control" style="max-width:150px;font-size:0.85rem;" onchange="Clients.search()">
+                        <select id="filterClientPresc" class="form-control" style="display:none;">
                             <option value="">Com ou sem receita</option>
                             <option value="com">Com receita</option>
                             <option value="sem">Sem receita</option>
                         </select>
-                        <button class="btn btn-secondary btn-sm" onclick="Clients.clearFilter()" title="Limpar filtros"><i class="fas fa-times"></i></button>
                     </div>
                     </div>
                     <table id="clientsTable">
@@ -8111,29 +8246,43 @@ body.dark-mode,
                         </div>
                         <span class="sales-count-badge" id="productsCountBadge">0 produtos</span>
                     </div>
-                    <div style="display:flex;align-items:center;gap:0.75rem;flex-wrap:wrap;">
+                    <div class="mv-filter-row" style="margin-bottom:8px;">
                         <div class="sh-search-field">
                             <i class="fas fa-magnifying-glass"></i>
                             <input type="text" id="searchProduct" placeholder="Buscar produto..." onkeyup="Products.search()" autocomplete="off">
                         </div>
-                        <button class="btn btn-secondary btn-sm" onclick="document.getElementById('importProductsFile').click()" title="Importar produtos via Excel/CSV">
-                            <i class="fas fa-upload"></i> Importar
+                    </div>
+                    <div class="mv-toolbar">
+                        <button class="mv-icon-btn mv-import" onclick="document.getElementById('importProductsFile').click()" title="Importar produtos via Excel/CSV">
+                            <i class="fas fa-upload"></i>
                         </button>
-                        <button class="btn btn-secondary btn-sm" onclick="Products.exportToExcel()" title="Exportar lista de produtos">
-                            <i class="fas fa-download"></i> Exportar
+                        <button class="mv-icon-btn mv-export" onclick="Products.exportToExcel()" title="Exportar lista de produtos">
+                            <i class="fas fa-download"></i>
                         </button>
-                        <button class="btn btn-danger btn-sm" onclick="Products.removeDuplicates()" title="Remove produtos com mesmo código e nome, mantendo apenas um registro">
-                            <i class="fas fa-clone"></i> Remover Duplicidade
-                        </button>
-                        <button class="btn btn-info btn-sm" onclick="Products.selectAll()" title="Seleciona todos os produtos da tabela">
-                            <i class="fas fa-check-square"></i> Selecionar Tudo
-                        </button>
-                        <button class="btn btn-danger btn-sm" onclick="Products.removeAll()" title="Remove todos os produtos (com confirmação)">
-                            <i class="fas fa-trash-alt"></i> Remover Tudo
-                        </button>
+                        <div class="mv-menu-wrap">
+                            <button type="button" class="mv-menu-btn" onclick="this.nextElementSibling.classList.toggle('mv-open')">
+                                <i class="fas fa-ellipsis-vertical"></i> Ações
+                            </button>
+                            <div class="mv-menu-drop">
+                                <div class="mv-menu-item" onclick="Products.selectAll();this.closest('.mv-menu-drop').classList.remove('mv-open');"><i class="fas fa-check-square"></i> Selecionar Tudo</div>
+                                <div class="mv-menu-item" onclick="Products.removeDuplicates();this.closest('.mv-menu-drop').classList.remove('mv-open');"><i class="fas fa-clone"></i> Remover Duplicidade</div>
+                                <div class="mv-menu-item mv-danger" onclick="Products.removeAll();this.closest('.mv-menu-drop').classList.remove('mv-open');"><i class="fas fa-trash-alt"></i> Remover Tudo</div>
+                            </div>
+                        </div>
                         <input type="file" id="importProductsFile" accept=".xlsx,.csv" class="d-none" onchange="Products.importFromFile(event)">
                     </div>
                     </div>
+                    <script>
+                        // Fecha o menu "Ações" do Histórico de Produtos ao clicar fora dele
+                        if (!window._mvMenuOutsideBound) {
+                            window._mvMenuOutsideBound = true;
+                            document.addEventListener('click', function(e) {
+                                if (!e.target.closest('.mv-menu-wrap')) {
+                                    document.querySelectorAll('.mv-menu-drop.mv-open').forEach(el => el.classList.remove('mv-open'));
+                                }
+                            });
+                        }
+                    </script>
                     <table id="productsTable">
                         <thead>
                             <tr>
@@ -18797,14 +18946,17 @@ tbody tr td{border:1.5px solid #000;padding:2mm;text-align:center;font-weight:70
                 const recentSales = sales.slice(0, 20);
                 const countBadge = document.getElementById('recentSalesCountBadge');
                 if (countBadge) countBadge.textContent = `${recentSales.length} venda${recentSales.length === 1 ? '' : 's'}`;
-                const ST_LABELS = {orcamento:'Orçamento',pendente:'Pendente',producao:'Em Produção',laboratorio:'Laboratório',tratamento:'Tratamento',atrasado:'Atrasado',pronto:'Pronto',entregue:'Entregue',cancelado:'Cancelado'};
+                const ST_LABELS = {orcamento:'Orçamento',pendente:'Pendente',producao:'Em Produção',production:'Em Produção',laboratorio:'Laboratório',tratamento:'Tratamento',atrasado:'Atrasado',pronto:'Pronto',ready:'Pronto',entregue:'Entregue',delivered:'Entregue',cancelado:'Cancelado'};
+                const ST_CLASS = {orcamento:'mv-st-orcamento',pendente:'mv-st-pendente',producao:'mv-st-producao',production:'mv-st-producao',laboratorio:'mv-st-laboratorio',tratamento:'mv-st-tratamento',atrasado:'mv-st-atrasado',pronto:'mv-st-pronto',ready:'mv-st-pronto',entregue:'mv-st-entregue',delivered:'mv-st-entregue',cancelado:'mv-st-cancelado'};
                 recentSales.forEach(s => {
                     const client = state.clients.find(c => c.id === s.clientId)?.name || '';
+                    const stCls = ST_CLASS[s.status] || 'mv-st-orcamento';
+                    const stLbl = ST_LABELS[s.status] || s.status || '—';
                     tbody.innerHTML += `<tr>
                         <td>${s.number}</td>
                         <td>${Utils.sanitizeHTML(client)}</td>
                         <td>${Utils.formatCurrency(s.total)}</td>
-                        <td><span class="badge badge-info">${ST_LABELS[s.status]||s.status}</span></td>
+                        <td><span class="mv-status-pill ${stCls}"><span class="mv-dot"></span>${stLbl}</span></td>
                         <td>${Utils.formatDate(s.date)}</td>
                     </tr>`;
                 });
@@ -18897,12 +19049,20 @@ tbody tr td{border:1.5px solid #000;padding:2mm;text-align:center;font-weight:70
                 if (cityFilter && cityFilter.options.length <= 1) {
                     const cities = [...new Set(state.clients.map(c => c.city).filter(Boolean))].sort();
                     const frag = document.createDocumentFragment();
+                    const cityGroup = document.getElementById('filterClientUnifiedCityGroup');
+                    const fragUnified = cityGroup ? document.createDocumentFragment() : null;
                     cities.forEach(city => {
                         const opt = document.createElement('option');
                         opt.value = city; opt.textContent = city;
                         frag.appendChild(opt);
+                        if (fragUnified) {
+                            const opt2 = document.createElement('option');
+                            opt2.value = 'city:' + city; opt2.textContent = city;
+                            fragUnified.appendChild(opt2);
+                        }
                     });
                     cityFilter.appendChild(frag);
+                    if (cityGroup && fragUnified) cityGroup.appendChild(fragUnified);
                 }
 
                 // --- PERFORMANCE: Set para lookup O(1) de receitas ---
@@ -19402,7 +19562,23 @@ tbody tr td{border:1.5px solid #000;padding:2mm;text-align:center;font-weight:70
                 const s = document.getElementById('searchClient');
                 const c = document.getElementById('filterClientCity');
                 const p = document.getElementById('filterClientPresc');
-                if(s) s.value=''; if(c) c.value=''; if(p) p.value='';
+                const un = document.getElementById('filterClientUnified');
+                if(s) s.value=''; if(c) c.value=''; if(p) p.value=''; if(un) un.value='';
+                this.search();
+            },
+
+            // Recebe o valor do select único (ex: "city:São Paulo", "presc:com") e
+            // repassa para os selects reais (ocultos), que continuam sendo a fonte
+            // de verdade lida por search()/renderTable().
+            applyUnifiedFilter(val) {
+                const c = document.getElementById('filterClientCity');
+                const p = document.getElementById('filterClientPresc');
+                if (c) c.value = '';
+                if (p) p.value = '';
+                const [group, ...rest] = (val || '').split(':');
+                const value = rest.join(':'); // cidades podem conter ":" em casos raros, junta de volta
+                if (group === 'city'  && c) c.value = value;
+                if (group === 'presc' && p) p.value = value;
                 this.search();
             },
             search() {
@@ -23397,10 +23573,31 @@ ${container.innerHTML}
                 const st = document.getElementById('filterSaleStatus');
                 const p = document.getElementById('filterSalePeriod');
                 const py = document.getElementById('filterSalePayment');
+                const un = document.getElementById('filterSaleUnified');
                 if (s)  s.value  = '';
                 if (st) st.value = '';
                 if (p)  p.value  = '';
                 if (py) py.value = '';
+                if (un) un.value = '';
+                this.filterHistory();
+            },
+
+            // Recebe o valor do select único (ex: "status:entregue", "period:week",
+            // "payment:pix") e repassa para os selects reais (ocultos), que continuam
+            // sendo a fonte de verdade lida por filterHistory(). Assim, escolher uma
+            // opção nova sempre substitui a anterior do mesmo grupo — os 3 filtros
+            // continuam existindo, só que agora só um fica ativo por vez.
+            applyUnifiedFilter(val) {
+                const st = document.getElementById('filterSaleStatus');
+                const p  = document.getElementById('filterSalePeriod');
+                const py = document.getElementById('filterSalePayment');
+                if (st) st.value = '';
+                if (p)  p.value  = '';
+                if (py) py.value = '';
+                const [group, value] = (val || '').split(':');
+                if (group === 'status'  && st) st.value = value;
+                if (group === 'period'  && p)  p.value  = value;
+                if (group === 'payment' && py) py.value = value;
                 this.filterHistory();
             },
 
