@@ -2527,55 +2527,125 @@
             50%       { box-shadow: 0 2px 20px rgba(255,193,7,0.7); }
         }
 
-        /* ===== BUSCA NO HISTÓRICO DE VENDAS ===== */
+        /* ===== BUSCA/FILTROS DOS HISTÓRICOS (Vendas / Clientes / Produtos) =====
+           Visual único e moderno, reaproveitado nas 3 telas. Não afeta nenhum
+           botão de ação (Ações, O.S./PDF, WhatsApp) — só a barra de busca/filtro. */
         .sales-search-bar {
             display: flex;
-            gap: 0.75rem;
+            gap: 0.65rem;
             margin-bottom: 1rem;
             flex-wrap: wrap;
             align-items: center;
         }
-        .sales-search-bar input {
+        .sales-search-bar .ss-field {
+            position: relative;
             flex: 1;
-            min-width: 200px;
-            padding: 0.5rem 0.85rem;
+            min-width: 210px;
+        }
+        .sales-search-bar .ss-field i.ss-ic {
+            position: absolute;
+            left: 14px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: var(--gray);
+            font-size: 0.85rem;
+            pointer-events: none;
+        }
+        .sales-search-bar input {
+            width: 100%;
+            padding: 0.62rem 0.9rem 0.62rem 2.35rem;
             border: 1.5px solid var(--light-gray);
-            border-radius: var(--border-radius);
+            border-radius: 24px;
             font-size: 0.9rem;
-            transition: border-color 0.2s;
+            background: #fbfaf7;
+            transition: border-color 0.2s, box-shadow 0.2s, background 0.2s;
         }
         .sales-search-bar input:focus {
             outline: none;
             border-color: var(--primary);
+            background: #fff;
             box-shadow: 0 0 0 3px rgba(255,107,0,0.12);
         }
         .sales-search-bar select {
-            padding: 0.5rem 0.75rem;
+            padding: 0.55rem 0.9rem;
             border: 1.5px solid var(--light-gray);
-            border-radius: var(--border-radius);
-            font-size: 0.85rem;
-            background: white;
+            border-radius: 20px;
+            font-size: 0.83rem;
+            background: #fbfaf7;
             cursor: pointer;
-            transition: border-color 0.2s;
+            transition: border-color 0.2s, background 0.2s;
         }
         .sales-search-bar select:focus {
             outline: none;
             border-color: var(--primary);
+            background: #fff;
         }
         .sales-count-badge {
-            font-size: 0.8rem;
-            color: var(--gray);
+            font-size: 0.78rem;
+            font-weight: 700;
+            color: #fff;
             white-space: nowrap;
-            padding: 4px 10px;
-            background: var(--light);
+            padding: 5px 14px;
+            background: linear-gradient(135deg, var(--primary), var(--secondary));
             border-radius: 20px;
-            border: 1px solid var(--light-gray);
+            border: none;
+            box-shadow: 0 3px 10px rgba(255,107,0,0.25);
         }
         .dark-mode .sales-search-bar input,
         .dark-mode .sales-search-bar select {
             background: #2d2d2d;
             border-color: #444;
             color: #e0e0e0;
+        }
+
+        /* ===== TABELAS DOS HISTÓRICOS — visual mais profissional =====
+           Aplica-se ao container/cabeçalho/linhas das tabelas; as células e
+           botões de ação (view/edit/delete, PDF, WhatsApp) permanecem 100%
+           inalterados — apenas herdam o novo espaçamento/hover da linha. */
+        .table-container.tf-ready {
+            border-radius: var(--r-lg, 14px);
+            overflow: hidden;
+        }
+        .table-container.tf-ready h3 {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .table-container.tf-ready h3::before {
+            content: '';
+            display: inline-block;
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, var(--primary), var(--secondary));
+            flex-shrink: 0;
+        }
+        .table-container.tf-ready table thead th {
+            background: #fff7ee;
+            color: var(--primary-dark);
+            text-transform: uppercase;
+            font-size: 0.72rem;
+            letter-spacing: 0.4px;
+            font-weight: 800;
+            border-bottom: 2px solid var(--primary-light);
+            padding: 12px 10px;
+        }
+        .table-container.tf-ready table tbody td {
+            padding: 11px 10px;
+        }
+        .table-container.tf-ready table tbody tr {
+            transition: background 0.15s;
+        }
+        .table-container.tf-ready table tbody tr:hover {
+            background: #fffaf3;
+        }
+        .dark-mode .table-container.tf-ready table thead th {
+            background: #241a0c;
+            color: var(--secondary);
+            border-bottom-color: #3a2a12;
+        }
+        .dark-mode .table-container.tf-ready table tbody tr:hover {
+            background: #241a0c;
         }
 
         /* ===== FILTRO PERÍODO DASHBOARD ===== */
@@ -5870,22 +5940,27 @@ body.dark-mode,
                     </div>
                 </div>
                 <div class="table-container tf-ready">
-                    <div class="table-filtros" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:0.5rem;">
+                    <div class="table-filtros">
+                    <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:0.75rem;margin-bottom:1rem;">
                         <h3 style="margin:0;">Últimas Vendas</h3>
-                        <div style="display:flex;gap:0.5rem;flex-wrap:wrap;">
-                            <input type="text" id="filterRecentClient" class="form-control" placeholder="🔍 Cliente..." oninput="Dashboard.filterRecentSales()" style="max-width:160px;font-size:0.82rem;">
-                            <select id="filterRecentStatus" class="form-control" onchange="Dashboard.filterRecentSales()" style="max-width:150px;font-size:0.82rem;">
-                                <option value="">Todos os status</option>
-                                <option value="orcamento">Orçamento</option>
-                                <option value="pendente">Pendente</option>
-                                <option value="producao">Em Produção</option>
-                                <option value="laboratorio">Laboratório</option>
-                                <option value="tratamento">Tratamento</option>
-                                <option value="pronto">Pronto</option>
-                                <option value="entregue">Entregue</option>
-                                <option value="cancelado">Cancelado</option>
-                            </select>
+                    </div>
+                    <div class="sales-search-bar">
+                        <div class="ss-field">
+                            <i class="fas fa-search ss-ic"></i>
+                            <input type="text" id="filterRecentClient" placeholder="Cliente..." oninput="Dashboard.filterRecentSales()">
                         </div>
+                        <select id="filterRecentStatus" onchange="Dashboard.filterRecentSales()">
+                            <option value="">Todos os status</option>
+                            <option value="orcamento">Orçamento</option>
+                            <option value="pendente">Pendente</option>
+                            <option value="producao">Em Produção</option>
+                            <option value="laboratorio">Laboratório</option>
+                            <option value="tratamento">Tratamento</option>
+                            <option value="pronto">Pronto</option>
+                            <option value="entregue">Entregue</option>
+                            <option value="cancelado">Cancelado</option>
+                        </select>
+                    </div>
                     </div>
                     <table id="recentSalesTable">
                         <thead><tr><th>Nº O.S</th><th>Cliente</th><th>Valor</th><th>Status</th><th>Data</th></tr></thead>
@@ -6930,7 +7005,10 @@ body.dark-mode,
                         <span class="sales-count-badge" id="salesCountBadge">0 OS</span>
                     </div>
                     <div class="sales-search-bar">
-                        <input type="text" id="searchSaleHistory" placeholder="🔍 Buscar por OS, cliente, valor..." oninput="Sales.filterHistory()" autocomplete="off">
+                        <div class="ss-field">
+                            <i class="fas fa-search ss-ic"></i>
+                            <input type="text" id="searchSaleHistory" placeholder="Buscar por OS, cliente, valor..." oninput="Sales.filterHistory()" autocomplete="off">
+                        </div>
                         <select id="filterSaleStatus" onchange="Sales.filterHistory()">
                             <option value="">Todos os status</option>
                             <option value="orcamento">📋 Orçamento</option>
@@ -7300,23 +7378,28 @@ body.dark-mode,
 
                 <!-- Tabela de Clientes (com coluna Receita) -->
                 <div class="table-container tf-ready">
-                    <div class="table-filtros" style="display:flex;align-items:center;gap:0.75rem;flex-wrap:wrap;">
-                        <div class="ss-wrapper" style="flex:1;min-width:200px;">
-                            <i class="fas fa-search" style="position:absolute;left:12px;top:50%;transform:translateY(-50%);color:var(--gray);z-index:1;"></i>
-                            <input type="text" id="searchClient" class="form-control" placeholder="Buscar por nome, CPF, telefone..." autocomplete="off"
-                                oninput="Clients.searchDebounced()" onfocus="Clients.searchDebounced()" style="padding-left:36px;">
+                    <div class="table-filtros">
+                    <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:0.75rem;margin-bottom:1rem;">
+                        <h3 style="margin:0;">Histórico de Clientes</h3>
+                        <span class="sales-count-badge" id="clientsCountBadge">0 clientes</span>
+                    </div>
+                    <div class="sales-search-bar">
+                        <div class="ss-field ss-wrapper">
+                            <i class="fas fa-search ss-ic"></i>
+                            <input type="text" id="searchClient" placeholder="Buscar por nome, CPF, telefone..." autocomplete="off"
+                                oninput="Clients.searchDebounced()" onfocus="Clients.searchDebounced()">
                             <div id="clientQuickDropdown" class="ss-dropdown" style="display:none;"></div>
                         </div>
-                        <select id="filterClientCity" class="form-control" style="max-width:160px;font-size:0.85rem;" onchange="Clients.search()">
+                        <select id="filterClientCity" onchange="Clients.search()">
                             <option value="">Todas as cidades</option>
                         </select>
-                        <select id="filterClientPresc" class="form-control" style="max-width:150px;font-size:0.85rem;" onchange="Clients.search()">
+                        <select id="filterClientPresc" onchange="Clients.search()">
                             <option value="">Com ou sem receita</option>
                             <option value="com">Com receita</option>
                             <option value="sem">Sem receita</option>
                         </select>
-                        <button class="btn btn-secondary btn-sm" onclick="Clients.clearFilter()" title="Limpar filtros"><i class="fas fa-times"></i></button>
-                        <span id="clientsCountBadge" style="background:var(--primary);color:white;padding:4px 14px;border-radius:20px;font-size:0.82rem;font-weight:700;white-space:nowrap;"></span>
+                        <button class="btn btn-secondary btn-sm" onclick="Clients.clearFilter()" title="Limpar filtros"><i class="fas fa-times"></i> Limpar</button>
+                    </div>
                     </div>
                     <table id="clientsTable">
                         <thead>
@@ -7719,9 +7802,16 @@ body.dark-mode,
                     </form>
                 </div>
                 <div class="table-container tf-ready">
-                    <div class="table-filtros" style="display:flex;align-items:center;gap:0.5rem;flex-wrap:wrap;">
-                        <input type="text" id="searchProduct" class="form-control" placeholder="🔍 Buscar produto..." onkeyup="Products.search()" style="flex:1;min-width:180px;margin:0;">
-                        <span id="productsCountBadge" style="background:#ff6b00;color:#fff;border-radius:20px;padding:3px 12px;font-size:0.78rem;font-weight:700;white-space:nowrap;">0 produtos</span>
+                    <div class="table-filtros">
+                    <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:0.75rem;margin-bottom:1rem;">
+                        <h3 style="margin:0;">Histórico de Produtos</h3>
+                        <span class="sales-count-badge" id="productsCountBadge">0 produtos</span>
+                    </div>
+                    <div class="sales-search-bar">
+                        <div class="ss-field">
+                            <i class="fas fa-search ss-ic"></i>
+                            <input type="text" id="searchProduct" placeholder="Buscar produto..." onkeyup="Products.search()">
+                        </div>
                         <button class="btn btn-secondary btn-sm" onclick="document.getElementById('importProductsFile').click()" title="Importar produtos via Excel/CSV">
                             <i class="fas fa-upload"></i> Importar
                         </button>
@@ -7738,6 +7828,7 @@ body.dark-mode,
                             <i class="fas fa-trash-alt"></i> Remover Tudo
                         </button>
                         <input type="file" id="importProductsFile" accept=".xlsx,.csv" class="d-none" onchange="Products.importFromFile(event)">
+                    </div>
                     </div>
                     <table id="productsTable">
                         <thead>
