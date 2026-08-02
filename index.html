@@ -4739,6 +4739,42 @@ body {
     min-width: 600px !important;
 }
 
+/* ══════════════════════════════════════
+   FIX: coluna AÇÕES fixa (sticky) em telas estreitas.
+   Causa raiz do "largura ultrapassando": .table-container table
+   tem min-width:600px!important, então em celulares (~360-430px)
+   a tabela sempre precisa de scroll horizontal — e a última coluna
+   (AÇÕES, com os botões de ver/editar/excluir) ficava empurrada
+   para fora da tela, exigindo rolagem lateral pra alcançar os botões.
+   Fixamos a última coluna (th/td) com position:sticky;right:0 para
+   que os botões de ação fiquem sempre visíveis, mesmo com o resto
+   da tabela rolando por baixo dela.
+══════════════════════════════════════ */
+@media (max-width: 768px) {
+    .table-container table th:last-child,
+    .table-container table td:last-child {
+        position: sticky !important;
+        right: 0 !important;
+        z-index: 15 !important;
+        box-shadow: -6px 0 8px -6px rgba(0,0,0,0.18) !important;
+    }
+    .table-container table th:last-child {
+        background: linear-gradient(90deg, #ff6b00 0%, #ffaa00 100%) !important;
+    }
+    .table-container table td:last-child {
+        background: #fff !important;
+    }
+    .table-container table tr:hover td:last-child {
+        background: #fff6ec !important;
+    }
+    .dark-mode .table-container table td:last-child {
+        background: #1a1208 !important;
+    }
+    .dark-mode .table-container table tr:hover td:last-child {
+        background: #241806 !important;
+    }
+}
+
 /* thead com gradiente correto — sem divisórias entre th */
 thead {
     background: linear-gradient(90deg, #ff6b00 0%, #ffaa00 100%) !important;
