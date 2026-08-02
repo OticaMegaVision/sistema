@@ -2583,32 +2583,37 @@
            Tudo escopado a #salesHistoryPanel: não altera nenhuma
            outra tabela/tela do sistema. Ícones não foram tocados.
         ══════════════════════════════════════ */
-        #salesHistoryPanel {
-            border-radius: 14px !important;
-            border: 1px solid #eef0f3 !important;
-            box-shadow: 0 1px 2px rgba(16,24,40,.04), 0 10px 28px -12px rgba(16,24,40,.10) !important;
-        }
-        #salesHistoryPanel .table-filtros { padding: 20px 24px 16px !important; }
-        #salesHistoryPanel .sh-head {
+        /* Cabeçalho reutilizável (ícone + título + subtítulo) — usado em
+           qualquer painel de histórico com esse padrão visual */
+        .sh-head {
             display: flex; align-items: center; justify-content: space-between;
             gap: 12px; flex-wrap: wrap; margin-bottom: 16px;
         }
-        #salesHistoryPanel .sh-title { display: flex; align-items: center; gap: 10px; }
-        #salesHistoryPanel .sh-title .sh-ico {
+        .sh-title { display: flex; align-items: center; gap: 10px; }
+        .sh-title .sh-ico {
             width: 34px; height: 34px; border-radius: 10px;
             display: flex; align-items: center; justify-content: center;
             background: linear-gradient(135deg, var(--primary), #ff9a3d); color: #fff;
             font-size: .85rem; flex-shrink: 0;
             box-shadow: 0 4px 10px rgba(255,107,0,.28);
         }
-        #salesHistoryPanel .sh-title h3 {
+        .sh-title h3 {
             margin: 0 !important; padding: 0 !important;
             font-size: 1.05rem !important; font-weight: 800 !important;
             letter-spacing: -.01em !important; color: #1c2129 !important;
         }
-        #salesHistoryPanel .sh-title .sh-sub {
+        .sh-title .sh-sub {
             display: block; font-size: .76rem; font-weight: 500; color: #5b6472; margin-top: 1px;
         }
+        .dark-mode .sh-title h3 { color: #f0f0f0 !important; }
+        .dark-mode .sh-title .sh-sub { color: #b0b0b0 !important; }
+
+        #salesHistoryPanel {
+            border-radius: 14px !important;
+            border: 1px solid #eef0f3 !important;
+            box-shadow: 0 1px 2px rgba(16,24,40,.04), 0 10px 28px -12px rgba(16,24,40,.10) !important;
+        }
+        #salesHistoryPanel .table-filtros { padding: 20px 24px 16px !important; }
         #salesHistoryPanel .sales-count-badge {
             font-size: .78rem !important; font-weight: 700 !important; color: #e55a00 !important;
             background: #fff2e6 !important; border: 1px solid #ffddb8 !important;
@@ -2656,8 +2661,6 @@
         #salesHistoryPanel .action-buttons { gap: 6px !important; }
 
         .dark-mode #salesHistoryPanel { border-color: rgba(255,107,0,0.12) !important; }
-        .dark-mode #salesHistoryPanel .sh-title h3 { color: #f0f0f0 !important; }
-        .dark-mode #salesHistoryPanel .sh-title .sh-sub { color: #b0b0b0 !important; }
         .dark-mode #salesHistoryPanel .sales-count-badge {
             background: rgba(255,107,0,.14) !important; border-color: rgba(255,107,0,.3) !important; color: #ffb066 !important;
         }
@@ -2670,6 +2673,76 @@
         .dark-mode #salesHistoryPanel thead tr th { background: #241a10 !important; color: #c7a97a !important; }
         .dark-mode #salesHistoryPanel tbody tr td { border-bottom-color: rgba(255,107,0,.08) !important; }
         .dark-mode #salesHistoryPanel tbody tr:hover td { background: rgba(255,107,0,.06) !important; }
+
+        /* ══════════════════════════════════════
+           HISTÓRICO DE CLIENTES — mesmo visual do Histórico de Vendas
+           Tudo escopado a #clientsHistoryPanel: não altera nenhuma
+           outra tabela/tela do sistema. Ícones não foram tocados.
+        ══════════════════════════════════════ */
+        #clientsHistoryPanel {
+            border-radius: 14px !important;
+            border: 1px solid #eef0f3 !important;
+            box-shadow: 0 1px 2px rgba(16,24,40,.04), 0 10px 28px -12px rgba(16,24,40,.10) !important;
+        }
+        #clientsHistoryPanel .table-filtros { padding: 20px 24px 16px !important; }
+        #clientsHistoryPanel #searchClient {
+            border: 1.5px solid #eef0f3 !important; border-radius: 10px !important;
+            font-size: .86rem !important; background: #f6f7f9 !important;
+        }
+        #clientsHistoryPanel #searchClient:focus { background: #fff !important; border-color: var(--primary) !important; }
+        #clientsHistoryPanel #filterClientCity,
+        #clientsHistoryPanel #filterClientPresc {
+            border: 1.5px solid #eef0f3 !important; border-radius: 10px !important;
+            font-size: .82rem !important; font-weight: 600 !important; background-color: #f6f7f9 !important;
+        }
+        #clientsHistoryPanel .btn-secondary.btn-sm {
+            border-radius: 10px !important; border: 1.5px solid #eef0f3 !important;
+            background: #fff !important; color: #5b6472 !important;
+        }
+        #clientsHistoryPanel #clientsCountBadge {
+            background: #fff2e6 !important; color: #e55a00 !important;
+            border: 1px solid #ffddb8 !important; font-weight: 700 !important;
+            font-size: .78rem !important; padding: 5px 12px !important;
+            border-radius: 20px !important; white-space: nowrap;
+        }
+        #clientsHistoryPanel thead { background: #fbfbfc !important; }
+        #clientsHistoryPanel thead tr th {
+            background: #fbfbfc !important; color: #8992a0 !important;
+            font-size: .68rem !important; font-weight: 800 !important; letter-spacing: .06em !important;
+            padding: 12px 16px !important; border-bottom: 1.5px solid #eef0f3 !important;
+        }
+        #clientsHistoryPanel tbody tr td { padding: 10px 16px !important; border-bottom: 1px solid #eef0f3 !important; }
+        #clientsHistoryPanel tbody tr:hover td { background: #fbf8f5 !important; }
+        #clientsHistoryPanel tbody tr:last-child td { border-bottom: none !important; }
+        #clientsHistoryPanel .btn-icon { border-radius: 9px !important; }
+        #clientsHistoryPanel .action-buttons { gap: 6px !important; }
+
+        /* Avatar/foto do cliente */
+        #clientsHistoryPanel .cli-avatar-cell { display: inline-flex; cursor: pointer; }
+        #clientsHistoryPanel .cli-avatar {
+            width: 36px; height: 36px; border-radius: 50%; flex: none;
+            display: flex; align-items: center; justify-content: center;
+            color: #fff; font-weight: 800; font-size: .74rem;
+            box-shadow: 0 2px 6px rgba(0,0,0,.15);
+        }
+        #clientsHistoryPanel .cli-avatar.cli-avatar-photo { background: #fff; border: 1px solid #f1e4d0; overflow: hidden; }
+        #clientsHistoryPanel .cli-avatar.cli-avatar-photo img { width: 100%; height: 100%; object-fit: cover; }
+
+        .dark-mode #clientsHistoryPanel { border-color: rgba(255,107,0,0.12) !important; }
+        .dark-mode #clientsHistoryPanel #searchClient,
+        .dark-mode #clientsHistoryPanel #filterClientCity,
+        .dark-mode #clientsHistoryPanel #filterClientPresc,
+        .dark-mode #clientsHistoryPanel .btn-secondary.btn-sm {
+            background: #2d2d2d !important; border-color: #444 !important; color: #e0e0e0 !important;
+        }
+        .dark-mode #clientsHistoryPanel #clientsCountBadge {
+            background: rgba(255,107,0,.14) !important; border-color: rgba(255,107,0,.3) !important; color: #ffb066 !important;
+        }
+        .dark-mode #clientsHistoryPanel thead,
+        .dark-mode #clientsHistoryPanel thead tr th { background: #241a10 !important; color: #c7a97a !important; }
+        .dark-mode #clientsHistoryPanel tbody tr td { border-bottom-color: rgba(255,107,0,.08) !important; }
+        .dark-mode #clientsHistoryPanel tbody tr:hover td { background: rgba(255,107,0,.06) !important; }
+        .dark-mode #clientsHistoryPanel .cli-avatar.cli-avatar-photo { border-color: #444; }
 
         /* ===== FILTRO PERÍODO DASHBOARD ===== */
         .dash-period-bar {
@@ -7401,8 +7474,19 @@ body.dark-mode,
                 </div>
 
                 <!-- Tabela de Clientes (com coluna Receita) -->
-                <div class="table-container tf-ready">
-                    <div class="table-filtros" style="display:flex;align-items:center;gap:0.75rem;flex-wrap:wrap;">
+                <div class="table-container tf-ready" id="clientsHistoryPanel">
+                    <div class="table-filtros">
+                    <div class="sh-head">
+                        <div class="sh-title">
+                            <span class="sh-ico"><i class="fas fa-address-book"></i></span>
+                            <div>
+                                <h3 style="margin:0;">Histórico de Clientes</h3>
+                                <span class="sh-sub">Cadastro e relacionamento com clientes</span>
+                            </div>
+                        </div>
+                        <span id="clientsCountBadge"></span>
+                    </div>
+                    <div style="display:flex;align-items:center;gap:0.75rem;flex-wrap:wrap;">
                         <div class="ss-wrapper" style="flex:1;min-width:200px;">
                             <i class="fas fa-search" style="position:absolute;left:12px;top:50%;transform:translateY(-50%);color:var(--gray);z-index:1;"></i>
                             <input type="text" id="searchClient" class="form-control" placeholder="Buscar por nome, CPF, telefone..." autocomplete="off"
@@ -7418,11 +7502,12 @@ body.dark-mode,
                             <option value="sem">Sem receita</option>
                         </select>
                         <button class="btn btn-secondary btn-sm" onclick="Clients.clearFilter()" title="Limpar filtros"><i class="fas fa-times"></i></button>
-                        <span id="clientsCountBadge" style="background:var(--primary);color:white;padding:4px 14px;border-radius:20px;font-size:0.82rem;font-weight:700;white-space:nowrap;"></span>
+                    </div>
                     </div>
                     <table id="clientsTable">
                         <thead>
                             <tr>
+                                <th>Foto</th>
                                 <th>Código</th>
                                 <th>Nome</th>
                                 <th>Telefone</th>
@@ -18658,9 +18743,16 @@ tbody tr td{border:1.5px solid #000;padding:2mm;text-align:center;font-weight:70
                 const slice = this._filtered.slice(start, start + this._pageSize);
 
                 // --- PERFORMANCE: construir HTML em string e atribuir uma vez ---
-                tbody.innerHTML = slice.map(c => {
+                const avatarPalette = ['#ff6b00', '#e85500', '#ffaa00', '#cc4400', '#ff8c42'];
+                tbody.innerHTML = slice.map((c, i) => {
                     const hasPresc = prescSet.has(c.id);
+                    const initials = (c.name || '?').trim().split(/\s+/).slice(0, 2).map(w => w[0]).join('').toUpperCase();
+                    const avatarColor = avatarPalette[i % avatarPalette.length];
+                    const avatarCell = c.photo
+                        ? `<div class="cli-avatar cli-avatar-photo"><img src="${c.photo}" alt=""></div>`
+                        : `<div class="cli-avatar" style="background:${avatarColor};">${Utils.sanitizeHTML(initials)}</div>`;
                     return `<tr>
+                        <td><span class="cli-avatar-cell" onclick="Clients.view('${c.id}')" title="Ver ficha do cliente">${avatarCell}</span></td>
                         <td>${c.code || c.id}</td>
                         <td>${Utils.sanitizeHTML(c.name)}</td>
                         <td>${c.phone || ''}</td>
