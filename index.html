@@ -2764,6 +2764,123 @@
         .dark-mode #clientsHistoryPanel tbody tr:hover td { background: rgba(255,107,0,.06) !important; }
         .dark-mode #clientsHistoryPanel .cli-avatar.cli-avatar-photo { border-color: #444; }
 
+        /* ══════════════════════════════════════
+           HISTÓRICO DE PRODUTOS — mesmo visual do Histórico de Vendas/Clientes
+           Tudo escopado a #productsPanel: não altera nenhuma outra tabela/tela
+           do sistema. Ícones não foram tocados.
+        ══════════════════════════════════════ */
+        #productsPanel {
+            border-radius: 14px !important;
+            border: 1px solid #eef0f3 !important;
+            box-shadow: 0 1px 2px rgba(16,24,40,.04), 0 10px 28px -12px rgba(16,24,40,.10) !important;
+        }
+        #productsPanel .table-filtros { padding: 20px 24px 16px !important; }
+        #productsPanel .sh-search-field { position: relative; flex: 1; min-width: 200px; }
+        #productsPanel .sh-search-field i {
+            position: absolute; left: 13px; top: 50%; transform: translateY(-50%);
+            color: #a8afba; font-size: .82rem; pointer-events: none;
+        }
+        #productsPanel .sh-search-field input {
+            width: 100% !important; padding: 9px 12px 9px 34px !important;
+            border: 1.5px solid #eef0f3 !important; border-radius: 10px !important;
+            font-size: .86rem !important; background: #f6f7f9 !important;
+        }
+        #productsPanel .sh-search-field input:focus {
+            outline: none !important; background: #fff !important; border-color: var(--primary) !important;
+        }
+        #productsPanel .sales-count-badge {
+            font-size: .78rem !important; font-weight: 700 !important; color: #e55a00 !important;
+            background: #fff2e6 !important; border: 1px solid #ffddb8 !important;
+            padding: 5px 12px !important; border-radius: 20px !important; white-space: nowrap;
+        }
+        #productsPanel .btn-secondary.btn-sm,
+        #productsPanel .btn-danger.btn-sm,
+        #productsPanel .btn-info.btn-sm {
+            border-radius: 10px !important;
+        }
+        #productsPanel thead { background: #fbfbfc !important; }
+        #productsPanel thead tr th {
+            background: #fbfbfc !important; color: #8992a0 !important;
+            font-size: .68rem !important; font-weight: 800 !important; letter-spacing: .06em !important;
+            padding: 12px 16px !important; border-bottom: 1.5px solid #eef0f3 !important;
+        }
+        #productsPanel tbody tr td { padding: 10px 16px !important; border-bottom: 1px solid #eef0f3 !important; }
+        #productsPanel tbody tr:hover td { background: #fbf8f5 !important; }
+        #productsPanel tbody tr:last-child td { border-bottom: none !important; }
+        #productsPanel .btn-icon { border-radius: 9px !important; }
+        #productsPanel .action-buttons { gap: 6px !important; }
+
+        .dark-mode #productsPanel { border-color: rgba(255,107,0,0.12) !important; }
+        .dark-mode #productsPanel .sh-search-field input,
+        .dark-mode #productsPanel .btn-secondary.btn-sm {
+            background: #2d2d2d !important; border-color: #444 !important; color: #e0e0e0 !important;
+        }
+        .dark-mode #productsPanel .sales-count-badge {
+            background: rgba(255,107,0,.14) !important; border-color: rgba(255,107,0,.3) !important; color: #ffb066 !important;
+        }
+        .dark-mode #productsPanel thead,
+        .dark-mode #productsPanel thead tr th { background: #241a10 !important; color: #c7a97a !important; }
+        .dark-mode #productsPanel tbody tr td { border-bottom-color: rgba(255,107,0,.08) !important; }
+        .dark-mode #productsPanel tbody tr:hover td { background: rgba(255,107,0,.06) !important; }
+
+        /* ══════════════════════════════════════
+           ÚLTIMAS VENDAS (Dashboard) — mesmo visual do Histórico de Vendas
+           Tudo escopado a #recentSalesPanel: não altera nenhuma outra
+           tabela/tela do sistema. Ícones não foram tocados.
+        ══════════════════════════════════════ */
+        #recentSalesPanel {
+            border-radius: 14px !important;
+            border: 1px solid #eef0f3 !important;
+            box-shadow: 0 1px 2px rgba(16,24,40,.04), 0 10px 28px -12px rgba(16,24,40,.10) !important;
+        }
+        #recentSalesPanel .table-filtros { padding: 20px 24px 16px !important; }
+        #recentSalesPanel .sh-search-field { position: relative; flex: 1; min-width: 200px; }
+        #recentSalesPanel .sh-search-field i {
+            position: absolute; left: 13px; top: 50%; transform: translateY(-50%);
+            color: #a8afba; font-size: .82rem; pointer-events: none;
+        }
+        #recentSalesPanel .sh-search-field input {
+            width: 100% !important; padding: 9px 12px 9px 34px !important;
+            border: 1.5px solid #eef0f3 !important; border-radius: 10px !important;
+            font-size: .86rem !important; background: #f6f7f9 !important;
+        }
+        #recentSalesPanel .sh-search-field input:focus {
+            outline: none !important; background: #fff !important; border-color: var(--primary) !important;
+        }
+        #recentSalesPanel select {
+            padding: 9px 30px 9px 12px !important;
+            border: 1.5px solid #eef0f3 !important; border-radius: 10px !important;
+            font-size: .82rem !important; font-weight: 600 !important;
+            background-color: #f6f7f9 !important; cursor: pointer;
+        }
+        #recentSalesPanel .sales-count-badge {
+            font-size: .78rem !important; font-weight: 700 !important; color: #e55a00 !important;
+            background: #fff2e6 !important; border: 1px solid #ffddb8 !important;
+            padding: 5px 12px !important; border-radius: 20px !important; white-space: nowrap;
+        }
+        #recentSalesPanel thead { background: #fbfbfc !important; }
+        #recentSalesPanel thead tr th {
+            background: #fbfbfc !important; color: #8992a0 !important;
+            font-size: .68rem !important; font-weight: 800 !important; letter-spacing: .06em !important;
+            padding: 12px 16px !important; border-bottom: 1.5px solid #eef0f3 !important;
+        }
+        #recentSalesPanel tbody tr td { padding: 10px 16px !important; border-bottom: 1px solid #eef0f3 !important; }
+        #recentSalesPanel tbody tr:hover td { background: #fbf8f5 !important; }
+        #recentSalesPanel tbody tr:last-child td { border-bottom: none !important; }
+
+        .dark-mode #recentSalesPanel { border-color: rgba(255,107,0,0.12) !important; }
+        .dark-mode #recentSalesPanel .sh-search-field input,
+        .dark-mode #recentSalesPanel select {
+            background: #2d2d2d !important; border-color: #444 !important; color: #e0e0e0 !important;
+        }
+        .dark-mode #recentSalesPanel .sales-count-badge {
+            background: rgba(255,107,0,.14) !important; border-color: rgba(255,107,0,.3) !important; color: #ffb066 !important;
+        }
+        .dark-mode #recentSalesPanel thead,
+        .dark-mode #recentSalesPanel thead tr th { background: #241a10 !important; color: #c7a97a !important; }
+        .dark-mode #recentSalesPanel tbody tr td { border-bottom-color: rgba(255,107,0,.08) !important; }
+        .dark-mode #recentSalesPanel tbody tr:hover td { background: rgba(255,107,0,.06) !important; }
+
         /* ===== FILTRO PERÍODO DASHBOARD ===== */
         .dash-period-bar {
             display: flex;
@@ -6055,23 +6172,35 @@ body.dark-mode,
                         <div class="bar-chart" id="productsChart"></div>
                     </div>
                 </div>
-                <div class="table-container tf-ready">
-                    <div class="table-filtros" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:0.5rem;">
-                        <h3 style="margin:0;">Últimas Vendas</h3>
-                        <div style="display:flex;gap:0.5rem;flex-wrap:wrap;">
-                            <input type="text" id="filterRecentClient" class="form-control" placeholder="🔍 Cliente..." oninput="Dashboard.filterRecentSales()" style="max-width:160px;font-size:0.82rem;">
-                            <select id="filterRecentStatus" class="form-control" onchange="Dashboard.filterRecentSales()" style="max-width:150px;font-size:0.82rem;">
-                                <option value="">Todos os status</option>
-                                <option value="orcamento">Orçamento</option>
-                                <option value="pendente">Pendente</option>
-                                <option value="producao">Em Produção</option>
-                                <option value="laboratorio">Laboratório</option>
-                                <option value="tratamento">Tratamento</option>
-                                <option value="pronto">Pronto</option>
-                                <option value="entregue">Entregue</option>
-                                <option value="cancelado">Cancelado</option>
-                            </select>
+                <div class="table-container tf-ready" id="recentSalesPanel">
+                    <div class="table-filtros">
+                    <div class="sh-head">
+                        <div class="sh-title">
+                            <span class="sh-ico"><i class="fas fa-clock-rotate-left"></i></span>
+                            <div>
+                                <h3 style="margin:0;">Últimas Vendas</h3>
+                                <span class="sh-sub">As ordens de serviço mais recentes</span>
+                            </div>
                         </div>
+                        <span class="sales-count-badge" id="recentSalesCountBadge">0 vendas</span>
+                    </div>
+                    <div style="display:flex;align-items:center;gap:0.75rem;flex-wrap:wrap;">
+                        <div class="sh-search-field">
+                            <i class="fas fa-magnifying-glass"></i>
+                            <input type="text" id="filterRecentClient" placeholder="Cliente..." oninput="Dashboard.filterRecentSales()" autocomplete="off">
+                        </div>
+                        <select id="filterRecentStatus" onchange="Dashboard.filterRecentSales()">
+                            <option value="">Todos os status</option>
+                            <option value="orcamento">Orçamento</option>
+                            <option value="pendente">Pendente</option>
+                            <option value="producao">Em Produção</option>
+                            <option value="laboratorio">Laboratório</option>
+                            <option value="tratamento">Tratamento</option>
+                            <option value="pronto">Pronto</option>
+                            <option value="entregue">Entregue</option>
+                            <option value="cancelado">Cancelado</option>
+                        </select>
+                    </div>
                     </div>
                     <table id="recentSalesTable">
                         <thead><tr><th>Nº O.S</th><th>Cliente</th><th>Valor</th><th>Status</th><th>Data</th></tr></thead>
@@ -7925,10 +8054,23 @@ body.dark-mode,
                         </div>
                     </form>
                 </div>
-                <div class="table-container tf-ready">
-                    <div class="table-filtros" style="display:flex;align-items:center;gap:0.5rem;flex-wrap:wrap;">
-                        <input type="text" id="searchProduct" class="form-control" placeholder="🔍 Buscar produto..." onkeyup="Products.search()" style="flex:1;min-width:180px;margin:0;">
-                        <span id="productsCountBadge" style="background:#ff6b00;color:#fff;border-radius:20px;padding:3px 12px;font-size:0.78rem;font-weight:700;white-space:nowrap;">0 produtos</span>
+                <div class="table-container tf-ready" id="productsPanel">
+                    <div class="table-filtros">
+                    <div class="sh-head">
+                        <div class="sh-title">
+                            <span class="sh-ico"><i class="fas fa-box-open"></i></span>
+                            <div>
+                                <h3 style="margin:0;">Histórico de Produtos</h3>
+                                <span class="sh-sub">Catálogo e controle de estoque</span>
+                            </div>
+                        </div>
+                        <span class="sales-count-badge" id="productsCountBadge">0 produtos</span>
+                    </div>
+                    <div style="display:flex;align-items:center;gap:0.75rem;flex-wrap:wrap;">
+                        <div class="sh-search-field">
+                            <i class="fas fa-magnifying-glass"></i>
+                            <input type="text" id="searchProduct" placeholder="Buscar produto..." onkeyup="Products.search()" autocomplete="off">
+                        </div>
                         <button class="btn btn-secondary btn-sm" onclick="document.getElementById('importProductsFile').click()" title="Importar produtos via Excel/CSV">
                             <i class="fas fa-upload"></i> Importar
                         </button>
@@ -7945,6 +8087,7 @@ body.dark-mode,
                             <i class="fas fa-trash-alt"></i> Remover Tudo
                         </button>
                         <input type="file" id="importProductsFile" accept=".xlsx,.csv" class="d-none" onchange="Products.importFromFile(event)">
+                    </div>
                     </div>
                     <table id="productsTable">
                         <thead>
@@ -18607,6 +18750,8 @@ tbody tr td{border:1.5px solid #000;padding:2mm;text-align:center;font-weight:70
                     });
                 }
                 const recentSales = sales.slice(0, 20);
+                const countBadge = document.getElementById('recentSalesCountBadge');
+                if (countBadge) countBadge.textContent = `${recentSales.length} venda${recentSales.length === 1 ? '' : 's'}`;
                 const ST_LABELS = {orcamento:'Orçamento',pendente:'Pendente',producao:'Em Produção',laboratorio:'Laboratório',tratamento:'Tratamento',atrasado:'Atrasado',pronto:'Pronto',entregue:'Entregue',cancelado:'Cancelado'};
                 recentSales.forEach(s => {
                     const client = state.clients.find(c => c.id === s.clientId)?.name || '';
