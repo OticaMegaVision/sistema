@@ -4751,6 +4751,15 @@ body {
    da tabela rolando por baixo dela.
 ══════════════════════════════════════ */
 @media (max-width: 768px) {
+    /* Rolagem horizontal com "inércia" nativa em iPhone/Android de verdade
+       (sem isso, arrastar a tabela no celular físico fica travado/soquinho,
+       mesmo funcionando liso no mouse do computador) e contida no eixo X
+       pra não disparar o gesto de "voltar página" do navegador ao arrastar
+       a tabela pro lado. */
+    .table-container {
+        -webkit-overflow-scrolling: touch !important;
+        overscroll-behavior-x: contain !important;
+    }
     .table-container table th:last-child,
     .table-container table td:last-child {
         position: sticky !important;
