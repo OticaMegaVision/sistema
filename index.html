@@ -10215,12 +10215,21 @@ body.dark-mode,
                     const snap = { _ts: new Date().toISOString(), _store: sid, _v: 2 };
                     TABLES.forEach(k => {
                         if (Array.isArray(state[k])) {
-                            // Remove blobs base64 grandes para não estourar quota de ~5-10MB
+                            // Remove blobs base64 grandes do snapshot principal para não
+                            // estourar quota de ~5-10MB, mas antes espelha cada imagem numa
+                            // chave própria do MediaCache (pintura instantânea, sem risco de
+                            // sobrescrever o IDB — ver comentário do MediaCache acima).
                             snap[k] = state[k].map(item => {
                                 if (!item || typeof item !== 'object') return item;
                                 const c = { ...item };
-                                if (typeof c.image === 'string' && c.image.startsWith('data:')) delete c.image;
-                                if (typeof c.photo === 'string' && c.photo.startsWith('data:'))  delete c.photo;
+                                if (typeof c.image === 'string' && c.image.startsWith('data:')) {
+                                    if (c.id && window.MediaCache) MediaCache.set(k, c.id, c.image);
+                                    delete c.image;
+                                }
+                                if (typeof c.photo === 'string' && c.photo.startsWith('data:')) {
+                                    if (c.id && window.MediaCache) MediaCache.set(k, c.id, c.photo);
+                                    delete c.photo;
+                                }
                                 return c;
                             });
                         } else { snap[k] = []; }
@@ -10235,6 +10244,7 @@ body.dark-mode,
                     if (logoData) {
                         try { localStorage.setItem(this._key(sid) + '_logo', logoData); }
                         catch(_le) { /* quota excedida para o logo — segue sem ele */ }
+                        try { if (window.MediaCache) MediaCache.set('company', 'logo', logoData); } catch(_le2) {}
                         delete company.logo; // remove do snapshot principal
                     } else {
                         // Logo removido: limpa a chave separada para não restaurar logo antigo
@@ -10336,6 +10346,118 @@ body.dark-mode,
         window.LocalStorageBackup = LocalStorageBackup;
         // ══════════════════════════════════════════════════════════════════════
         //  /LocalStorageBackup
+        // ══════════════════════════════════════════════════════════════════════
+
+        // ══════════════════════════════════════════════════════════════════════
+        //  MediaCache — cache local INSTANTÂNEO de imagens (logo + fotos)
+        //  Objetivo: pintar logo/fotos na tela IMEDIATAMENTE (leitura síncrona
+        //  do localStorage), sem esperar o IndexedDB abrir ou o pull da nuvem
+        //  terminar — elimina o "sumiço"/lentidão do logo e das fotos de
+        //  produto ao carregar o app.
+        //  IMPORTANTE: isto é só uma camada de EXIBIÇÃO (stale-while-revalidate).
+        //  Nunca é usada como fonte de verdade pra restaurar dados nem grava no
+        //  IndexedDB — por isso não corre o risco de reintroduzir o bug antigo
+        //  de "fotos somem" (causado por regravar o IDB com uma cópia sem
+        //  imagens). Cada imagem fica numa chave própria do localStorage
+        //  (nunca dentro do snapshot grande), com limite de entradas e limpeza
+        //  automática se a quota estourar.
+        // ══════════════════════════════════════════════════════════════════════
+        const MediaCache = {
+            _PREFIX: 'optic_media_',
+            _MAX_ENTRIES: 400, // por loja — evita estourar a quota do localStorage (~5-10MB)
+
+            _key(sid, type, id) { return this._PREFIX + sid + '_' + type + '_' + id; },
+            _idxKey(sid) { return this._PREFIX + sid + '_idx'; },
+
+            _loadIndex(sid) {
+                try { return JSON.parse(localStorage.getItem(this._idxKey(sid)) || '[]'); }
+                catch(_e) { return []; }
+            },
+            _saveIndex(sid, idx) {
+                try { localStorage.setItem(this._idxKey(sid), JSON.stringify(idx)); } catch(_e) {}
+            },
+
+            // Grava uma imagem no cache (chamado no momento em que a imagem é
+            // definida/recebida, para o próximo boot/render já ter ela pronta).
+            set(type, id, dataUrl) {
+                if (!id || typeof dataUrl !== 'string' || !dataUrl.startsWith('data:')) return;
+                const sid = window._currentStore || 'barueri';
+                const k = this._key(sid, type, id);
+                try {
+                    localStorage.setItem(k, dataUrl);
+                    this._touchIndex(sid, type, id);
+                } catch(e) {
+                    if (e && e.name === 'QuotaExceededError') {
+                        // Sem espaço: descarta metade das entradas mais antigas e tenta 1x
+                        try {
+                            const idx = this._loadIndex(sid);
+                            const toDrop = idx.splice(0, Math.ceil(idx.length / 2));
+                            toDrop.forEach(entry => {
+                                const sep = entry.indexOf(':');
+                                const t = entry.slice(0, sep), i = entry.slice(sep + 1);
+                                try { localStorage.removeItem(this._key(sid, t, i)); } catch(_e2) {}
+                            });
+                            this._saveIndex(sid, idx);
+                            localStorage.setItem(k, dataUrl);
+                            this._touchIndex(sid, type, id);
+                        } catch(_e3) { /* segue sem cache — não é crítico, só perde a pintura instantânea */ }
+                    }
+                }
+            },
+
+            _touchIndex(sid, type, id) {
+                const idx = this._loadIndex(sid);
+                const entry = type + ':' + id;
+                const pos = idx.indexOf(entry);
+                if (pos !== -1) idx.splice(pos, 1);
+                idx.push(entry);
+                while (idx.length > this._MAX_ENTRIES) {
+                    const old = idx.shift();
+                    if (old) {
+                        const sep = old.indexOf(':');
+                        const t = old.slice(0, sep), i = old.slice(sep + 1);
+                        try { localStorage.removeItem(this._key(sid, t, i)); } catch(_e) {}
+                    }
+                }
+                this._saveIndex(sid, idx);
+            },
+
+            // Leitura síncrona (instantânea) — usada para pintar antes do IDB/nuvem responderem.
+            get(type, id) {
+                if (!id) return null;
+                const sid = window._currentStore || 'barueri';
+                try { return localStorage.getItem(this._key(sid, type, id)); } catch(_e) { return null; }
+            },
+
+            remove(type, id) {
+                if (!id) return;
+                const sid = window._currentStore || 'barueri';
+                try {
+                    localStorage.removeItem(this._key(sid, type, id));
+                    const idx = this._loadIndex(sid);
+                    const entry = type + ':' + id;
+                    const pos = idx.indexOf(entry);
+                    if (pos !== -1) { idx.splice(pos, 1); this._saveIndex(sid, idx); }
+                } catch(_e) {}
+            },
+
+            // Preenche instantaneamente os itens de um array com a versão em
+            // cache quando ainda não têm imagem carregada (ex: primeiro frame,
+            // antes do IDB devolver os dados completos).
+            hydrateArray(type, arr, field) {
+                field = field || 'image';
+                if (!Array.isArray(arr)) return;
+                arr.forEach(item => {
+                    if (item && item.id && !item[field]) {
+                        const cached = this.get(type, item.id);
+                        if (cached) item[field] = cached;
+                    }
+                });
+            }
+        };
+        window.MediaCache = MediaCache;
+        // ══════════════════════════════════════════════════════════════════════
+        //  /MediaCache
         // ══════════════════════════════════════════════════════════════════════
 
         // ── Mapa de coleções ──────────────────────────────────────────────────
@@ -12179,9 +12301,11 @@ body.dark-mode,
                         state.company.logo = remote.logo;
                         try { App.updateCompanyDisplay?.(); } catch(e) {}
                     }
+                    try { if (window.MediaCache) MediaCache.set('company', 'logo', remote.logo); } catch(_e) {}
                 } else if (remote.logo === null && state.company && state.company.logo) {
                     // Logo removido em outro dispositivo — remove aqui também.
                     delete state.company.logo;
+                    try { if (window.MediaCache) MediaCache.remove('company', 'logo'); } catch(_e) {}
                     try { App.updateCompanyDisplay?.(); } catch(e) {}
                 }
 
@@ -12195,6 +12319,7 @@ body.dark-mode,
                         const img = _resolveBrandRef(remote.products[p.id]);
                         if (typeof img === 'string' && img.startsWith('data:') && p.image !== img) {
                             p.image = img;
+                            try { if (window.MediaCache) MediaCache.set('products', p.id, img); } catch(_e) {}
                             mudou = true;
                         }
                     });
@@ -15199,6 +15324,15 @@ body.dark-mode,
         // FIX: expõe state globalmente para RxDBPanel e módulos externos
         window.state = state;
 
+        // ✅ Pintura instantânea do logo: lê do MediaCache (localStorage,
+        // síncrono) ANTES de qualquer leitura assíncrona do IndexedDB ou
+        // pull da nuvem. Assim a tela de login/sidebar já nascem com o logo
+        // certo, em vez de mostrar o placeholder até o IDB abrir.
+        try {
+            const _cachedLogo = window.MediaCache && MediaCache.get('company', 'logo');
+            if (_cachedLogo) state.company.logo = _cachedLogo;
+        } catch(_e) {}
+
         // Inicializa campos NF-e no state se não existirem (BUG FIX #9)
         if (!state.nfe_historico) state.nfe_historico = [];
         if (!state.nfe_counter)   state.nfe_counter   = '1';
@@ -17080,6 +17214,7 @@ tbody tr td{border:1.5px solid #000;padding:2mm;text-align:center;font-weight:70
                         // ✅ Comprime antes de guardar — reduz o peso do logo no
                         // snapshot sincronizado com a nuvem (ver Utils.compressImageDataUrl).
                         state.company.logo = await Utils.compressImageDataUrl(e.target.result, 500, 0.8);
+                        try { if (window.MediaCache) MediaCache.set('company', 'logo', state.company.logo); } catch(_e) {}
                         this.updateCompanyDisplay();
                         this.saveData();
                         // FIX BUG#1: sincroniza logo com a nuvem (Supabase/Drive/OneDrive)
@@ -19152,12 +19287,16 @@ tbody tr td{border:1.5px solid #000;padding:2mm;text-align:center;font-weight:70
                 toRender.forEach(p => {
                     const status = p.qty === 0 ? 'danger' : (p.qty <= (p.minQty||5) ? 'warning' : 'success');
                     const statusText = p.qty === 0 ? 'Esgotado' : (p.qty <= (p.minQty||5) ? 'Baixo' : 'Normal');
+                    // ✅ Pintura instantânea: se a foto ainda não chegou no objeto
+                    // (ex: IDB ainda abrindo), usa a versão em cache local (MediaCache)
+                    // pra não mostrar o placeholder à toa enquanto os dados carregam.
+                    const thumb = p.image || (window.MediaCache && p.id ? MediaCache.get('products', p.id) : null);
                     const tr = document.createElement('tr');
                     tr.innerHTML = `
                         <td style="font-family:monospace;font-size:.82rem;font-weight:700;">${Utils.sanitizeHTML(p.code||'')}</td>
                         <td style="text-align:center;">
-                            ${p.image
-                                ? `<button class="prod-thumb-btn" onclick="ProdView.open('${p.id}')" title="Ver produto"><img src="${p.image}" alt="${Utils.sanitizeHTML(p.name)}"></button>`
+                            ${thumb
+                                ? `<button class="prod-thumb-btn" onclick="ProdView.open('${p.id}')" title="Ver produto"><img src="${thumb}" alt="${Utils.sanitizeHTML(p.name)}"></button>`
                                 : `<button class="prod-thumb-btn prod-thumb-empty" onclick="ProdView.open('${p.id}')" title="Ver produto"><i class="fas fa-box"></i></button>`}
                         </td>
                         <td><span style="font-weight:600;cursor:pointer;" onclick="ProdView.open('${p.id}')" title="Visualizar produto">${Utils.sanitizeHTML(p.name)}</span></td>
@@ -19490,6 +19629,15 @@ tbody tr td{border:1.5px solid #000;padding:2mm;text-align:center;font-weight:70
                 
                 App.saveData();
                 SupaSync.upsertProduto(product);
+                // ✅ Cache instantâneo: grava a foto já aqui (não espera o debounce
+                // de 2s do LocalStorageBackup), garantindo pintura imediata no
+                // próximo render/reload mesmo antes do IDB/nuvem confirmarem.
+                try {
+                    if (window.MediaCache) {
+                        if (product.image) MediaCache.set('products', product.id, product.image);
+                        else MediaCache.remove('products', product.id);
+                    }
+                } catch(_e) {}
                 // ✅ FIX PERFORMANCE-SYNC: a foto do produto não viaja mais no
                 // pacote principal (ver CloudSync._collectAllData) — envia pelo
                 // canal de mídia separado só quando o produto tem imagem.
@@ -19529,6 +19677,7 @@ tbody tr td{border:1.5px solid #000;padding:2mm;text-align:center;font-weight:70
             delete(id) {
                 Modal.showConfirm('Excluir este produto?', () => {
                     state.products = state.products.filter(p => p.id !== id);
+                    try { if (window.MediaCache) MediaCache.remove('products', id); } catch(_e) {}
                     App.saveData();
                     SupaSync.deletarProduto(id);
                     this.renderTable();
@@ -21605,6 +21754,7 @@ tbody tr td{border:1.5px solid #000;padding:2mm;text-align:center;font-weight:70
                         if (prev) { prev.src = compressed; prev.style.display = 'block'; }
                         if (ph)   ph.style.display = 'none';
                         state.company.logo = compressed;
+                        try { if (window.MediaCache) MediaCache.set('company', 'logo', compressed); } catch(_e) {}
                         App.saveData();
                         App.updateCompanyDisplay();
                         SupaSync.upsertConfig().catch(() => {});
@@ -21620,6 +21770,7 @@ tbody tr td{border:1.5px solid #000;padding:2mm;text-align:center;font-weight:70
                 if (prev) { prev.src = ''; prev.style.display = 'none'; }
                 if (ph)   ph.style.display = 'flex';
                 delete state.company.logo;
+                try { if (window.MediaCache) MediaCache.remove('company', 'logo'); } catch(_e) {}
                 App.saveData();
                 App.updateCompanyDisplay();
                 Toast.show('Logo removida');
