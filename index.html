@@ -11496,6 +11496,9 @@ body.dark-mode,
             function _mediaFileName() { return 'OticaVisionPro_media_' + (window._currentStore || 'barueri') + '.json'; }
             function _lsFileIdKey(provider) { return 'cs_' + provider + '_file_id_' + (window._currentStore || 'barueri'); }
             function _lsMediaFileIdKey(provider) { return 'cs_' + provider + '_media_file_id_' + (window._currentStore || 'barueri'); }
+            // FIX PERFORMANCE-SYNC 3: guarda a "impressão digital" (modifiedTime no
+            // Drive, eTag no OneDrive) do último pull do arquivo de mídia bem-sucedido.
+            function _lsMediaFingerprintKey(provider) { return 'cs_' + provider + '_media_fp_' + (window._currentStore || 'barueri'); }
             function _lsPullTsKey()         { return 'cs_last_pull_ts_' + (window._currentStore || 'barueri'); }
             // REAL-TIME SYNC: polling adaptativo (5s ativo / 45s background)
             // ✅ FIX: a UI (aba Backup) anuncia "5s ⚡ REAL-TIME" mas o código
@@ -12257,6 +12260,28 @@ body.dark-mode,
                 try {
                     const fileId = await _gdriveGetOrCreateMediaFileId();
                     if (!fileId) return;
+                    // FIX PERFORMANCE-SYNC 3: antes de baixar o arquivo de mídia inteiro
+                    // (que pode ter várias fotos de produtos, às vezes bem pesado), faz
+                    // uma checagem rápida e pequena (só metadados) pra ver se ele mudou
+                    // desde o último pull. A cada 45s isso evita baixar tudo de novo sem
+                    // necessidade — só baixa o conteúdo completo quando algo realmente
+                    // mudou. Se a checagem falhar por qualquer motivo, cai no
+                    // comportamento antigo (baixa tudo) pra nunca travar a sincronização.
+                    try {
+                        const metaR = await _fetchTimeout(
+                            'https://www.googleapis.com/drive/v3/files/' + fileId + '?fields=modifiedTime',
+                            { headers: { Authorization: 'Bearer ' + _gdriveToken.access_token }, cache: 'no-store' },
+                            15000
+                        );
+                        const meta = await metaR.json();
+                        const fpKey = _lsMediaFingerprintKey('gdrive');
+                        if (meta && meta.modifiedTime) {
+                            if (meta.modifiedTime === localStorage.getItem(fpKey)) {
+                                return; // nada mudou desde o último pull — não baixa de novo
+                            }
+                            localStorage.setItem(fpKey, meta.modifiedTime);
+                        }
+                    } catch(_e) { /* checagem falhou: segue pro download completo abaixo */ }
                     const r = await _fetchTimeout(
                         'https://www.googleapis.com/drive/v3/files/' + fileId + '?alt=media',
                         { headers: { Authorization: 'Bearer ' + _gdriveToken.access_token }, cache: 'no-store' },
@@ -12314,6 +12339,27 @@ body.dark-mode,
                 try {
                     const fileId = await _onedriveGetOrCreateMediaFileId();
                     if (!fileId) return;
+                    // FIX PERFORMANCE-SYNC 3: mesma ideia do Drive — checa o eTag (bem
+                    // leve) antes de baixar o arquivo de mídia inteiro. Só baixa tudo
+                    // quando o eTag mudou desde o último pull. Se a checagem falhar,
+                    // cai no comportamento antigo (baixa tudo).
+                    try {
+                        const metaR = await _fetchTimeout(
+                            'https://graph.microsoft.com/v1.0/me/drive/items/' + fileId + '?select=eTag',
+                            { headers: { Authorization: 'Bearer ' + _onedriveToken.access_token } },
+                            15000
+                        );
+                        if (metaR.ok) {
+                            const meta = await metaR.json();
+                            const fpKey = _lsMediaFingerprintKey('onedrive');
+                            if (meta && meta.eTag) {
+                                if (meta.eTag === localStorage.getItem(fpKey)) {
+                                    return; // nada mudou desde o último pull — não baixa de novo
+                                }
+                                localStorage.setItem(fpKey, meta.eTag);
+                            }
+                        }
+                    } catch(_e) { /* checagem falhou: segue pro download completo abaixo */ }
                     const r = await _fetchTimeout(
                         'https://graph.microsoft.com/v1.0/me/drive/items/' + fileId + '/content',
                         { headers: { Authorization: 'Bearer ' + _onedriveToken.access_token }, cache: 'no-store' },
