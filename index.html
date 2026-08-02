@@ -7731,6 +7731,12 @@ body.dark-mode,
                         <button class="btn btn-danger btn-sm" onclick="Products.removeDuplicates()" title="Remove produtos com mesmo código e nome, mantendo apenas um registro">
                             <i class="fas fa-clone"></i> Remover Duplicidade
                         </button>
+                        <button class="btn btn-info btn-sm" onclick="Products.selectAll()" title="Seleciona todos os produtos da tabela">
+                            <i class="fas fa-check-square"></i> Selecionar Tudo
+                        </button>
+                        <button class="btn btn-danger btn-sm" onclick="Products.removeAll()" title="Remove todos os produtos (com confirmação)">
+                            <i class="fas fa-trash-alt"></i> Remover Tudo
+                        </button>
                         <input type="file" id="importProductsFile" accept=".xlsx,.csv" class="d-none" onchange="Products.importFromFile(event)">
                     </div>
                     <table id="productsTable">
@@ -19873,6 +19879,37 @@ tbody tr td{border:1.5px solid #000;padding:2mm;text-align:center;font-weight:70
             search() {
                 // Chama renderTable que já integra busca + DocumentFragment para 2700+ produtos
                 this.renderTable();
+            },
+
+            // ── Seleciona todos os produtos ───────────────────────────────
+            selectAll() {
+                const checkboxes = document.querySelectorAll('#productsTable tbody input[type="checkbox"]');
+                checkboxes.forEach(cb => cb.checked = true);
+                Toast.show(`${checkboxes.length} produto(s) selecionado(s)`, 'success');
+            },
+
+            // ── Remove todos os produtos com confirmação ──────────────────
+            removeAll() {
+                const total = state.products.length;
+                if (total === 0) {
+                    Toast.show('Nenhum produto cadastrado.', 'warning');
+                    return;
+                }
+                
+                Modal.showConfirm(
+                    `Tem certeza que deseja remover TODOS os ${total} produto(s)? Esta ação não pode ser desfeita.`,
+                    () => {
+                        const idsParaRemover = [...state.products].map(p => p.id);
+                        state.products = [];
+                        App.saveData();
+                        idsParaRemover.forEach(id => {
+                            SupaSync.deletarProduto(id).catch(() => {});
+                            try { if (window.MediaCache) MediaCache.remove('products', id); } catch(_e) {}
+                        });
+                        this.renderTable();
+                        Toast.show(`${total} produto(s) removido(s) com sucesso!`, 'success', 5000);
+                    }
+                );
             },
         };
 
