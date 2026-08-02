@@ -12316,11 +12316,20 @@ body.dark-mode,
                         // FIX PERFORMANCE-SYNC 2: o remoto pode trazer uma referência
                         // curta ("$brand:kodak") em vez do base64 completo — resolve
                         // para a imagem real usando os logos já embutidos no código.
-                        const img = _resolveBrandRef(remote.products[p.id]);
+                        const rawRef = remote.products[p.id];
+                        const img = _resolveBrandRef(rawRef);
                         if (typeof img === 'string' && img.startsWith('data:') && p.image !== img) {
                             p.image = img;
                             try { if (window.MediaCache) MediaCache.set('products', p.id, img); } catch(_e) {}
                             mudou = true;
+                        } else if (typeof rawRef === 'string' && rawRef.startsWith('$brand:') && img === null) {
+                            // ✅ FIX SYNC-MEDIA: antes essa falha era 100% silenciosa —
+                            // se a marca referenciada (ex.: "$brand:braslab") não existir
+                            // no mapa local Products._LOGOS_MARCA (versão de código
+                            // desatualizada em cache, ou marca removida), o produto
+                            // simplesmente ficava sem imagem e sem nenhum aviso. Agora
+                            // pelo menos loga no console pra facilitar o diagnóstico.
+                            console.warn('[CloudSync] Referência de marca "' + rawRef + '" não encontrada em Products._LOGOS_MARCA — produto ' + p.id + ' ficará sem imagem. Verifique se o app está atualizado (cache do navegador).');
                         }
                     });
                     if (mudou) { try { Products.renderTable?.(); } catch(e) {} }
