@@ -526,6 +526,10 @@
             color: #ff9944;
         }
 
+        html {
+            overflow-x: hidden;
+            width: 100%;
+        }
         body {
             background-color: #eef0f3;
             background-image: linear-gradient(165deg, #f4f5f8 0%, #e9ebef 100%);
@@ -533,6 +537,8 @@
             color: var(--dark);
             transition: var(--transition);
             min-height: 100vh;
+            overflow-x: hidden;
+            width: 100%;
         }
         body.dark-mode,
         .dark-mode body {
@@ -1479,6 +1485,8 @@
 
         .form-control {
             width: 100%;
+            max-width: 100%;
+            box-sizing: border-box;
             padding: 0.75rem 1rem;
             border: 1px solid var(--light-gray);
             border-radius: var(--border-radius);
@@ -1486,6 +1494,18 @@
             background: white;
             color: var(--dark);
             transition: border-color 0.2s, box-shadow 0.2s;
+        }
+
+        /* Impede que o usuário arraste textareas para fora do container
+           (a alça de redimensionar do navegador permite largura "both" por
+           padrão, o que quebra o layout no mobile e no desktop) */
+        textarea,
+        textarea.form-control,
+        .presc-obs {
+            width: 100%;
+            max-width: 100%;
+            box-sizing: border-box;
+            resize: vertical;
         }
 
         .form-control:focus {
