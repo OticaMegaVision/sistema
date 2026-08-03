@@ -12246,7 +12246,12 @@ body.dark-mode,
             // mídia continua barato (checa só metadados antes de baixar o
             // arquivo inteiro), esse intervalo menor não pesa no tráfego.
             const MEDIA_POLL_ACTIVE_MS    = 7000;
-            const MEDIA_POLL_BACKGROUND_MS = 45000;
+            // ✅ FIX SYNC-POLLING: reduzido de 45s para 15s — melhora a
+            // responsividade da sincronização do logo/fotos quando a aba está em
+            // background (outra aba/app em foco), sem pesar muito no consumo de
+            // dados (a checagem em si é leve, só baixa o arquivo completo se o
+            // fingerprint mudou — ver gdrivePullMedia/onedrivePullMedia).
+            const MEDIA_POLL_BACKGROUND_MS = 15000;
 
             let _gdriveToken    = null;
             let _onedriveToken  = null;
@@ -13349,13 +13354,25 @@ body.dark-mode,
                     })();
                     return;
                 }
-                if (_activeProvider === 'gdrive'   && _gdriveToken)   gdrivePushMedia(true).catch(()=>{});
-                if (_activeProvider === 'onedrive' && _onedriveToken) onedrivePushMedia(true).catch(()=>{});
+                // ✅ FIX SYNC-MEDIA-FEEDBACK: pushMediaNow() é sempre disparado por
+                // uma ação explícita do usuário (trocar logo, remover logo, mudar
+                // foto de produto) — diferente do pull, que roda em polling contínuo
+                // em background. Por isso faz sentido avisar o usuário quando ESTE
+                // envio falha (antes era .catch(()=>{}), erro 100% silencioso).
+                const _mediaPushFail = () => {
+                    Toast.show('⚠️ Falha ao sincronizar logo/fotos com a nuvem. Verifique sua conexão.', 'warning', 5000);
+                };
+                if (_activeProvider === 'gdrive'   && _gdriveToken)   gdrivePushMedia(true).catch(_mediaPushFail);
+                if (_activeProvider === 'onedrive' && _onedriveToken) onedrivePushMedia(true).catch(_mediaPushFail);
             }
 
             function _pullMediaNow(silent) {
-                if (_activeProvider === 'gdrive'   && _gdriveToken)   gdrivePullMedia(silent).catch(()=>{});
-                if (_activeProvider === 'onedrive' && _onedriveToken) onedrivePullMedia(silent).catch(()=>{});
+                // O pull de mídia roda em polling contínuo (a cada 7-45s) e no boot,
+                // então mostrar Toast a cada falha de rede seria muito ruidoso —
+                // mantemos silencioso para o usuário, mas logamos no console para
+                // facilitar diagnóstico (antes o erro desaparecia por completo).
+                if (_activeProvider === 'gdrive'   && _gdriveToken)   gdrivePullMedia(silent).catch((e)=>console.warn('[CloudSync] pull de mídia falhou:', e?.message));
+                if (_activeProvider === 'onedrive' && _onedriveToken) onedrivePullMedia(silent).catch((e)=>console.warn('[CloudSync] pull de mídia falhou:', e?.message));
             }
 
             // ════════════════════════════════════════════════════════════════
@@ -17841,14 +17858,19 @@ tbody tr td{border:1.5px solid #000;padding:2mm;text-align:center;font-weight:70
                 var wrapper     = document.getElementById('logoWrapper');
                 var placeholder = document.getElementById('logoPlaceholder');
                 var logoImg     = document.getElementById('logoImg');
-                if (state.company.logo) {
+                // ✅ FIX SYNC-LOGO-FALLBACK: se state.company.logo ainda não chegou
+                // (ex.: pull em andamento, wipe recente) mas o MediaCache local já
+                // tem o logo (pintura instantânea, sobrevive a reload), usa o cache
+                // como fallback em vez de deixar o logo sumir da tela.
+                var _logoToShow = state.company.logo || (window.MediaCache && MediaCache.get('company', 'logo')) || null;
+                if (_logoToShow) {
                     if (wrapper) {
                         // Remove qualquer background-image para usar só o <img> com qualidade máxima
                         wrapper.style.backgroundImage = 'none';
                         wrapper.style.backgroundColor = 'transparent';
                         wrapper.style.backgroundSize = '';
                         if (logoImg) {
-                            logoImg.src = state.company.logo;
+                            logoImg.src = _logoToShow;
                             logoImg.style.display = 'block';
                             logoImg.style.position = 'absolute';
                             logoImg.style.top = '0';
@@ -17877,7 +17899,7 @@ tbody tr td{border:1.5px solid #000;padding:2mm;text-align:center;font-weight:70
                     const loginWrap = document.getElementById('loginLogoWrap');
                     const loginFallback = document.getElementById('loginFallbackIcon');
                     const loginName = document.getElementById('loginCompanyName');
-                    const logoSrc = state.company && state.company.logo ? state.company.logo : null;
+                    const logoSrc = _logoToShow || null;
                     if (logoSrc && loginLogo) {
                         loginLogo.src = logoSrc;
                         loginLogo.style.cssText = 'display:block;width:100%;height:100%;object-fit:cover;border-radius:50%;';
@@ -22776,6 +22798,13 @@ tbody tr td{border:1.5px solid #000;padding:2mm;text-align:center;font-weight:70
                         App.saveData();
                         App.updateCompanyDisplay();
                         SupaSync.upsertConfig().catch(() => {});
+                        // ✅ FIX SYNC-LOGO-CONFIG: Config.uploadLogo() nunca chamava
+                        // CloudSync.pushMediaNow(), então um logo trocado por aqui
+                        // (tela de Configurações) ficava só local e nunca era enviado
+                        // para o Drive/OneDrive — diferente de App.updateLogo() (sidebar),
+                        // que já fazia isso. Resultado: logo "sumia"/não aparecia em
+                        // outros dispositivos quando trocado por este caminho.
+                        try { window.CloudSync?.pushMediaNow?.(); } catch(_e) {}
                         Toast.show('Logo atualizada com sucesso!');
                     };
                     reader.readAsDataURL(file);
@@ -22791,6 +22820,11 @@ tbody tr td{border:1.5px solid #000;padding:2mm;text-align:center;font-weight:70
                 try { if (window.MediaCache) MediaCache.remove('company', 'logo'); } catch(_e) {}
                 App.saveData();
                 App.updateCompanyDisplay();
+                SupaSync.upsertConfig().catch(() => {});
+                // ✅ FIX SYNC-LOGO-CONFIG: sem isso, remover o logo pelas Configurações
+                // não propagava a remoção para o arquivo de mídia na nuvem — o logo
+                // apagado aqui continuava aparecendo em outros dispositivos.
+                try { window.CloudSync?.pushMediaNow?.(); } catch(_e) {}
                 Toast.show('Logo removida');
             },
 
@@ -29895,6 +29929,12 @@ const StoreManager = {
                 setTimeout(() => {
                     if (window._currentStore !== lojaId) return;
                     CloudSync.forcePull().catch(()=>{});
+                    // ✅ FIX SYNC-MEDIA-TROCA-LOJA: forcePull() só puxa os dados
+                    // principais (clientes, produtos, vendas...) — o arquivo de
+                    // mídia (logo + fotos) só chegava depois, via o próximo ciclo
+                    // do polling (até MEDIA_POLL_ACTIVE_MS/BACKGROUND_MS). Agora o
+                    // logo/fotos da loja nova também são puxados imediatamente.
+                    try { CloudSync.pullMediaNow?.(true); } catch(_e2) {}
                 }, 600);
             }
         } catch(_e) {}
