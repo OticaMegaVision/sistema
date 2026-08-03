@@ -14743,6 +14743,7 @@ body.dark-mode,
                                 valor: retiradaMista,
                                 vencimento: sale.deliveryForecast || sale.date || '',
                                 pago: !!sale.retiradaPaga,
+                                pagamentosParciais: sale.pagamentosParciaisRetirada || undefined,
                                 _readonly: true
                             });
                         }
@@ -14769,6 +14770,7 @@ body.dark-mode,
                                         vencimento: p.dueDate || '',
                                         pago: isParcPago,
                                         paidValue: isParcPago ? (p.paidValue || p.value || 0) : undefined,
+                                        pagamentosParciais: p.pagamentosParciais || undefined,
                                         _readonly: true
                                     });
                                 });
@@ -14784,6 +14786,7 @@ body.dark-mode,
                                         valor: parseFloat(slot.retirada),
                                         vencimento: sale.deliveryForecast || sale.date || '',
                                         pago: retPagaDual,
+                                        pagamentosParciais: sale.pagamentosParciaisRetirada || undefined,
                                         _readonly: true
                                     });
                                 }
@@ -14800,6 +14803,7 @@ body.dark-mode,
                                         valor: parseFloat(slot.retirada),
                                         vencimento: sale.deliveryForecast || sale.date || '',
                                         pago: retPagaDualAV,
+                                        pagamentosParciais: sale.pagamentosParciaisRetirada || undefined,
                                         _readonly: true
                                     });
                                 }
@@ -14824,6 +14828,7 @@ body.dark-mode,
                                 vencimento: p.dueDate || '',
                                 pago: isParcPago,
                                 paidValue: isParcPago ? (p.paidValue || p.value || 0) : undefined,
+                                pagamentosParciais: p.pagamentosParciais || undefined,
                                 _readonly: true
                             });
                         });
@@ -14841,6 +14846,7 @@ body.dark-mode,
                                 valor: retiradaCrediario,
                                 vencimento: sale.deliveryForecast || sale.date || '',
                                 pago: !!sale.retiradaPaga,
+                                pagamentosParciais: sale.pagamentosParciaisRetirada || undefined,
                                 _readonly: true
                             });
                         }
@@ -14861,6 +14867,7 @@ body.dark-mode,
                                 valor: retiradaAVista,
                                 vencimento: sale.deliveryForecast || sale.date || '',
                                 pago: !!sale.retiradaPaga,
+                                pagamentosParciais: sale.pagamentosParciaisRetirada || undefined,
                                 _readonly: true
                             });
                         }
@@ -14884,6 +14891,7 @@ body.dark-mode,
                             valor: valorTotalPendente,
                             vencimento: sale.deliveryForecast || sale.date || '',
                             pago: !!(sale.paymentStatus === 'pago' || sale.pago),
+                            pagamentosParciais: sale.pagamentosParciaisTotal || undefined,
                             _readonly: true
                         });
                     }
@@ -15091,6 +15099,21 @@ body.dark-mode,
                     const wppBtn = (hasWpp && phone && !c.pago) ? `<button class="ci-action-btn wpp" title="Cobrar via WhatsApp"
                         onclick="ContasManager.enviarCobrancaWhatsApp('${c.id}')"><i class="fab fa-whatsapp"></i></button>` : '';
 
+                    // ✅ FIX: ícone de comprovante para itens de venda (parcela/retirada/total)
+                    // também após baixa PARCIAL — antes só aparecia quando o item estava
+                    // 100% pago (c.pago), então uma baixa parcial "sumia" sem deixar como
+                    // reimprimir o comprovante do valor já recebido.
+                    const temParcial = c._readonly && !c.pago && c.pagamentosParciais && c.pagamentosParciais.length > 0;
+                    let reciboVendaBtn = '';
+                    if (c._readonly && (c.pago || temParcial)) {
+                        const ultimoParcial = temParcial ? c.pagamentosParciais[c.pagamentosParciais.length - 1] : null;
+                        const valorRecibo   = c.pago ? parseFloat(c.paidValue || c.valor || 0) : parseFloat(ultimoParcial?.valor || 0);
+                        const formaRecibo   = c.pago ? '' : (ultimoParcial?.forma || '');
+                        const obsRecibo     = c.pago ? '' : `Pagamento parcial. Saldo restante: R$ ${parseFloat(c.valor || 0).toFixed(2).replace('.',',')}`;
+                        const tituloRecibo  = temParcial ? 'Comprovante do Pagamento Parcial' : 'Comprovante de Pagamento';
+                        reciboVendaBtn = `<button class="ci-action-btn recibo" title="${tituloRecibo}" onclick="ContasManager.gerarComprovanteVenda('${c.id}','${(c.descricao||'').replace(/'/g,"\\'")}',${valorRecibo},'${(c.parte||'').replace(/'/g,"\\'")}','${(c.categoria||'').replace(/'/g,"\\'")}','${c.vencimento||''}','${formaRecibo.replace(/'/g,"\\'")}','${obsRecibo.replace(/'/g,"\\'")}')"><i class="fas fa-receipt"></i></button>`;
+                    }
+
                     return `<div class="${classes}">
                         <div class="conta-item-row1">
                             <div class="conta-item-nome" title="${c.descricao||''}">${c.descricao||'—'}</div>
@@ -15104,7 +15127,7 @@ body.dark-mode,
                                 ${!c.pago && c._readonly ? `<button class="ci-action-btn check" title="Dar Baixa" onclick="ContasManager.darBaixaVenda('${c.id}')"><i class="fas fa-check"></i></button>` : ''}
                                 ${wppBtn}
                                 ${!c._readonly ? `<button class="ci-action-btn recibo" title="Comprovante" onclick="ContasManager.gerarComprovante('${c.id}')"><i class="fas fa-receipt"></i></button>` : ''}
-                                ${c._readonly && c.pago ? `<button class="ci-action-btn recibo" title="Comprovante de Pagamento" onclick="ContasManager.gerarComprovanteVenda('${c.id}','${(c.descricao||'').replace(/'/g,"\\'")}',${parseFloat(c.paidValue||c.valor||0)},'${(c.parte||'').replace(/'/g,"\\'")}','${(c.categoria||'').replace(/'/g,"\\'")}','${c.vencimento||''}','','')"><i class="fas fa-receipt"></i></button>` : ''}
+                                ${reciboVendaBtn}
                                 ${!c._readonly ? `<button class="ci-action-btn editar" title="Editar" onclick="ContasManager.editarConta('${c.id}')"><i class="fas fa-pen"></i></button>` : ''}
                                 ${!c._readonly ? `<button class="ci-action-btn del" title="Excluir" onclick="ContasManager.excluirConta('${c.id}')"><i class="fas fa-trash"></i></button>` : ''}
                                 ${c._readonly && !c.pago ? `<span class="ci-action-btn link" title="Gerado automaticamente pela venda">🔗</span>` : ''}
