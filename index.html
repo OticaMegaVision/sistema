@@ -12232,6 +12232,38 @@ body.dark-mode,
             let _pendingDeletions = {}; // ex: { 'barueri|sales|V-001': '2025-01-01T10:00:00Z' }
             const TOMBSTONE_TTL_MS = 7 * 24 * 60 * 60 * 1000; // 7 dias
 
+            // ── FIX SYNC USUÁRIOS: os usuários de login (Configurações → Usuários)
+            // não eram incluídos no pacote sincronizado com a nuvem — cada usuário
+            // criado ficava só no IndexedDB local daquele aparelho/navegador, por
+            // isso "sumia" ao abrir o sistema em outro dispositivo. Usa o mesmo
+            // padrão de tombstones das outras coleções, só que numa chave própria
+            // (usuários não pertencem a uma loja específica, então não usam o
+            // formato 'storeId|col|id' do _pendingDeletions acima).
+            let _pendingUserDeletions = {}; // ex: { 'joao': '2025-01-01T10:00:00Z' }
+            function _recordUserDeletion(username) {
+                _pendingUserDeletions[username] = new Date().toISOString();
+                try {
+                    const raw = localStorage.getItem('cs_user_tombstones') || '{}';
+                    const stored = JSON.parse(raw);
+                    stored[username] = _pendingUserDeletions[username];
+                    const now = Date.now();
+                    Object.keys(stored).forEach(k => { if (now - new Date(stored[k]).getTime() > TOMBSTONE_TTL_MS) delete stored[k]; });
+                    localStorage.setItem('cs_user_tombstones', JSON.stringify(stored));
+                } catch(_e) {}
+            }
+            function _loadUserTombstones() {
+                try {
+                    const raw = localStorage.getItem('cs_user_tombstones');
+                    if (raw) {
+                        const stored = JSON.parse(raw);
+                        const now = Date.now();
+                        Object.entries(stored).forEach(([k, ts]) => {
+                            if (now - new Date(ts).getTime() < TOMBSTONE_TTL_MS) _pendingUserDeletions[k] = ts;
+                        });
+                    }
+                } catch(_e) {}
+            }
+
             // ── RETRY: reenvio automático quando o push para a nuvem falha ──
             // gdrivePush/onedrivePush já reenviam o SNAPSHOT COMPLETO (não é uma
             // fila por-item), então não precisamos guardar operações individuais:
@@ -12445,6 +12477,16 @@ body.dark-mode,
                         const parts = k.split('|');
                         return { storeId: parts[0], col: parts[1], id: parts[2], deletedAt };
                     });
+                // ✅ FIX SYNC USUÁRIOS: os usuários de login (Configurações → Usuários)
+                // ficavam só no IndexedDB local — nunca viajavam para a nuvem, por
+                // isso um usuário criado num aparelho não aparecia em outro. Lidos
+                // direto do cache em memória (síncrono) — populado por
+                // AuthSystem._loadUsers()/_saveUsers(), sem precisar tornar esta
+                // função assíncrona.
+                let usersForSync = [];
+                try { usersForSync = JSON.parse(IDB._cache['optic_auth_users'] || '[]'); } catch(_uE) {}
+                const userTombstones = Object.entries(_pendingUserDeletions)
+                    .map(([username, deletedAt]) => ({ username, deletedAt }));
                 return {
                     _rxdb:              'v17',
                     _store:             storeId,
@@ -12475,7 +12517,10 @@ body.dark-mode,
                     notificacoes:       state.notificacoes       || {},
                     backupConfig:       state.backupConfig       || {},
                     contasFinanceiras:  contasFinanceiras,
-                    tombstones:         tombstones   // ← deleções propagadas para outros navegadores
+                    tombstones:         tombstones,   // ← deleções propagadas para outros navegadores
+                    // ✅ FIX SYNC USUÁRIOS: usuários de login + suas deleções
+                    users:              usersForSync,
+                    userTombstones:     userTombstones
                 };
             }
 
@@ -12683,6 +12728,70 @@ body.dark-mode,
                     console.error('[CloudSync] ⚠️ Merge de "' + k + '" falhou — coleções seguintes NÃO foram afetadas:', mergeErr);
                   }
                 });
+
+                // ✅ FIX SYNC USUÁRIOS: merge dos usuários de login (Configurações →
+                // Usuários), mesma ideia do merge acima (item mais recente vence),
+                // só que a chave é o "username" (não "id") e o resultado é
+                // persistido via AuthSystem._saveUsers() em vez de state[k], já que
+                // usuários não moram no "state" normal.
+                if (Array.isArray(remote.users)) {
+                    try {
+                        // Aplica tombstones de usuários deletados vindos da nuvem
+                        if (Array.isArray(remote.userTombstones)) {
+                            remote.userTombstones.forEach(t => {
+                                if (!t || !t.username) return;
+                                const existing = _pendingUserDeletions[t.username];
+                                if (!existing || t.deletedAt > existing) _pendingUserDeletions[t.username] = t.deletedAt || remoteTs;
+                            });
+                            try { localStorage.setItem('cs_user_tombstones', JSON.stringify(_pendingUserDeletions)); } catch(_e) {}
+                        }
+
+                        let localUsers = [];
+                        try { localUsers = JSON.parse(IDB._cache['optic_auth_users'] || '[]'); } catch(_e2) {}
+                        const localMap = {};
+                        localUsers.forEach(u => { if (u && u.username) localMap[u.username] = u; });
+
+                        const merged = {};
+                        Object.assign(merged, localMap);
+
+                        remote.users.forEach(ru => {
+                            if (!ru || !ru.username) return;
+                            const delTs = _pendingUserDeletions[ru.username];
+                            // Deletado localmente após a última edição remota → não readiciona
+                            if (delTs && new Date(delTs).getTime() > new Date(ru._updatedAt || remoteTs || 0).getTime()) {
+                                delete merged[ru.username];
+                                return;
+                            }
+                            const lu = localMap[ru.username];
+                            if (!lu) {
+                                merged[ru.username] = ru;
+                            } else {
+                                const rd = new Date(ru._updatedAt || remoteTs || 0).getTime();
+                                const ld = new Date(lu._updatedAt || 0).getTime();
+                                if (rd > ld) merged[ru.username] = ru;
+                            }
+                        });
+
+                        // Remove localmente qualquer usuário cujo tombstone é mais
+                        // recente que a última edição conhecida (exclusão feita neste
+                        // ou em outro aparelho, já propagada).
+                        Object.keys(_pendingUserDeletions).forEach(uname => {
+                            const u = merged[uname];
+                            if (u && new Date(_pendingUserDeletions[uname]).getTime() > new Date(u._updatedAt || 0).getTime()) {
+                                delete merged[uname];
+                            }
+                        });
+
+                        const mergedList = Object.values(merged);
+                        if (JSON.stringify(mergedList) !== JSON.stringify(localUsers)) {
+                            await AuthSystem._saveUsers(mergedList);
+                            // Atualiza a tabela de usuários na tela, se estiver aberta
+                            if (typeof Usuarios !== 'undefined' && Usuarios.renderTable) Usuarios.renderTable();
+                        }
+                    } catch(usersMergeErr) {
+                        console.error('[CloudSync] ⚠️ Merge de usuários falhou:', usersMergeErr);
+                    }
+                }
                 // FIX SYNC: aplica company com deep merge para garantir que logo e
                 // todos os campos sejam copiados (não apenas os que existem localmente)
                 //
@@ -14274,6 +14383,7 @@ body.dark-mode,
             // ── Init ─────────────────────────────────────────────────────────
             _loadTokens();
             _loadTombstones(); // FIX DELETE-SYNC: restaura tombstones persistidos
+            _loadUserTombstones(); // FIX SYNC USUÁRIOS: restaura tombstones de usuários excluídos
             // ✅ RETRY: se a aba foi fechada/o app foi recarregado com um push
             // pendente (ex: usuário fechou o app ainda offline), retoma o envio
             // assim que houver provedor conectado e rede disponível.
@@ -14399,6 +14509,9 @@ body.dark-mode,
                 // em outro dispositivo antes de decidir se deve "ressuscitá-lo".
                 isDeletedLocally(storeId, col, id, remoteTs) { return _isDeletedLocally(storeId, col, id, remoteTs); },
                 _recordDeletion(storeId, col, id) { _recordDeletion(storeId, col, id); },
+                // ✅ FIX SYNC USUÁRIOS: mesma ideia do isDeletedLocally/_recordDeletion
+                // acima, só que para usuários de login (ver Usuarios.delete()).
+                _recordUserDeletion(username) { _recordUserDeletion(username); },
                 // ── Exposição pública do coletor de dados (para OPFS + exportação) ──
                 _collectAllDataPublic() { return _collectAllData(); },
                 get connected() { return !!(_gdriveToken || _onedriveToken); },
@@ -23037,16 +23150,21 @@ ${container.innerHTML}
 
                 if (isEdit) {
                     const idx = users.findIndex(u => u.username === username);
-                    users[idx] = { ...users[idx], fullName, profile, status, stores };
+                    users[idx] = { ...users[idx], fullName, profile, status, stores, _updatedAt: new Date().toISOString() };
                     if (passwordHash) users[idx].passwordHash = passwordHash;
                 } else {
-                    users.push({ username, fullName, passwordHash, stores, profile, status, lastAccess: 'Nunca' });
+                    users.push({ username, fullName, passwordHash, stores, profile, status, lastAccess: 'Nunca', _updatedAt: new Date().toISOString() });
                 }
 
                 await AuthSystem._saveUsers(users);
                 this.renderTable();
                 Modal.close('userModal');
                 Toast.show(isEdit ? 'Usuário atualizado!' : 'Usuário criado!', 'success');
+                // ✅ FIX SYNC USUÁRIOS: sem isso, o usuário só ia para a nuvem no
+                // próximo ciclo automático de sync — se a pessoa fechasse o app
+                // antes disso, o usuário criado ficava só neste aparelho. Dispara
+                // o envio imediatamente (mesmo padrão usado após salvar venda/cliente).
+                try { if (window.CloudSync) CloudSync.autoSync(); } catch(_e) {}
             },
 
             async edit(username) {
@@ -23076,6 +23194,11 @@ ${container.innerHTML}
                     let users = await AuthSystem._loadUsers() || [];
                     users = users.filter(u => u.username !== username);
                     await AuthSystem._saveUsers(users);
+                    // ✅ FIX SYNC USUÁRIOS: registra a exclusão para que ela se
+                    // propague aos outros dispositivos (sem isso, um pull de outro
+                    // aparelho podia "ressuscitar" o usuário excluído aqui).
+                    try { if (window.CloudSync) CloudSync._recordUserDeletion(username); } catch(_e) {}
+                    try { if (window.CloudSync) CloudSync.autoSync(); } catch(_e) {}
                     this.renderTable();
                     Toast.show('Usuário excluído!', 'success');
                 });
