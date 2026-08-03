@@ -2654,9 +2654,9 @@
             background: #fff !important; border-color: var(--primary) !important;
         }
         #salesHistoryPanel .sales-search-bar select {
-            padding: 9px 30px 9px 12px !important;
+            padding: 9px 26px 9px 10px !important;
             border: 1.5px solid #eef0f3 !important; border-radius: 10px !important;
-            font-size: .82rem !important; font-weight: 600 !important;
+            font-size: .8rem !important; font-weight: 600 !important;
             background-color: #f6f7f9 !important;
         }
         #salesHistoryPanel .sh-btn-clear {
@@ -2888,30 +2888,48 @@
            Tudo com classes próprias (prefixo mv-) para não colidir
            com nenhum estilo já existente no sistema.
         ══════════════════════════════════════ */
-        .mv-filter-row { display: flex !important; align-items: stretch !important; gap: 6px !important; flex-wrap: nowrap !important; }
+        .mv-filter-row {
+            display: flex !important; align-items: stretch !important; gap: 6px !important;
+            flex-wrap: nowrap !important; width: 100% !important; max-width: 100% !important;
+            position: static !important;
+        }
         .mv-filter-row .sh-search-field,
-        .mv-filter-row .ss-wrapper { flex: 1 1 auto !important; min-width: 0 !important; }
+        .mv-filter-row .ss-wrapper {
+            flex: 1 1 0% !important; min-width: 0 !important; width: auto !important; position: relative !important;
+        }
         .mv-filter-row .sh-search-field input,
-        .mv-filter-row .ss-wrapper input { width: 100% !important; }
+        .mv-filter-row .ss-wrapper input { width: 100% !important; box-sizing: border-box !important; }
+        /* ✅ FIX: o <select> nativo (Android/iOS) calcula a própria largura pelo
+           conteúdo (texto da opção selecionada) e, com appearance nativa, essa
+           largura pode ignorar o cálculo do flexbox e "vazar" por cima do campo
+           de busca ao lado. Removendo a aparência nativa e travando uma largura
+           fixa (em vez de auto) elimina esse vazamento em qualquer navegador. */
         .mv-select {
-            flex: 0 0 auto !important; max-width: 46% !important; min-width: 0 !important;
-            padding: 9px 26px 9px 10px !important; border: 1.5px solid #eef0f3 !important; border-radius: 10px !important;
-            font-size: .8rem !important; font-weight: 700 !important; background-color: #f6f7f9 !important;
+            flex: 0 0 108px !important; width: 108px !important; max-width: 40% !important; min-width: 0 !important;
+            box-sizing: border-box !important; position: relative !important;
+            -webkit-appearance: none !important; -moz-appearance: none !important; appearance: none !important;
+            padding: 9px 24px 9px 10px !important; border: 1.5px solid #eef0f3 !important; border-radius: 10px !important;
+            font-size: .78rem !important; font-weight: 700 !important; background-color: #f6f7f9 !important;
+            background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='10' height='6'><path d='M0 0l5 6 5-6z' fill='%235b6472'/></svg>") !important;
+            background-repeat: no-repeat !important; background-position: right 9px center !important;
             color: #1c2129; cursor: pointer;
             text-overflow: ellipsis; white-space: nowrap; overflow: hidden;
         }
-        .mv-select:focus { outline: none !important; background: #fff !important; border-color: var(--primary) !important; }
+        .mv-select:focus { outline: none !important; background-color: #fff !important; border-color: var(--primary) !important; }
         .mv-clear-btn {
-            flex: 0 0 auto !important; width: 36px !important; height: 36px !important;
+            flex: 0 0 36px !important; width: 36px !important; height: 36px !important; box-sizing: border-box !important;
             display: flex !important; align-items: center !important; justify-content: center !important;
             border: 1.5px solid #eef0f3 !important; border-radius: 10px !important; background: #fff !important;
             color: #5b6472 !important; cursor: pointer !important; font-size: .82rem !important; padding: 0 !important;
         }
         .mv-clear-btn:hover { border-color: #d8dce2 !important; color: #1c2129 !important; background: #f6f7f9 !important; }
-        .dark-mode .mv-select,
+        .dark-mode .mv-select {
+            background-color: #2d2d2d !important; border-color: #444 !important; color: #e0e0e0 !important;
+            background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='10' height='6'><path d='M0 0l5 6 5-6z' fill='%23e0e0e0'/></svg>") !important;
+        }
         .dark-mode .mv-clear-btn { background: #2d2d2d !important; border-color: #444 !important; color: #e0e0e0 !important; }
         @media (max-width: 380px) {
-            .mv-select { font-size: .72rem !important; padding: 9px 20px 9px 8px !important; }
+            .mv-select { flex-basis: 92px !important; width: 92px !important; font-size: .7rem !important; padding: 9px 20px 9px 8px !important; }
             .mv-filter-row .sh-search-field input,
             .mv-filter-row .ss-wrapper input { font-size: .78rem !important; padding-left: 28px !important; }
         }
@@ -6958,14 +6976,14 @@ body.dark-mode,
                                         <option value="credit">Crédito</option>
                                         <option value="installment">Crediário</option>
                                     </select>
-                                    <input type="number" id="dual1Value" class="form-control" placeholder="R$ 0,00" min="0" step="0.01"
-                                        style="flex:1;font-size:0.9rem;font-weight:700;" oninput="Sales.calcDual()">
+                                    <input type="text" inputmode="numeric" id="dual1Value" class="form-control" placeholder="0,00" value="0"
+                                        style="flex:1;font-size:0.9rem;font-weight:700;" oninput="Utils.maskMoney(this); Sales.calcDual()">
                                 </div>
                                 <div id="dual1Crediario" style="display:none;margin-top:8px;background:#fff3e0;border:1px solid #ffb74d;border-radius:8px;padding:10px;">
                                     <div style="font-size:0.78rem;font-weight:600;color:#e65100;margin-bottom:6px;">📅 Crediário — 1ª forma</div>
                                     <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;">
-                                        <div><label style="font-size:11px;color:#666;">Entrada (R$)</label><input type="number" id="dual1Entry" class="form-control" value="0" min="0" step="0.01" style="font-size:0.83rem;" oninput="Sales.calcDual()"></div>
-                                        <div><label style="font-size:11px;color:#666;">Retirada (R$)</label><input type="number" id="dual1Retirada" class="form-control" value="0" min="0" step="0.01" style="font-size:0.83rem;" oninput="Sales.calcDual()"></div>
+                                        <div><label style="font-size:11px;color:#666;">Entrada (R$)</label><input type="text" inputmode="numeric" id="dual1Entry" class="form-control" value="0" style="font-size:0.83rem;" oninput="Utils.maskMoney(this); Sales.calcDual()"></div>
+                                        <div><label style="font-size:11px;color:#666;">Retirada (R$)</label><input type="text" inputmode="numeric" id="dual1Retirada" class="form-control" value="0" style="font-size:0.83rem;" oninput="Utils.maskMoney(this); Sales.calcDual()"></div>
                                         <div><label style="font-size:11px;color:#666;">Nº Parcelas</label><input type="number" id="dual1Parcelas" class="form-control" value="2" min="1" max="48" style="font-size:0.83rem;" oninput="Sales.calcDual()"></div>
                                     </div>
                                     <div style="margin-top:6px;font-size:0.78rem;color:#e65100;" id="dual1ParcelaInfo">—</div>
@@ -6983,14 +7001,14 @@ body.dark-mode,
                                         <option value="credit">Crédito</option>
                                         <option value="installment">Crediário</option>
                                     </select>
-                                    <input type="number" id="dual2Value" class="form-control" placeholder="R$ 0,00" min="0" step="0.01"
-                                        style="flex:1;font-size:0.9rem;font-weight:700;" oninput="Sales.calcDual()">
+                                    <input type="text" inputmode="numeric" id="dual2Value" class="form-control" placeholder="0,00" value="0"
+                                        style="flex:1;font-size:0.9rem;font-weight:700;" oninput="Utils.maskMoney(this); Sales.calcDual()">
                                 </div>
                                 <div id="dual2Crediario" style="display:none;margin-top:8px;background:#fff3e0;border:1px solid #ffb74d;border-radius:8px;padding:10px;">
                                     <div style="font-size:0.78rem;font-weight:600;color:#e65100;margin-bottom:6px;">📅 Crediário — 2ª forma</div>
                                     <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;">
-                                        <div><label style="font-size:11px;color:#666;">Entrada (R$)</label><input type="number" id="dual2Entry" class="form-control" value="0" min="0" step="0.01" style="font-size:0.83rem;" oninput="Sales.calcDual()"></div>
-                                        <div><label style="font-size:11px;color:#666;">Retirada (R$)</label><input type="number" id="dual2Retirada" class="form-control" value="0" min="0" step="0.01" style="font-size:0.83rem;" oninput="Sales.calcDual()"></div>
+                                        <div><label style="font-size:11px;color:#666;">Entrada (R$)</label><input type="text" inputmode="numeric" id="dual2Entry" class="form-control" value="0" style="font-size:0.83rem;" oninput="Utils.maskMoney(this); Sales.calcDual()"></div>
+                                        <div><label style="font-size:11px;color:#666;">Retirada (R$)</label><input type="text" inputmode="numeric" id="dual2Retirada" class="form-control" value="0" style="font-size:0.83rem;" oninput="Utils.maskMoney(this); Sales.calcDual()"></div>
                                         <div><label style="font-size:11px;color:#666;">Nº Parcelas</label><input type="number" id="dual2Parcelas" class="form-control" value="2" min="1" max="48" style="font-size:0.83rem;" oninput="Sales.calcDual()"></div>
                                     </div>
                                     <div style="margin-top:6px;font-size:0.78rem;color:#e65100;" id="dual2ParcelaInfo">—</div>
@@ -7048,7 +7066,7 @@ body.dark-mode,
                                 <div style="margin-top:12px;display:grid;grid-template-columns:1fr 1fr;gap:10px;">
                                     <div>
                                         <label style="font-size:12px;font-weight:600;color:#555;display:block;margin-bottom:4px;">Entrada paga (R$)</label>
-                                        <input type="number" id="pixEntrada" class="form-control" value="0" min="0" step="0.01" oninput="Sales.PAY.retirada('pix')">
+                                        <input type="text" inputmode="numeric" id="pixEntrada" class="form-control" value="0" oninput="Utils.maskMoney(this); Sales.PAY.retirada('pix')">
                                     </div>
                                     <div>
                                         <label style="font-size:12px;font-weight:600;color:#555;display:block;margin-bottom:4px;">Restante na retirada</label>
@@ -7093,7 +7111,7 @@ body.dark-mode,
                                 <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;">
                                     <div>
                                         <label style="font-size:12px;font-weight:600;color:#555;display:block;margin-bottom:4px;">Valor recebido (R$)</label>
-                                        <input type="number" id="cashRecebido" class="form-control" value="0" min="0" step="0.01" oninput="Sales.PAY.cashChange()">
+                                        <input type="text" inputmode="numeric" id="cashRecebido" class="form-control" value="0" oninput="Utils.maskMoney(this); Sales.PAY.cashChange()">
                                     </div>
                                     <div>
                                         <label style="font-size:12px;font-weight:600;color:#2e7d32;display:block;margin-bottom:4px;">Troco</label>
@@ -7101,7 +7119,7 @@ body.dark-mode,
                                     </div>
                                     <div>
                                         <label style="font-size:12px;font-weight:600;color:#555;display:block;margin-bottom:4px;">Entrada paga (R$)</label>
-                                        <input type="number" id="cashEntrada" class="form-control" value="0" min="0" step="0.01" oninput="Sales.PAY.retirada('cash')">
+                                        <input type="text" inputmode="numeric" id="cashEntrada" class="form-control" value="0" oninput="Utils.maskMoney(this); Sales.PAY.retirada('cash')">
                                     </div>
                                 </div>
                                 <div id="cashAlerta" class="retirada-alert" style="display:none;margin-top:8px;">
@@ -7138,7 +7156,7 @@ body.dark-mode,
                                     </div>
                                     <div>
                                         <label style="font-size:12px;font-weight:600;color:#555;display:block;margin-bottom:4px;">Entrada paga (R$)</label>
-                                        <input type="number" id="debitEntrada" class="form-control" value="0" min="0" step="0.01" oninput="Sales.PAY.retirada('debit')">
+                                        <input type="text" inputmode="numeric" id="debitEntrada" class="form-control" value="0" oninput="Utils.maskMoney(this); Sales.PAY.retirada('debit')">
                                     </div>
                                     <div>
                                         <label style="font-size:12px;font-weight:600;color:#555;display:block;margin-bottom:4px;">Restante na retirada</label>
@@ -7210,7 +7228,7 @@ body.dark-mode,
                                 <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
                                     <div>
                                         <label style="font-size:12px;font-weight:600;color:#555;display:block;margin-bottom:4px;">Entrada paga (R$) — opcional</label>
-                                        <input type="number" id="creditEntrada" class="form-control" value="0" min="0" step="0.01" oninput="Sales.PAY.retirada('credit')">
+                                        <input type="text" inputmode="numeric" id="creditEntrada" class="form-control" value="0" oninput="Utils.maskMoney(this); Sales.PAY.retirada('credit')">
                                     </div>
                                     <div>
                                         <label style="font-size:12px;font-weight:600;color:#555;display:block;margin-bottom:4px;">Restante na retirada</label>
@@ -8425,18 +8443,22 @@ body.dark-mode,
                         </div>
                         <div class="form-row">
                             <div class="form-group"><label for="expenseCategory">Categoria</label>
-                                <select id="expenseCategory" class="form-control">
+                                <select id="expenseCategory" class="form-control" onchange="Expenses.toggleCategoryOther()">
                                     <option value="aluguel">Aluguel</option>
                                     <option value="agua">Água</option>
                                     <option value="energia">Energia</option>
                                     <option value="telefone">Telefone/Internet</option>
                                     <option value="salarios">Salários</option>
                                     <option value="impostos">Impostos</option>
+                                    <option value="lentes">Lentes</option>
+                                    <option value="armacoes">Armações</option>
                                     <option value="material">Material de Consumo</option>
                                     <option value="manutencao">Manutenção</option>
                                     <option value="marketing">Marketing</option>
                                     <option value="outros">Outros</option>
+                                    <option value="outro">Outra (digitar)...</option>
                                 </select>
+                                <input type="text" id="expenseCategoryOther" class="form-control" placeholder="Digite a categoria..." style="display:none;margin-top:8px;">
                             </div>
                             <div class="form-group"><label for="expenseSupplier">Fornecedor (opcional)</label>
                                 <select id="expenseSupplier" class="form-control">
@@ -14848,13 +14870,18 @@ body.dark-mode,
 
                     // ── Outros métodos sem parcelamento ────────────────────────
                     if (parcelas.length === 0 && sale.total > 0 && sale.status !== 'entregue') {
+                        // ✅ FIX: após uma baixa parcial, exibe o saldo restante
+                        // (sale._saldoRestanteTotal) em vez do valor total original.
+                        const valorTotalPendente = sale._saldoRestanteTotal != null
+                            ? parseFloat(sale._saldoRestanteTotal)
+                            : parseFloat(sale.total || 0);
                         contasVendas.push({
                             id: 'venda_' + sale.id + '_total',
                             tipo: 'receber',
                             descricao: `OS ${sale.number} — Total`,
                             parte: nomeCliente,
                             categoria: 'Venda',
-                            valor: parseFloat(sale.total || 0),
+                            valor: valorTotalPendente,
                             vencimento: sale.deliveryForecast || sale.date || '',
                             pago: !!(sale.paymentStatus === 'pago' || sale.pago),
                             _readonly: true
@@ -15437,23 +15464,72 @@ body.dark-mode,
                     }
                 } else if (tipo === 'retirada') {
                     // Valor na retirada (crediário ou à vista com saldo)
-                    // Fix: unifica zeragem de retiradaEntry e retiradaValue
-                    if (sale.paymentDetails) {
-                        if (sale.paymentDetails.retiradaEntry) sale.paymentDetails.retiradaEntry = 0;
-                        if (sale.paymentDetails.retiradaValue) sale.paymentDetails.retiradaValue = 0;
+                    // ✅ FIX: suporta baixa parcial — antes, qualquer valor informado
+                    // quitava a retirada inteira e zerava o saldo, mesmo que o valor
+                    // pago fosse menor que o valor devido (ex: devia R$500, pagou R$200
+                    // e o sistema dava baixa nos R$500 inteiros). Agora, se o valor pago
+                    // for menor que o valor da retirada, reduz o saldo e mantém pendente
+                    // — igual ao que já acontecia com parcelas de crediário.
+                    const det = sale.paymentDetails || {};
+                    const valorRetiradaAtual = parseFloat(det.retiradaEntry || det.retiradaValue || itemValor || 0);
+                    const isParcialRet = paidVal < valorRetiradaAtual - 0.009;
+
+                    if (!sale.pagamentosParciaisRetirada) sale.pagamentosParciaisRetirada = [];
+                    sale.pagamentosParciaisRetirada.push({ data: new Date().toISOString(), valor: paidVal, forma, obs });
+
+                    if (isParcialRet) {
+                        const saldoRet = Math.max(0, valorRetiradaAtual - paidVal);
+                        if (sale.paymentDetails) {
+                            if (sale.paymentDetails.retiradaEntry)  sale.paymentDetails.retiradaEntry  = parseFloat(saldoRet.toFixed(2));
+                            if (sale.paymentDetails.retiradaValue)  sale.paymentDetails.retiradaValue  = parseFloat(saldoRet.toFixed(2));
+                        }
+                        sale.retiradaPaga = false;
+                        sale._updatedAt = new Date().toISOString();
+                        (window.LocalFirst ? LocalFirst.pushItem('sales',sale) : Promise.resolve()).catch(()=>{}).finally(()=>{ ContasManager.renderAll().catch(()=>{}); Dashboard.update().catch(()=>{}); });
+                        Toast.show(`💰 Pagamento parcial de R$ ${paidVal.toFixed(2).replace('.',',')} registrado. Saldo restante: R$ ${saldoRet.toFixed(2).replace('.',',')}`, 'warning', 5000);
+                        // Comprovante do valor efetivamente pago nesta baixa parcial
+                        this.gerarComprovanteVenda(itemId, itemDescricao||'Pagamento na Retirada', paidVal, itemCliente, itemCategoria, itemVencimento, forma,
+                            (obs ? obs + ' — ' : '') + `Pagamento parcial. Saldo restante: R$ ${saldoRet.toFixed(2).replace('.',',')}`);
+                    } else {
+                        // Fix: unifica zeragem de retiradaEntry e retiradaValue
+                        if (sale.paymentDetails) {
+                            if (sale.paymentDetails.retiradaEntry) sale.paymentDetails.retiradaEntry = 0;
+                            if (sale.paymentDetails.retiradaValue) sale.paymentDetails.retiradaValue = 0;
+                        }
+                        sale.retiradaPaga = true;
+                        if (this.checkPaymentComplete(sale)) sale.paymentStatus = 'pago';
+                        sale._updatedAt = new Date().toISOString();
+                        (window.LocalFirst ? LocalFirst.pushItem('sales',sale) : Promise.resolve()).catch(()=>{}).finally(()=>{ ContasManager.renderAll().catch(()=>{}); Dashboard.update().catch(()=>{}); });
+                        Toast.show('Pagamento na retirada registrado! ✅', 'success');
+                        this.gerarComprovanteVenda(itemId, itemDescricao||'Pagamento na Retirada', itemValor, itemCliente, itemCategoria, itemVencimento, forma, obs);
                     }
-                    sale.retiradaPaga = true;
-                    if (this.checkPaymentComplete(sale)) sale.paymentStatus = 'pago';
-                    sale._updatedAt = new Date().toISOString();
-                    (window.LocalFirst ? LocalFirst.pushItem('sales',sale) : Promise.resolve()).catch(()=>{}).finally(()=>{ ContasManager.renderAll().catch(()=>{}); Dashboard.update().catch(()=>{}); });
-                    Toast.show('Pagamento na retirada registrado! ✅', 'success');
-                    this.gerarComprovanteVenda(itemId, itemDescricao||'Pagamento na Retirada', itemValor, itemCliente, itemCategoria, itemVencimento, forma, obs);
                 } else if (tipo === 'total') {
-                    sale.paymentStatus = 'pago';
-                    sale._updatedAt = new Date().toISOString();
-                    (window.LocalFirst ? LocalFirst.pushItem('sales',sale) : Promise.resolve()).catch(()=>{}).finally(()=>{ ContasManager.renderAll().catch(()=>{}); Dashboard.update().catch(()=>{}); });
-                    Toast.show('Pagamento registrado! ✅', 'success');
-                    this.gerarComprovanteVenda(itemId, itemDescricao||'Pagamento Total', itemValor||sale.total||0, itemCliente, itemCategoria, itemVencimento, forma, obs);
+                    // ✅ FIX: mesma lógica de baixa parcial aplicada ao pagamento total
+                    // de vendas sem parcelamento (métodos sem crediário/retirada, ex:
+                    // boleto/cheque/outros). Guarda o saldo restante em sale._saldoRestanteTotal
+                    // sem alterar sale.total (usado em relatórios/PDF/dashboard).
+                    const valorTotalAtual = parseFloat(sale._saldoRestanteTotal != null ? sale._saldoRestanteTotal : (itemValor || sale.total || 0));
+                    const isParcialTot = paidVal < valorTotalAtual - 0.009;
+
+                    if (!sale.pagamentosParciaisTotal) sale.pagamentosParciaisTotal = [];
+                    sale.pagamentosParciaisTotal.push({ data: new Date().toISOString(), valor: paidVal, forma, obs });
+
+                    if (isParcialTot) {
+                        const saldoTot = Math.max(0, valorTotalAtual - paidVal);
+                        sale._saldoRestanteTotal = parseFloat(saldoTot.toFixed(2));
+                        sale._updatedAt = new Date().toISOString();
+                        (window.LocalFirst ? LocalFirst.pushItem('sales',sale) : Promise.resolve()).catch(()=>{}).finally(()=>{ ContasManager.renderAll().catch(()=>{}); Dashboard.update().catch(()=>{}); });
+                        Toast.show(`💰 Pagamento parcial de R$ ${paidVal.toFixed(2).replace('.',',')} registrado. Saldo restante: R$ ${saldoTot.toFixed(2).replace('.',',')}`, 'warning', 5000);
+                        this.gerarComprovanteVenda(itemId, itemDescricao||'Pagamento Total', paidVal, itemCliente, itemCategoria, itemVencimento, forma,
+                            (obs ? obs + ' — ' : '') + `Pagamento parcial. Saldo restante: R$ ${saldoTot.toFixed(2).replace('.',',')}`);
+                    } else {
+                        sale.paymentStatus = 'pago';
+                        sale._saldoRestanteTotal = 0;
+                        sale._updatedAt = new Date().toISOString();
+                        (window.LocalFirst ? LocalFirst.pushItem('sales',sale) : Promise.resolve()).catch(()=>{}).finally(()=>{ ContasManager.renderAll().catch(()=>{}); Dashboard.update().catch(()=>{}); });
+                        Toast.show('Pagamento registrado! ✅', 'success');
+                        this.gerarComprovanteVenda(itemId, itemDescricao||'Pagamento Total', itemValor||sale.total||0, itemCliente, itemCategoria, itemVencimento, forma, obs);
+                    }
                 }
             },
 
@@ -20883,12 +20959,22 @@ tbody tr td{border:1.5px solid #000;padding:2mm;text-align:center;font-weight:70
                     Toast.show('Preencha todos os campos obrigatórios', 'warning');
                     return;
                 }
-                
+                if (document.getElementById('expenseCategory').value === 'outro' && !document.getElementById('expenseCategoryOther').value.trim()) {
+                    Toast.show('Digite o nome da categoria', 'warning');
+                    return;
+                }
+
+                // ✅ Categoria "Outra": usa o texto digitado no campo livre em vez do value do select
+                const _catSelVal = document.getElementById('expenseCategory').value;
+                const _catFinal  = (_catSelVal === 'outro')
+                    ? (document.getElementById('expenseCategoryOther').value.trim() || 'Outros')
+                    : _catSelVal;
+
                 const expense = {
                     id: state.editingId || 'EXP-' + Date.now(),
                     date: document.getElementById('expenseDate').value,
                     desc: document.getElementById('expenseDesc').value,
-                    category: document.getElementById('expenseCategory').value,
+                    category: _catFinal,
                     supplierId: document.getElementById('expenseSupplier').value || null,
                     value: Utils.parseMoney(document.getElementById('expenseValue').value) || 0,
                     paymentMethod: document.getElementById('expensePaymentMethod').value,
@@ -20925,7 +21011,20 @@ tbody tr td{border:1.5px solid #000;padding:2mm;text-align:center;font-weight:70
                 state.editingId = id;
                 document.getElementById('expenseDate').value = e.date;
                 document.getElementById('expenseDesc').value = e.desc;
-                document.getElementById('expenseCategory').value = e.category;
+                // ✅ Categoria: se o valor salvo não corresponde a nenhuma opção pré-definida
+                // (foi digitado como "Outra" anteriormente), seleciona "outro" e preenche o texto livre
+                const _catSel = document.getElementById('expenseCategory');
+                const _catOtherInput = document.getElementById('expenseCategoryOther');
+                const _hasPreset = Array.from(_catSel.options).some(o => o.value === e.category);
+                if (_hasPreset) {
+                    _catSel.value = e.category;
+                    _catOtherInput.style.display = 'none';
+                    _catOtherInput.value = '';
+                } else {
+                    _catSel.value = 'outro';
+                    _catOtherInput.style.display = 'block';
+                    _catOtherInput.value = e.category || '';
+                }
                 document.getElementById('expenseSupplier').value = e.supplierId || '';
                 document.getElementById('expenseValue').value = e.value;
                 document.getElementById('expensePaymentMethod').value = e.paymentMethod || 'dinheiro';
@@ -20951,6 +21050,22 @@ tbody tr td{border:1.5px solid #000;padding:2mm;text-align:center;font-weight:70
                 document.getElementById('expenseDate').value = new Date().toISOString().slice(0,10);
                 document.getElementById('expensePaymentMethod').value = 'dinheiro';
                 document.getElementById('expenseStatus').value = 'pago';
+                const _catOtherInput = document.getElementById('expenseCategoryOther');
+                if (_catOtherInput) { _catOtherInput.style.display = 'none'; _catOtherInput.value = ''; }
+            },
+
+            // ✅ Mostra/oculta o campo de texto livre quando "Outra (digitar)" é escolhida
+            toggleCategoryOther() {
+                const sel = document.getElementById('expenseCategory');
+                const other = document.getElementById('expenseCategoryOther');
+                if (!sel || !other) return;
+                if (sel.value === 'outro') {
+                    other.style.display = 'block';
+                    other.focus();
+                } else {
+                    other.style.display = 'none';
+                    other.value = '';
+                }
             }
         };
 
@@ -24485,7 +24600,7 @@ ${container.innerHTML}
                     };
                     const cfg = ids[method]; if (!cfg) return;
                     const total    = state.currentSale.total || 0;
-                    const entrada  = parseFloat(document.getElementById(cfg.entrada)?.value) || 0;
+                    const entrada  = Utils.parseMoney(document.getElementById(cfg.entrada)?.value) || 0;
                     const restante = Math.max(0, total - entrada);
                     const dispEl   = document.getElementById(cfg.display);
                     if (dispEl) dispEl.textContent = this.fmt(restante);
@@ -24552,7 +24667,7 @@ ${container.innerHTML}
                 // Troco do dinheiro
                 cashChange() {
                     const total    = state.currentSale.total || 0;
-                    const recebido = parseFloat(document.getElementById('cashRecebido')?.value) || 0;
+                    const recebido = Utils.parseMoney(document.getElementById('cashRecebido')?.value) || 0;
                     const troco    = Math.max(0, recebido - total);
                     const el = document.getElementById('cashTroco'); if (el) el.textContent = this.fmt(troco);
                 },
@@ -24922,8 +25037,8 @@ ${container.innerHTML}
                 const total = state.currentSale._grossTotal || state.currentSale.total || 0;
                 const m1    = document.getElementById('dual1Method')?.value || 'pix';
                 const m2    = document.getElementById('dual2Method')?.value || 'cash';
-                const v1    = parseFloat(document.getElementById('dual1Value')?.value) || 0;
-                const v2    = parseFloat(document.getElementById('dual2Value')?.value) || 0;
+                const v1    = Utils.parseMoney(document.getElementById('dual1Value')?.value) || 0;
+                const v2    = Utils.parseMoney(document.getElementById('dual2Value')?.value) || 0;
                 const sum   = v1 + v2;
                 const diff  = total - sum;
 
@@ -24935,8 +25050,8 @@ ${container.innerHTML}
 
                 // Resumo crediário forma 1
                 if (m1 === 'installment' && v1 > 0) {
-                    const entry1    = parseFloat(document.getElementById('dual1Entry')?.value) || 0;
-                    const ret1      = parseFloat(document.getElementById('dual1Retirada')?.value) || 0;
+                    const entry1    = Utils.parseMoney(document.getElementById('dual1Entry')?.value) || 0;
+                    const ret1      = Utils.parseMoney(document.getElementById('dual1Retirada')?.value) || 0;
                     const nparc1    = parseInt(document.getElementById('dual1Parcelas')?.value) || 2;
                     const saldo1    = Math.max(0, v1 - entry1 - ret1);
                     const parcVal1  = nparc1 > 0 ? saldo1 / nparc1 : 0;
@@ -24945,8 +25060,8 @@ ${container.innerHTML}
                 }
                 // Resumo crediário forma 2
                 if (m2 === 'installment' && v2 > 0) {
-                    const entry2    = parseFloat(document.getElementById('dual2Entry')?.value) || 0;
-                    const ret2      = parseFloat(document.getElementById('dual2Retirada')?.value) || 0;
+                    const entry2    = Utils.parseMoney(document.getElementById('dual2Entry')?.value) || 0;
+                    const ret2      = Utils.parseMoney(document.getElementById('dual2Retirada')?.value) || 0;
                     const nparc2    = parseInt(document.getElementById('dual2Parcelas')?.value) || 2;
                     const saldo2    = Math.max(0, v2 - entry2 - ret2);
                     const parcVal2  = nparc2 > 0 ? saldo2 / nparc2 : 0;
@@ -24975,12 +25090,12 @@ ${container.innerHTML}
                 // Salva no state para o save() usar
                 state.currentSale._dualPayments = [
                     { method: m1, value: v1,
-                      entry: parseFloat(document.getElementById('dual1Entry')?.value) || 0,
-                      retirada: parseFloat(document.getElementById('dual1Retirada')?.value) || 0,
+                      entry: Utils.parseMoney(document.getElementById('dual1Entry')?.value) || 0,
+                      retirada: Utils.parseMoney(document.getElementById('dual1Retirada')?.value) || 0,
                       parcelas: parseInt(document.getElementById('dual1Parcelas')?.value) || 2 },
                     { method: m2, value: v2,
-                      entry: parseFloat(document.getElementById('dual2Entry')?.value) || 0,
-                      retirada: parseFloat(document.getElementById('dual2Retirada')?.value) || 0,
+                      entry: Utils.parseMoney(document.getElementById('dual2Entry')?.value) || 0,
+                      retirada: Utils.parseMoney(document.getElementById('dual2Retirada')?.value) || 0,
                       parcelas: parseInt(document.getElementById('dual2Parcelas')?.value) || 2 }
                 ];
             },
@@ -26729,7 +26844,7 @@ ${container.innerHTML}
                         // Para métodos à vista: zera paymentDetails (descarta dados antigos de crediário)
                         const entradaIds = { pix:'pixEntrada', cash:'cashEntrada', debit:'debitEntrada', credit:'creditEntrada' };
                         const entradaEl  = document.getElementById(entradaIds[method]);
-                        const entradaVal = entradaEl ? (parseFloat(entradaEl.value) || 0) : 0;
+                        const entradaVal = entradaEl ? (Utils.parseMoney(entradaEl.value) || 0) : 0;
                         const totalFinal = state.currentSale.total || 0;
                         const retiradaVal = Math.max(0, totalFinal - entradaVal);
                         // FIX BUG PIX-RETIRADA: condição anterior "entradaVal > 0.01" impedia de salvar
