@@ -5483,20 +5483,32 @@ body.dark-mode,
 /* ══ FIM UPGRADE VISUAL v4.0 ══ */
 </style>
 <style id="visionpro-final-override">
-.table-container{overflow-y:auto!important;overflow-x:auto!important;max-height:520px!important;}
-.table-container::-webkit-scrollbar{width:7px;height:7px;}
-.table-container::-webkit-scrollbar-track{background:#fdf9f5;border-radius:99px;}
-.table-container::-webkit-scrollbar-thumb{background:linear-gradient(180deg,#ff6b00,#ffaa00);border-radius:99px;}
-.table-container::-webkit-scrollbar-thumb:hover{background:#e85500;}
-.table-container::-webkit-scrollbar-corner{background:#fdf9f5;}
-.table-container thead tr th{position:sticky!important;top:0!important;z-index:10!important;padding:0.52rem 0.9rem!important;font-size:0.68rem!important;font-weight:700!important;white-space:nowrap!important;}
-.table-container tbody tr td{padding:0.5rem 0.9rem!important;font-size:0.82rem!important;vertical-align:middle!important;}
-.table-container tbody tr:hover td{background:rgba(255,107,0,0.03)!important;}
-.dark-mode .table-container::-webkit-scrollbar-track{background:#1a1208!important;}
+/* ✅ FIX — barra de rolagem lateral sobrepondo o cabeçalho (mobile):
+   antes, o scroll (overflow-y:auto + max-height) ficava no .table-container
+   INTEIRO, que também envolve o título/busca/filtros — por isso a barra
+   (desenhada como overlay no celular) passava por cima do cabeçalho.
+   Agora o scroll fica só em .table-scroll-body, um wrapper que o JS injeta
+   em volta da <table> (ver TableScrollFix.init()), deixando o cabeçalho
+   sempre fora da área rolável. */
+.table-container{overflow:visible!important;max-height:none!important;}
+.table-scroll-body{
+    overflow-y:auto!important;overflow-x:auto!important;max-height:520px!important;
+    -webkit-overflow-scrolling:touch!important;overscroll-behavior-x:contain!important;
+}
+.table-scroll-body::-webkit-scrollbar{width:7px;height:7px;}
+.table-scroll-body::-webkit-scrollbar-track{background:#fdf9f5;border-radius:99px;}
+.table-scroll-body::-webkit-scrollbar-thumb{background:linear-gradient(180deg,#ff6b00,#ffaa00);border-radius:99px;}
+.table-scroll-body::-webkit-scrollbar-thumb:hover{background:#e85500;}
+.table-scroll-body::-webkit-scrollbar-corner{background:#fdf9f5;}
+.table-scroll-body thead tr th{position:sticky!important;top:0!important;z-index:10!important;padding:0.52rem 0.9rem!important;font-size:0.68rem!important;font-weight:700!important;white-space:nowrap!important;}
+.table-scroll-body tbody tr td{padding:0.5rem 0.9rem!important;font-size:0.82rem!important;vertical-align:middle!important;}
+.table-scroll-body tbody tr:hover td{background:rgba(255,107,0,0.03)!important;}
+.dark-mode .table-scroll-body::-webkit-scrollbar-track{background:#1a1208!important;}
 
-/* ── Barra de filtros fixa (sticky) acima das listas ── */
-.table-filtros{position:sticky!important;top:0!important;left:0!important;z-index:11!important;background:#fff!important;padding-bottom:0.75rem!important;margin-bottom:0!important;}
-.table-container.tf-ready thead tr th{top:var(--tf-h,0px)!important;}
+/* ── Cabeçalho/filtros agora ficam FORA da área de rolagem — não precisa
+   mais de position:sticky (isso já resolvia sobreposição de CONTEÚDO, mas
+   não da barra de rolagem em si, que é desenhada pelo navegador) ── */
+.table-filtros{position:static!important;background:#fff!important;padding-bottom:0.75rem!important;margin-bottom:0!important;}
 .dark-mode .table-filtros{background:#1a1208!important;}
 .os-pdf-wrapper,.os-pdf-wrapper *{font-family:"DM Sans",Arial,sans-serif!important;}
 .os-pdf-wrapper .os-empresa-nome{font-weight:900!important;letter-spacing:-0.3px!important;}
@@ -16295,6 +16307,45 @@ body.dark-mode,
             }
         };
         window.TableFiltros = TableFiltros;
+
+        // ── FIX: barra de rolagem lateral sobrepondo o cabeçalho (mobile) ──
+        // Envolve cada <table> dentro de .table-container com um novo
+        // div.table-scroll-body (que é quem recebe overflow-y/x + a barra
+        // de rolagem via CSS). Assim o título/busca/filtros ficam SEMPRE
+        // fora da área rolável, e a barra de rolagem nunca mais passa por
+        // cima deles — só roda dentro do próprio corpo da tabela.
+        // Roda uma vez, assim que o DOM está pronto: a tabela (thead/tbody)
+        // já existe no HTML nesse ponto, só as linhas são preenchidas depois
+        // via JS, o que não afeta este wrapper.
+        const TableScrollFix = {
+            wrap(container) {
+                const table = container.querySelector(':scope > table');
+                if (!table) return; // já corrigido, ou não tem <table> direto (ainda)
+                const wrap = document.createElement('div');
+                wrap.className = 'table-scroll-body';
+                container.insertBefore(wrap, table);
+                wrap.appendChild(table);
+            },
+            init() {
+                document.querySelectorAll('.table-container').forEach(c => this.wrap(c));
+                // Alguns painéis (ex: #reportContainer) só ganham a <table> depois,
+                // via innerHTML (relatórios gerados sob demanda). O observer pega
+                // esses casos automaticamente, sem precisar mexer em cada função
+                // de geração de relatório.
+                if (window.MutationObserver) {
+                    new MutationObserver(muts => {
+                        muts.forEach(m => {
+                            m.addedNodes && m.addedNodes.forEach(node => {
+                                if (node.nodeType !== 1) return;
+                                const container = node.closest ? node.closest('.table-container') : null;
+                                if (container) this.wrap(container);
+                            });
+                        });
+                    }).observe(document.body, { childList: true, subtree: true });
+                }
+            }
+        };
+        window.TableScrollFix = TableScrollFix;
 
         const Utils = {
             // ── Comprime uma imagem (logo/foto de produto) ANTES de guardá-la ──
@@ -27641,6 +27692,9 @@ ${container.innerHTML}
 
         // ==================== INICIALIZAÇÃO ====================
         document.addEventListener('DOMContentLoaded', async () => {
+            // ✅ Corrige a estrutura de rolagem das tabelas (ver TableScrollFix
+            // acima) antes de qualquer outra coisa — independe de login/sessão.
+            try { if (window.TableScrollFix) TableScrollFix.init(); } catch(e) {}
             // ── Verifica sessão antes de qualquer inicialização ──
             const isLoggedIn = await AuthSystem.checkSession();
             if (!isLoggedIn) {
