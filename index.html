@@ -7056,7 +7056,7 @@ body.dark-mode,
                                             <button type="button" onclick="Sales.copyPixKey()" style="margin-left:6px;padding:2px 8px;background:#00a884;color:white;border:none;border-radius:6px;font-size:11px;cursor:pointer;"><i class="fas fa-copy"></i> Copiar</button>
                                         </div>
                                         <label style="display:inline-flex;align-items:center;gap:6px;margin-top:6px;cursor:pointer;font-size:13px;color:#2e7d32;font-weight:600;">
-                                            <input type="checkbox" id="pixDescontoAtivo" checked onchange="Sales.PAY.pixCalc.call(Sales.PAY)" style="width:16px;height:16px;cursor:pointer;">
+                                            <input type="checkbox" id="pixDescontoAtivo" onchange="Sales.PAY.pixCalc.call(Sales.PAY)" style="width:16px;height:16px;cursor:pointer;">
                                             Aplicar desconto PIX (<span id="pixDescontoPct">5</span>%) — opcional
                                         </label>
                                     </div>
@@ -7101,7 +7101,7 @@ body.dark-mode,
                                     <div style="flex:1;">
                                         <div style="font-weight:800;color:#1b5e20;font-size:14px;">Pagamento em Dinheiro</div>
                                         <label style="display:inline-flex;align-items:center;gap:6px;margin-top:6px;cursor:pointer;font-size:13px;color:#2e7d32;font-weight:600;">
-                                            <input type="checkbox" id="cashDescontoAtivo" checked onchange="Sales.PAY.cashCalc.call(Sales.PAY)" style="width:16px;height:16px;cursor:pointer;">
+                                            <input type="checkbox" id="cashDescontoAtivo" onchange="Sales.PAY.cashCalc.call(Sales.PAY)" style="width:16px;height:16px;cursor:pointer;">
                                             Aplicar desconto dinheiro (<span id="cashDescontoPct">3</span>%) — opcional
                                         </label>
                                     </div>
@@ -24990,7 +24990,7 @@ ${container.innerHTML}
                 else if (method === 'installment')  this.PAY.instCalc.call(this.PAY);
             },
 
-            selectPayment(method) {
+            selectPayment(method, preserveDiscount) {
                 state.currentSale.paymentMethod = method;
 
                 document.querySelectorAll('.payment-card').forEach(c => c.classList.remove('active'));
@@ -25010,9 +25010,21 @@ ${container.innerHTML}
 
                 if (method === 'pix') {
                     document.getElementById('pixDetails')?.classList.remove('d-none');
+                    // Desconto inicia sempre desmarcado — usuário decide se aplica
+                    // (exceto ao reabrir uma venda já salva, cujo estado é preservado)
+                    if (!preserveDiscount) {
+                        const pixDescCb = document.getElementById('pixDescontoAtivo');
+                        if (pixDescCb) pixDescCb.checked = false;
+                    }
                     this.PAY.pixCalc.call(this.PAY);
                 } else if (method === 'cash') {
                     document.getElementById('cashDetails')?.classList.remove('d-none');
+                    // Desconto inicia sempre desmarcado — usuário decide se aplica
+                    // (exceto ao reabrir uma venda já salva, cujo estado é preservado)
+                    if (!preserveDiscount) {
+                        const cashDescCb = document.getElementById('cashDescontoAtivo');
+                        if (cashDescCb) cashDescCb.checked = false;
+                    }
                     this.PAY.cashCalc.call(this.PAY);
                 } else if (method === 'debit') {
                     document.getElementById('debitDetails')?.classList.remove('d-none');
@@ -25725,8 +25737,15 @@ ${container.innerHTML}
                 document.getElementById('subtotalDisplay').innerText = Utils.formatCurrency(sale.subtotal);
                 document.getElementById('totalDisplay').innerText = Utils.formatCurrency(sale.total);
 
-                // Selecionar método de pagamento
-                this.selectPayment(sale.paymentMethod);
+                // Selecionar método de pagamento (preserva se o desconto já estava aplicado na venda salva)
+                this.selectPayment(sale.paymentMethod, true);
+                if (sale.paymentMethod === 'pix') {
+                    const pixDescCb = document.getElementById('pixDescontoAtivo');
+                    if (pixDescCb) { pixDescCb.checked = !!sale.methodDiscount; this.PAY.pixCalc.call(this.PAY); }
+                } else if (sale.paymentMethod === 'cash') {
+                    const cashDescCb = document.getElementById('cashDescontoAtivo');
+                    if (cashDescCb) { cashDescCb.checked = !!sale.methodDiscount; this.PAY.cashCalc.call(this.PAY); }
+                }
 
                 // Restaurar profissional
                 if (profEl) profEl.value = sale.professional || '';
@@ -27169,11 +27188,11 @@ ${container.innerHTML}
                     const el = document.getElementById(id);
                     if (el) { el.classList.add('d-none'); el.style.display = ''; }
                 });
-                // Reseta checkboxes de desconto opcional
+                // Reseta checkboxes de desconto opcional (inicia desmarcado — usuário decide)
                 const pixCb = document.getElementById('pixDescontoAtivo');
-                if (pixCb) pixCb.checked = true;
+                if (pixCb) pixCb.checked = false;
                 const cashCb = document.getElementById('cashDescontoAtivo');
-                if (cashCb) cashCb.checked = true;
+                if (cashCb) cashCb.checked = false;
                 // Oculta alertas de retirada/troco
                 ['pixAlerta','cashAlerta','retiradaAlert'].forEach(id => {
                     const el = document.getElementById(id); if (el) el.style.display = 'none';
