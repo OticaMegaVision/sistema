@@ -11358,13 +11358,16 @@ body.dark-mode,
                 // edição local aconteceu há poucos segundos NESTA MESMA loja, confia
                 // no que já está em memória em vez de arriscar sobrescrever com uma
                 // leitura do IDB que pode ainda não refletir essa gravação.
-                // ✅ Janela ampliada de 4s → 10s: o caminho completo edição → push
-                // (debounce local de 1.5s + debounce de nuvem de 0.8s + tempo de
-                // upload em rede) pode facilmente ultrapassar 4s em conexões móveis
-                // mais lentas, reabrindo a mesma janela de risco que este guard
-                // existe para fechar.
+                // ✅ FIX RELATÓRIO 05/08: janela reduzida de 10s → 6s. Os 10s (que
+                // substituíram um valor anterior de 4s, insuficiente em conexões
+                // móveis lentas — ver histórico acima) resolviam a race de
+                // sobrescrita, mas faziam Empresa/Meta do Mês ficarem visivelmente
+                // atrás do resto da tela em qualquer sync/troca de loja que
+                // ocorresse logo após uma edição. 6s mantém margem de segurança
+                // acima do valor que já se mostrou insuficiente (4s), reduzindo o
+                // atraso percebido sem reabrir a race original.
                 const recentLocalEdit = this._lastLocalConfigEdit
-                    && (Date.now() - this._lastLocalConfigEdit < 10000)
+                    && (Date.now() - this._lastLocalConfigEdit < 6000)
                     && this._lastLocalConfigEditStore === storeId;
                 if (!recentLocalEdit) {
                     state.company       = {};
@@ -30171,6 +30174,18 @@ const AuthSystem = {
                 const savedPref = await IDB.get(StoreManager._STORE_PREF_KEY);
                 if (savedPref === 'caucaia' || savedPref === 'barueri') preloadStoreId = savedPref;
             } catch(e) {}
+            // ✅ FIX RELATÓRIO 05/08 (logo some na tela de login): a resolução
+            // acima já descobria a loja certa, mas `window._currentStore`
+            // continuava fixo no valor padrão do carregamento do script até
+            // o login terminar. Como o MediaCache (usado tanto aqui quanto
+            // dentro de showLoginScreen() como reserva instantânea do logo) é
+            // sempre lido pela CHAVE de `window._currentStore`, o app buscava
+            // o logo em cache da loja ERRADA sempre que a última loja usada
+            // não era a padrão. Atualizamos a variável já aqui, antes de
+            // qualquer leitura de cache/tela de login, para as duas fontes
+            // (state.company vindo da nuvem e o MediaCache local) apontarem
+            // para a mesma loja.
+            window._currentStore = preloadStoreId;
             console.log('[DIAG checkSession] tela de login — preloadStoreId resolvido:', preloadStoreId);
             if (window.StoreManager && window.StoreManager.preloadCompanyConfig) {
                 await window.StoreManager.preloadCompanyConfig(preloadStoreId);
@@ -30277,6 +30292,20 @@ const StoreManager = {
                 try { App.updateCompanyDisplay(); } catch(e) {}
             }
         } catch(e) { console.warn('[StoreManager] preloadCompanyConfig:', e.message); }
+        // ✅ FIX RELATÓRIO 05/08 (logo some na tela de login): o doc
+        // 'config/empresa' buscado acima NUNCA contém o logo em si — o
+        // base64 é deliberadamente removido dele antes de subir para a
+        // nuvem (ver _pushAllData) e vive só no arquivo de mídia separado.
+        // Sem isto, a tela de login dependia inteiramente do MediaCache já
+        // salvo neste navegador; num aparelho novo, ou após limpar dados,
+        // o logo nunca chegava antes do login. Disparamos aqui o pull do
+        // arquivo de mídia da loja já resolvida (não aguardado — não deve
+        // atrasar a tela de login); quando a resposta chegar, o próprio
+        // fluxo de aplicação (_applyMediaData) já chama
+        // App.updateCompanyDisplay(), que também repinta o logo do card de
+        // login. Se a rede estiver lenta/indisponível, a tela de login
+        // segue exibindo o fallback padrão normalmente — nada trava.
+        try { window.CloudSync?.pullMediaNow?.(true); } catch(_e) {}
     },
 
     _updateUI() {
@@ -30369,6 +30398,28 @@ const StoreManager = {
         IDB.set(this._STORE_PREF_KEY, lojaId).catch(()=>{});
         // FIX: salva também no IndexedDB nativo para persistir mesmo sem localStorage
         sbUpsertDoc('_sistema', 'prefs', 'current_store', { storeId: lojaId, _updatedAt: new Date().toISOString() }).catch(()=>{});
+
+        // 2.5. ✅ FIX RELATÓRIO 05/08 (logo/empresa "sempre somem"/atrasam ao
+        // trocar de loja): até aqui a troca de loja só disparava
+        // LocalFirst.switchStore() → sync('switch_store'), que LÊ APENAS o
+        // IndexedDB local — nunca busca a versão mais recente na nuvem. Se
+        // este navegador nunca tinha carregado a loja nova antes (ou o cache
+        // local dela está desatualizado), Empresa/Meta/Logo ficavam visíveis
+        // apenas no próximo ciclo automático do polling (até alguns
+        // segundos). Igual ao que já acontece no boot, disparamos aqui um
+        // pull real (dados + arquivo de mídia/logo) para a loja NOVA, em
+        // paralelo, sem bloquear a UI — _applyCloudData()/_applyMediaData()
+        // já validam a loja ativa antes de aplicar qualquer coisa a `state`,
+        // então é seguro mesmo se o usuário trocar de loja de novo enquanto
+        // isso ainda está em voo.
+        try {
+            if (window.CloudSync) {
+                const provider = window.CloudSync.provider;
+                if (provider === 'gdrive')        window.CloudSync.gdrivePull(true).catch(()=>{});
+                else if (provider === 'onedrive') window.CloudSync.onedrivePull(true).catch(()=>{});
+                try { window.CloudSync.pullMediaNow?.(true); } catch(_e) {}
+            }
+        } catch(_e) {}
 
         // 3. Invalida cache de contas e file ID para a nova loja
         IDB._cache['contas_financeiras_' + lojaId] = null;
