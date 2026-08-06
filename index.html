@@ -11114,9 +11114,13 @@ body.dark-mode,
             },
 
             // Leitura síncrona (instantânea) — usada para pintar antes do IDB/nuvem responderem.
-            get(type, id) {
+            // overrideSid: permite ler o cache de uma loja específica mesmo que
+            // window._currentStore ainda não tenha sido atualizado para ela —
+            // usado pela tela de login, que precisa ler o cache da loja "última
+            // usada" antes de window._currentStore ser oficialmente trocado.
+            get(type, id, overrideSid) {
                 if (!id) return null;
-                const sid = window._currentStore || 'barueri';
+                const sid = overrideSid || window._currentStore || 'barueri';
                 try { return localStorage.getItem(this._key(sid, type, id)); } catch(_e) { return null; }
             },
 
@@ -11358,13 +11362,16 @@ body.dark-mode,
                 // edição local aconteceu há poucos segundos NESTA MESMA loja, confia
                 // no que já está em memória em vez de arriscar sobrescrever com uma
                 // leitura do IDB que pode ainda não refletir essa gravação.
-                // ✅ Janela ampliada de 4s → 10s: o caminho completo edição → push
-                // (debounce local de 1.5s + debounce de nuvem de 0.8s + tempo de
-                // upload em rede) pode facilmente ultrapassar 4s em conexões móveis
-                // mais lentas, reabrindo a mesma janela de risco que este guard
-                // existe para fechar.
+                // ✅ FIX RELATÓRIO 05/08: janela reduzida de 10s → 6s. Os 10s (que
+                // substituíram um valor anterior de 4s, insuficiente em conexões
+                // móveis lentas — ver histórico acima) resolviam a race de
+                // sobrescrita, mas faziam Empresa/Meta do Mês ficarem visivelmente
+                // atrás do resto da tela em qualquer sync/troca de loja que
+                // ocorresse logo após uma edição. 6s mantém margem de segurança
+                // acima do valor que já se mostrou insuficiente (4s), reduzindo o
+                // atraso percebido sem reabrir a race original.
                 const recentLocalEdit = this._lastLocalConfigEdit
-                    && (Date.now() - this._lastLocalConfigEdit < 10000)
+                    && (Date.now() - this._lastLocalConfigEdit < 6000)
                     && this._lastLocalConfigEditStore === storeId;
                 if (!recentLocalEdit) {
                     state.company       = {};
@@ -29902,7 +29909,14 @@ const AuthSystem = {
             // lógica reaproveitada aqui: quando state.company.logo ainda não
             // chegou, consulta o MediaCache antes de cair para o fallback da
             // sidebar/ícone padrão.
-            const cacheSrc = (window.MediaCache) ? MediaCache.get('company', 'logo') : null;
+            // ✅ FIX RELATÓRIO 05/08: passa window._loginPreloadStore como
+            // overrideSid — sem isso, esta leitura usava window._currentStore,
+            // que antes do login ainda é o valor padrão do carregamento do
+            // script, não a última loja realmente usada neste navegador
+            // (ver checkSession()). Cai para o comportamento antigo (usa
+            // window._currentStore) se por algum motivo a variável não foi
+            // resolvida ainda.
+            const cacheSrc = (window.MediaCache) ? MediaCache.get('company', 'logo', window._loginPreloadStore) : null;
 
             // 2) Fallback: tenta pegar do elemento img da sidebar
             const sidebarImg = document.getElementById('logoImg');
@@ -29947,7 +29961,10 @@ const AuthSystem = {
                     ? state.company.logo : null;
                 // ✅ FIX BUG B-2: mesma reserva via MediaCache na checagem de
                 // segurança de 300ms — igual à checagem inicial acima.
-                const cacheSrc = (window.MediaCache) ? MediaCache.get('company', 'logo') : null;
+                // ✅ FIX RELATÓRIO 05/08: idem, usa a loja resolvida no
+                // pré-load do login (window._loginPreloadStore), não
+                // window._currentStore.
+                const cacheSrc = (window.MediaCache) ? MediaCache.get('company', 'logo', window._loginPreloadStore) : null;
                 const finalSrc300 = logoSrc || cacheSrc;
                 if (finalSrc300 && loginLogo) {
                     loginLogo.src = finalSrc300;
@@ -30171,6 +30188,20 @@ const AuthSystem = {
                 const savedPref = await IDB.get(StoreManager._STORE_PREF_KEY);
                 if (savedPref === 'caucaia' || savedPref === 'barueri') preloadStoreId = savedPref;
             } catch(e) {}
+            // ✅ FIX RELATÓRIO 05/08 (v2 — correção da correção): a primeira
+            // tentativa mutava `window._currentStore` aqui, ANTES do login.
+            // Isso violava uma premissa usada por outro trecho do próprio
+            // código (ver CloudSync.resumeAutoConnect: "chamado depois que a
+            // loja correta do usuário logado já foi resolvida — nunca antes
+            // disso"): mexer nessa variável global antes da autenticação
+            // podia deixar código de conexão/sync com a nuvem agir cedo
+            // demais, usando uma loja que é só um "palpite" de exibição, não
+            // a loja realmente resolvida pelo login. Revertido: NÃO mexe
+            // mais em window._currentStore aqui. Em vez disso, guardamos a
+            // loja resolvida numa variável dedicada, só para a tela de
+            // login saber em qual cache local procurar o logo (ver
+            // MediaCache.get(..., overrideSid) e showLoginScreen()).
+            window._loginPreloadStore = preloadStoreId;
             console.log('[DIAG checkSession] tela de login — preloadStoreId resolvido:', preloadStoreId);
             if (window.StoreManager && window.StoreManager.preloadCompanyConfig) {
                 await window.StoreManager.preloadCompanyConfig(preloadStoreId);
@@ -30199,18 +30230,6 @@ window.AuthSystem = AuthSystem;
 // ==================== STORE MANAGER ====================
 const StoreManager = {
     _STORE_PREF_KEY: 'otica_current_store',
-    // ✅ FIX MISTURA DE LOJAS (RAIZ DO PROBLEMA): switchTo() fazia sua PRÓPRIA
-    // leitura assíncrona do IndexedDB e gravava direto em `state`, fora do
-    // mutex usado por LocalFirst (_withSyncLock) e sem nenhuma proteção contra
-    // reentrância. Se o usuário trocasse de loja duas vezes rápido (ou clicasse
-    // de novo antes da 1ª troca terminar), a chamada MAIS ANTIGA podia terminar
-    // DEPOIS da mais nova e sobrescrever `state.clients/sales/products/...` com
-    // os dados da loja ANTERIOR — mesmo com window._currentStore já apontando
-    // para a loja nova. Esse era o mecanismo real da "mistura entre lojas".
-    // _switchGen é incrementado a cada chamada de switchTo(); qualquer chamada
-    // cujo número de geração não seja mais o mais recente ao terminar seu
-    // trabalho assíncrono é descartada sem tocar em `state` ou na UI.
-    _switchGen: 0,
     _lojas: {
         barueri: { label: 'Barueri', fullLabel: 'Loja Barueri' },
         caucaia: { label: 'Caucaia do Alto', fullLabel: 'Loja Caucaia do Alto' }
@@ -30241,7 +30260,7 @@ const StoreManager = {
         // TODO reload de página com sessão já válida (F5, pós-logout, nova aba)
         // — nunca reaplicava essa correção. Resultado: um usuário restrito a
         // 1 loja podia herdar a loja errada (a última que outra sessão deixou
-        // na preferência global) sem passar pelo mutex/_switchGen do switchTo(),
+        // na preferência global) sem passar pelo fluxo de reload do switchTo(),
         // causando o "flash" de dados errados e, em corrida, a mistura real
         // entre lojas. Agora essa checagem é centralizada aqui, então vale
         // tanto para login novo quanto para sessão retomada.
@@ -30328,168 +30347,51 @@ const StoreManager = {
         if (m) m.style.display = 'none';
     },
 
+    // ✅ FIX DEFINITIVO — LOGO/EMPRESA SOMEM AO TROCAR DE LOJA: as versões
+    // anteriores deste método trocavam de loja "ao vivo", mutando `state` aos
+    // pedaços enquanto vários processos assíncronos (sync, realtime, cloud
+    // pull) podiam terminar fora de ordem — daí as várias camadas de mutex/
+    // geração (`_switchGen`) que ainda assim não fechavam 100% das brechas.
+    // Agora a troca de loja salva a preferência e recarrega a página inteira:
+    // o boot (App.init → StoreManager.init → LocalFirst.switchStore) já é o
+    // caminho testado e confiável que roda em todo F5, então a loja nova
+    // sempre sobe com state/company/logo consistentes, sem janela de estado
+    // "meio trocado".
     async switchTo(lojaId) {
         if (!this._lojas[lojaId]) return;
         if (lojaId === window._currentStore) { this.closeModal(); return; }
 
-        // ✅ FIX MISTURA DE LOJAS: token desta chamada específica. Comparado
-        // depois de cada trecho assíncrono (ver comentário no topo do objeto).
-        const myGen = ++this._switchGen;
-
         const loja = this._lojas[lojaId];
         this.closeModal();
 
-        // 0. FIX MULTI-LOJA: força o backup imediato da loja ANTERIOR antes de trocar.
-        // Cancela qualquer scheduleSave pendente e salva agora (síncrono) enquanto
-        // window._currentStore e state ainda apontam para a loja anterior.
+        // 0. Força o backup imediato da loja ANTERIOR antes de trocar — cancela
+        // qualquer scheduleSave pendente e salva agora, enquanto state ainda
+        // reflete a loja de origem, pra não perder edição recente no reload.
         const lojaAnterior = window._currentStore || 'barueri';
         try {
             if (window.LocalStorageBackup) {
                 clearTimeout(LocalStorageBackup._timers[lojaAnterior]);
                 LocalStorageBackup._timers[lojaAnterior] = null;
-                LocalStorageBackup.save(lojaAnterior); // salva agora, estado ainda correto
+                LocalStorageBackup.save(lojaAnterior);
             }
         } catch(_e) {}
 
-        // 1. Para Realtime da loja anterior imediatamente
-        try {
-            // LocalFirst listeners managed automatically
-        } catch(e) {}
-        LocalFirst._realtimePaused = true;
-        // ✅ FIX MISTURA DE LOJAS: cancela qualquer push/cloud-sync debounced que
-        // ainda não disparou. Sem isso, uma edição feita pouco antes da troca podia
-        // ter seu upload disparar DEPOIS de window._currentStore já ser a loja nova,
-        // subindo dados errados (da loja anterior, ou já resetados) para o arquivo
-        // da loja nova no Drive/OneDrive — misturando as duas lojas na nuvem.
+        // 1. Cancela qualquer push/cloud-sync debounced pendente da loja
+        // anterior — sem isso, o upload podia disparar DEPOIS do reload já
+        // ter trocado de loja, subindo dados errados para o arquivo da nova.
         try { clearTimeout(LocalFirst._cloudSyncTimer); LocalFirst._cloudSyncTimer = null; } catch(_e) {}
         try { if (window.CloudSync) CloudSync.cancelPendingPush(); } catch(_e) {}
 
-        // 2. Troca loja e salva preferência em ambos os storages
-        window._currentStore = lojaId;
-        IDB.set(this._STORE_PREF_KEY, lojaId).catch(()=>{});
-        // FIX: salva também no IndexedDB nativo para persistir mesmo sem localStorage
-        sbUpsertDoc('_sistema', 'prefs', 'current_store', { storeId: lojaId, _updatedAt: new Date().toISOString() }).catch(()=>{});
+        // 2. Salva a preferência da loja nova em ambos os storages ANTES do
+        // reload, pra que StoreManager.init() já carregue com ela no próximo
+        // boot da página.
+        try { await IDB.set(this._STORE_PREF_KEY, lojaId); } catch(_e) {}
+        try { await sbUpsertDoc('_sistema', 'prefs', 'current_store', { storeId: lojaId, _updatedAt: new Date().toISOString() }); } catch(_e) {}
 
-        // 3. Invalida cache de contas e file ID para a nova loja
-        IDB._cache['contas_financeiras_' + lojaId] = null;
-        // FIX MULTI-LOJA: limpa file ID em memória da nova loja para forçar
-        // re-busca do arquivo correto no Drive após troca de loja
-        // ✅ FIX: chamava uma propriedade inexistente (`_gdriveFileIdCache`), que
-        // nunca limpava nada de verdade — corrigido para o método real exposto
-        // pelo CloudSync (ver `clearFileIdCache` — mesmo fix que resolve os
-        // arquivos duplicados/divergentes entre navegadores).
-        try { if (window.CloudSync) CloudSync.clearFileIdCache(lojaId); } catch(_e) {}
-
-        // 4. Reseta state imediatamente (UI fica em branco por < 1s)
-        // ✅ FIX MISTURA DE LOJAS CRÍTICO: config/notificacoes/backupConfig não
-        // estavam nesta lista de reset. Resultado: ao trocar de loja, as
-        // configurações de Notificações e Backup Automático (e o objeto "config")
-        // continuavam sendo as da loja ANTERIOR até (e a menos que) a loja nova já
-        // tivesse um doc 'empresa' salvo — e mesmo aí, o Object.assign abaixo (passo
-        // 6) mesclava por cima do objeto antigo em vez de substituí-lo, deixando
-        // chaves da loja anterior misturadas com as da loja nova. Agora essas três
-        // chaves são sempre zeradas aqui, igual já acontecia com clients/products/etc.
-        const keepMsgs = state.wppMensagens;
-        Object.assign(state, {
-            company: { name: loja.fullLabel, primaryColor:'#ff6b00', secondaryColor:'#ffcc00',
-                paymentMethods:{pix:true,cash:true,debit:true,credit:true,installment:true},
-                lateFee:2, dailyInterest:0.033, logo:null, lojaAtual:lojaId },
-            clients:[], products:[], services:[], suppliers:[], sales:[], expenses:[],
-            prescriptions:[], crmContatos:[], crmTarefas:[], crmNps:[],
-            config:{}, notificacoes:{}, backupConfig:{},
-            editingId:null, editingSaleId:null, lastOsCounter:{},
-            wppMensagens: keepMsgs
-        });
-
-        // 4.5. ✅ FIX BUG B-1 (logo some ao trocar de loja): o reset acima zera
-        // state.company.logo (null) e, sem isto, o logo só voltava a ser pintado
-        // quando App.updateCompanyDisplay() rodasse de novo ao FINAL de todo o
-        // ciclo de sync (LocalFirst.switchStore() → _fetchAllData()) — ficando
-        // visivelmente ausente durante essa janela. App.updateCompanyDisplay()
-        // já sabe usar o MediaCache local (por loja) como reserva quando
-        // state.company.logo ainda não chegou; chamando-a aqui, imediatamente
-        // após a troca, o logo da loja nova (se já esteve em cache) volta na
-        // hora — sem esperar a nuvem. O dado definitivo segue vindo do sync
-        // normal no passo 6 abaixo, que sobrescreve este valor quando chegar.
-        try { App.updateCompanyDisplay?.(); } catch(_e) {}
-
-        // 5. Atualiza badge de loja e fecha modal imediatamente
-        this._updateUI();
-        Toast.show('⏳ ' + loja.fullLabel + ' — carregando...', 'info', 1500);
-
-        // 6. Busca dados da nova loja — DELEGADO ao pipeline único e protegido
-        // ✅ FIX MISTURA DE LOJAS (correção definitiva): este bloco fazia sua
-        // própria leitura do IndexedDB e escrevia direto em `state`, fora do
-        // mutex _withSyncLock usado por LocalFirst. Se outra troca de loja (ou
-        // um pull/broadcast concorrente) terminasse fora de ordem, os dados da
-        // loja ERRADA eram gravados em `state` sem nenhuma checagem. Agora toda
-        // leitura de dados passa exclusivamente por LocalFirst.switchStore(),
-        // que roda dentro do mesmo mutex usado por todo o resto do app — só uma
-        // operação de leitura/escrita em `state` roda por vez, nunca duas.
-        try {
-            await LocalFirst.switchStore(lojaId);
-
-            // ✅ Guarda de geração: se o usuário trocou de loja de novo (ou já
-            // estamos em outra loja) enquanto este await estava pendente, esta
-            // chamada é obsoleta — aborta ANTES de tocar em qualquer UI ou
-            // gravar preferências, para não sobrepor o resultado da troca mais
-            // recente com um toast/estado desatualizado.
-            if (myGen !== this._switchGen || window._currentStore !== lojaId) return;
-
-            // Aplica cor da loja (LocalFirst.switchStore já popula state.company)
-            if (state.company.primaryColor)   document.documentElement.style.setProperty('--primary', state.company.primaryColor);
-            if (state.company.secondaryColor) document.documentElement.style.setProperty('--secondary', state.company.secondaryColor);
-
-            // Passos de UI específicos do seletor de loja que o sync genérico
-            // (LocalFirst.sync) não cobre:
-            try { Config.renderBackupStatus?.(); } catch(e) {}
-            Utils.updatePixKey();
-            // FIX BUG#4: restaura preferência de ocultar valores para a nova loja
-            try { Dashboard._restoreHideValues?.(); } catch(e) {}
-
-            Toast.show('✅ ' + loja.fullLabel + ' carregada!', 'success', 2000);
-        } catch(e) {
-            console.warn('[StoreManager] Erro ao carregar loja:', e.message);
-            Toast.show('⚠️ Erro ao carregar dados — tente novamente', 'warning', 3000);
-        }
-
-        // Se uma troca mais nova já começou, para por aqui — os passos 7 e 8
-        // abaixo pertencem à chamada mais recente, não a esta.
-        if (myGen !== this._switchGen || window._currentStore !== lojaId) return;
-
-        // 7. Reinicia listeners local-first para a nova loja
-        try {
-            LocalFirst._realtimePaused = false;
-            LocalFirst._realtimeStatus = 'Local';
-            try { if (window.CloudSync) CloudSync._updateUI(); } catch(_e) {}
-        } catch(e) { console.warn('[StoreManager] LocalFirst:', e.message); }
-
-        // 8. FIX MULTI-LOJA: pull imediato do Drive para a nova loja
-        // Garante que Caucaia e Barueri sempre tenham seus dados mais recentes
-        // ao trocar de loja, mesmo que o sync automático ainda não tenha rodado.
-        // (CloudSync._applyCloudData já rejeita, por conta própria, qualquer
-        // arquivo remoto cujo _store não bata com a loja ativa no momento em
-        // que o download termina — ver comentário "FIX CRÍTICO — VALIDAÇÃO DE
-        // LOJA" — então mesmo que o usuário troque de loja de novo durante o
-        // download, o dado da loja errada não é aplicado.)
-        try {
-            if (window.CloudSync && CloudSync.connected) {
-                // ✅ FIX SYNC-REALTIME-TROCA-LOJA: sem isso, o canal Realtime do
-                // Supabase continuava escutando a loja ANTERIOR — a loja nova só
-                // recebia atualizações em tempo real depois de um F5.
-                try { CloudSync.rebindRealtimeForStore?.(); } catch(_e3) {}
-                setTimeout(() => {
-                    if (window._currentStore !== lojaId) return;
-                    CloudSync.forcePull().catch(()=>{});
-                    // ✅ FIX SYNC-MEDIA-TROCA-LOJA: forcePull() só puxa os dados
-                    // principais (clientes, produtos, vendas...) — o arquivo de
-                    // mídia (logo + fotos) só chegava depois, via o próximo ciclo
-                    // do polling (até MEDIA_POLL_ACTIVE_MS/BACKGROUND_MS). Agora o
-                    // logo/fotos da loja nova também são puxados imediatamente.
-                    try { CloudSync.pullMediaNow?.(true); } catch(_e2) {}
-                }, 600);
-            }
-        } catch(_e) {}
+        // 3. Recarrega a página inteira — troca de loja passa a usar o mesmo
+        // caminho de boot que já funciona corretamente no F5.
+        Toast.show('⏳ Trocando para ' + loja.fullLabel + '...', 'info', 4000);
+        setTimeout(() => { location.reload(); }, 250);
     }
 };
 window.StoreManager = StoreManager;
