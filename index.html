@@ -14461,10 +14461,8 @@ body.dark-mode,
             }
 
             // ════════════════════════════════════════════════════════════════
-            //  POLLING — detecta mudanças de outros dispositivos a cada 30s
-            // ════════════════════════════════════════════════════════════════
-            // ════════════════════════════════════════════════════════════════
-            //  POLLING ADAPTATIVO — 5s quando ativo, 45s em background
+            //  POLLING ADAPTATIVO — 5s quando a aba está ativa, 15s em background
+            //  (valores confirmados em 05/08/2026 — ver POLL_ACTIVE_MS/POLL_BACKGROUND_MS)
             // ════════════════════════════════════════════════════════════════
             function _startPolling() {
                 _stopPolling();
@@ -14476,9 +14474,11 @@ body.dark-mode,
                 _pollTimer = setTimeout(_tick, POLL_ACTIVE_MS);
                 console.log('[CloudSync] ✅ Polling adaptativo iniciado (ativo:' + POLL_ACTIVE_MS/1000 + 's / bg:' + POLL_BACKGROUND_MS/1000 + 's)');
 
-                // ✅ FIX PERFORMANCE-SYNC: poll separado e mais espaçado só pro
-                // arquivo de mídia (logo/fotos) — não faz sentido baixar imagens
-                // no mesmo ritmo de 5s dos dados, já que mudam raramente.
+                // ⚠️ NOTA 05/08/2026: este comentário dizia que a mídia sincroniza
+                // "mais espaçada" que os dados — não é mais verdade. MEDIA_POLL_ACTIVE_MS
+                // e MEDIA_POLL_BACKGROUND_MS foram igualados a POLL_ACTIVE_MS/POLL_BACKGROUND_MS
+                // (ver declaração das constantes) para o logo/fotos chegarem no mesmo
+                // ritmo dos dados "quentes" — ambos giram a 5s ativo / 15s background.
                 function _mediaTick() {
                     if (document.visibilityState !== 'hidden') _pullMediaNow(true);
                     const next = document.visibilityState === 'hidden' ? MEDIA_POLL_BACKGROUND_MS : MEDIA_POLL_ACTIVE_MS;
@@ -30347,7 +30347,8 @@ const StoreManager = {
         if (m) m.style.display = 'none';
     },
 
-    // ✅ FIX DEFINITIVO — LOGO/EMPRESA SOMEM AO TROCAR DE LOJA: as versões
+    // ✅ FIX DEFINITIVO — LOGO/EMPRESA SOMEM AO TROCAR DE LOJA
+    // [VALIDADO EM PRODUÇÃO — 05/08/2026: confirmado pelo usuário que resolveu]: as versões
     // anteriores deste método trocavam de loja "ao vivo", mutando `state` aos
     // pedaços enquanto vários processos assíncronos (sync, realtime, cloud
     // pull) podiam terminar fora de ordem — daí as várias camadas de mutex/
