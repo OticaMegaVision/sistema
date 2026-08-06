@@ -5893,6 +5893,124 @@ body.dark-mode,
 .dark-mode .ss-item { color: #eee; border-bottom-color: #333; }
 .dark-mode .ss-item:hover, .dark-mode .ss-item.ss-active { background: #2a2a2a; }
 .dark-mode .ss-empty { color: #777; }
+
+/* ══════════════════════════════════════════════════════════════
+   DASHBOARD — VISUAL 3D (amostra aprovada)
+   Apenas estilo. Nenhuma classe, id ou estrutura foi alterada,
+   então nada do JS que preenche os widgets é afetado.
+   Escopado em #dashboardCards para não vazar para outras telas
+   que reaproveitam .card / .card-icon / .card-value etc.
+══════════════════════════════════════════════════════════════ */
+#dashboardCards .card {
+    background: linear-gradient(180deg, #ffffff 0%, #fbfcfe 100%) !important;
+    border: 1px solid rgba(20,30,50,0.05) !important;
+    box-shadow:
+        0 1px 0 rgba(255,255,255,0.9) inset,
+        0 16px 28px -16px rgba(24,32,55,0.22),
+        0 2px 6px rgba(24,32,55,0.06) !important;
+    position: relative;
+    overflow: hidden;
+}
+#dashboardCards .card::before {
+    content: "";
+    position: absolute;
+    top: 0; left: 0; right: 0; height: 60%;
+    background: linear-gradient(180deg, rgba(255,255,255,0.55), rgba(255,255,255,0) 70%);
+    pointer-events: none;
+}
+#dashboardCards .card::after {
+    height: 3px !important;
+    opacity: 0.9;
+}
+#dashboardCards .card:hover {
+    transform: translateY(-3px) !important;
+    box-shadow:
+        0 1px 0 rgba(255,255,255,0.9) inset,
+        0 22px 34px -16px rgba(24,32,55,0.26),
+        0 3px 8px rgba(24,32,55,0.08) !important;
+}
+.dark-mode #dashboardCards .card {
+    background: linear-gradient(180deg, #1f1712 0%, #1a1208 100%) !important;
+    box-shadow:
+        0 1px 0 rgba(255,255,255,0.04) inset,
+        0 16px 28px -16px rgba(0,0,0,0.55) !important;
+}
+
+/* Badges 3D — brilho + profundidade, cor herdada do accent de cada widget */
+#dashboardCards .card-icon {
+    border-radius: 13px !important;
+    position: relative;
+    box-shadow: inset 0 1px 1px rgba(255,255,255,0.55);
+}
+#dashboardCards .card-icon::after {
+    content: "";
+    position: absolute; inset: 0;
+    border-radius: 13px;
+    background: linear-gradient(135deg, rgba(255,255,255,0.5), rgba(255,255,255,0) 55%);
+    pointer-events: none;
+}
+#dashboardCards .card-icon i {
+    position: relative; z-index: 1;
+    color: #fff !important;
+}
+/* Vendas (#ff6b00) e Meta do Mês (#ff6b00) */
+#dashboardCards .card-icon[style*="color:#ff6b00"] {
+    background: linear-gradient(145deg,#ffb25e,#ff6b00) !important;
+    box-shadow: 0 8px 14px -6px rgba(255,107,0,0.4), inset 0 1px 1px rgba(255,255,255,0.55) !important;
+}
+/* Recebido (#0d9488) */
+#dashboardCards .card-icon[style*="color:#0d9488"] {
+    background: linear-gradient(145deg,#5eead4,#0d9488) !important;
+    box-shadow: 0 8px 14px -6px rgba(13,148,136,0.4), inset 0 1px 1px rgba(255,255,255,0.55) !important;
+}
+/* Despesas / Resultado negativo (#dc3545) */
+#dashboardCards .card-icon[style*="color:#dc3545"] {
+    background: linear-gradient(145deg,#ff8a93,#dc3545) !important;
+    box-shadow: 0 8px 14px -6px rgba(220,53,69,0.35), inset 0 1px 1px rgba(255,255,255,0.55) !important;
+}
+/* Resultado positivo (#22c55e) */
+#dashboardCards .card-icon[style*="color:#22c55e"] {
+    background: linear-gradient(145deg,#86efac,#22c55e) !important;
+    box-shadow: 0 8px 14px -6px rgba(34,197,94,0.4), inset 0 1px 1px rgba(255,255,255,0.55) !important;
+}
+/* OS em Aberto (#d4a017) */
+#dashboardCards .card-icon[style*="color:#d4a017"] {
+    background: linear-gradient(145deg,#f7d67a,#d4a017) !important;
+    box-shadow: 0 8px 14px -6px rgba(212,160,23,0.4), inset 0 1px 1px rgba(255,255,255,0.55) !important;
+}
+/* Ótica / info da loja (#8b6b3d) */
+#dashboardCards .card-icon[style*="color:#8b6b3d"] {
+    background: linear-gradient(145deg,#c9a876,#8b6b3d) !important;
+    box-shadow: 0 8px 14px -6px rgba(139,107,61,0.4), inset 0 1px 1px rgba(255,255,255,0.55) !important;
+}
+
+/* Números com mais peso/relevo */
+#dashboardCards .card-value {
+    letter-spacing: -0.02em !important;
+    text-shadow: 0 1px 0 rgba(255,255,255,0.6);
+}
+.dark-mode #dashboardCards .card-value { text-shadow: none; }
+
+/* Selo de tendência com relevo sutil */
+#dashboardCards .kpi-trend-badge {
+    box-shadow: inset 0 1px 2px rgba(0,0,0,0.06);
+}
+
+/* Barra de progresso com trilho encaixado e brilho na cor do widget */
+#dashboardCards .kpi-progress-wrap {
+    background: rgba(20,30,50,0.07) !important;
+    box-shadow: inset 0 1px 2px rgba(20,30,50,0.10);
+    border-radius: 4px !important;
+}
+#dashboardCards .kpi-progress-bar {
+    box-shadow: 0 0 8px currentColor;
+    filter: saturate(1.05);
+}
+
+/* Card OS + Meta e Card Info da Loja acompanham o mesmo relevo */
+#dashboardCards .card-os-meta .dash-os-meta-divider {
+    background: linear-gradient(180deg, transparent, rgba(20,30,50,0.12), transparent) !important;
+}
 </style>
 </head>
 <body>
