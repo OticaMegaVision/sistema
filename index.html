@@ -11114,9 +11114,13 @@ body.dark-mode,
             },
 
             // Leitura síncrona (instantânea) — usada para pintar antes do IDB/nuvem responderem.
-            get(type, id) {
+            // overrideSid: permite ler o cache de uma loja específica mesmo que
+            // window._currentStore ainda não tenha sido atualizado para ela —
+            // usado pela tela de login, que precisa ler o cache da loja "última
+            // usada" antes de window._currentStore ser oficialmente trocado.
+            get(type, id, overrideSid) {
                 if (!id) return null;
-                const sid = window._currentStore || 'barueri';
+                const sid = overrideSid || window._currentStore || 'barueri';
                 try { return localStorage.getItem(this._key(sid, type, id)); } catch(_e) { return null; }
             },
 
@@ -11358,13 +11362,16 @@ body.dark-mode,
                 // edição local aconteceu há poucos segundos NESTA MESMA loja, confia
                 // no que já está em memória em vez de arriscar sobrescrever com uma
                 // leitura do IDB que pode ainda não refletir essa gravação.
-                // ✅ Janela ampliada de 4s → 10s: o caminho completo edição → push
-                // (debounce local de 1.5s + debounce de nuvem de 0.8s + tempo de
-                // upload em rede) pode facilmente ultrapassar 4s em conexões móveis
-                // mais lentas, reabrindo a mesma janela de risco que este guard
-                // existe para fechar.
+                // ✅ FIX RELATÓRIO 05/08: janela reduzida de 10s → 6s. Os 10s (que
+                // substituíram um valor anterior de 4s, insuficiente em conexões
+                // móveis lentas — ver histórico acima) resolviam a race de
+                // sobrescrita, mas faziam Empresa/Meta do Mês ficarem visivelmente
+                // atrás do resto da tela em qualquer sync/troca de loja que
+                // ocorresse logo após uma edição. 6s mantém margem de segurança
+                // acima do valor que já se mostrou insuficiente (4s), reduzindo o
+                // atraso percebido sem reabrir a race original.
                 const recentLocalEdit = this._lastLocalConfigEdit
-                    && (Date.now() - this._lastLocalConfigEdit < 10000)
+                    && (Date.now() - this._lastLocalConfigEdit < 6000)
                     && this._lastLocalConfigEditStore === storeId;
                 if (!recentLocalEdit) {
                     state.company       = {};
@@ -29902,7 +29909,14 @@ const AuthSystem = {
             // lógica reaproveitada aqui: quando state.company.logo ainda não
             // chegou, consulta o MediaCache antes de cair para o fallback da
             // sidebar/ícone padrão.
-            const cacheSrc = (window.MediaCache) ? MediaCache.get('company', 'logo') : null;
+            // ✅ FIX RELATÓRIO 05/08: passa window._loginPreloadStore como
+            // overrideSid — sem isso, esta leitura usava window._currentStore,
+            // que antes do login ainda é o valor padrão do carregamento do
+            // script, não a última loja realmente usada neste navegador
+            // (ver checkSession()). Cai para o comportamento antigo (usa
+            // window._currentStore) se por algum motivo a variável não foi
+            // resolvida ainda.
+            const cacheSrc = (window.MediaCache) ? MediaCache.get('company', 'logo', window._loginPreloadStore) : null;
 
             // 2) Fallback: tenta pegar do elemento img da sidebar
             const sidebarImg = document.getElementById('logoImg');
@@ -29947,7 +29961,10 @@ const AuthSystem = {
                     ? state.company.logo : null;
                 // ✅ FIX BUG B-2: mesma reserva via MediaCache na checagem de
                 // segurança de 300ms — igual à checagem inicial acima.
-                const cacheSrc = (window.MediaCache) ? MediaCache.get('company', 'logo') : null;
+                // ✅ FIX RELATÓRIO 05/08: idem, usa a loja resolvida no
+                // pré-load do login (window._loginPreloadStore), não
+                // window._currentStore.
+                const cacheSrc = (window.MediaCache) ? MediaCache.get('company', 'logo', window._loginPreloadStore) : null;
                 const finalSrc300 = logoSrc || cacheSrc;
                 if (finalSrc300 && loginLogo) {
                     loginLogo.src = finalSrc300;
@@ -30171,6 +30188,20 @@ const AuthSystem = {
                 const savedPref = await IDB.get(StoreManager._STORE_PREF_KEY);
                 if (savedPref === 'caucaia' || savedPref === 'barueri') preloadStoreId = savedPref;
             } catch(e) {}
+            // ✅ FIX RELATÓRIO 05/08 (v2 — correção da correção): a primeira
+            // tentativa mutava `window._currentStore` aqui, ANTES do login.
+            // Isso violava uma premissa usada por outro trecho do próprio
+            // código (ver CloudSync.resumeAutoConnect: "chamado depois que a
+            // loja correta do usuário logado já foi resolvida — nunca antes
+            // disso"): mexer nessa variável global antes da autenticação
+            // podia deixar código de conexão/sync com a nuvem agir cedo
+            // demais, usando uma loja que é só um "palpite" de exibição, não
+            // a loja realmente resolvida pelo login. Revertido: NÃO mexe
+            // mais em window._currentStore aqui. Em vez disso, guardamos a
+            // loja resolvida numa variável dedicada, só para a tela de
+            // login saber em qual cache local procurar o logo (ver
+            // MediaCache.get(..., overrideSid) e showLoginScreen()).
+            window._loginPreloadStore = preloadStoreId;
             console.log('[DIAG checkSession] tela de login — preloadStoreId resolvido:', preloadStoreId);
             if (window.StoreManager && window.StoreManager.preloadCompanyConfig) {
                 await window.StoreManager.preloadCompanyConfig(preloadStoreId);
