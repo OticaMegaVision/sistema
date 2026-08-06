@@ -14,6 +14,85 @@
     <meta name="apple-mobile-web-app-title" content="ÓticaMegaVision">
     <meta name="msapplication-TileColor" content="#ff6b00">
     <meta name="msapplication-tap-highlight" content="no">
+    <!-- ===== DEBUG MÓVEL TEMPORÁRIO (ver relatório 05/08) =====
+         Painel flutuante que captura os logs do console (log/warn/error) e
+         mostra na tela do celular, com botão de copiar — para diagnosticar
+         o bug de logo/empresa sumindo ao trocar de loja sem precisar de
+         cabo/computador. Puramente aditivo: só lê o console, não altera
+         nenhuma lógica do sistema. Pode ser removido depois que o bug for
+         resolvido. -->
+    <script>
+    (function() {
+        var buf = [];
+        var MAX = 400;
+        function push(kind, args) {
+            try {
+                var txt = Array.prototype.map.call(args, function(a) {
+                    if (a instanceof Error) return a.message;
+                    if (typeof a === 'object') { try { return JSON.stringify(a); } catch(_e) { return String(a); } }
+                    return String(a);
+                }).join(' ');
+                var t = new Date().toLocaleTimeString('pt-BR');
+                buf.push('[' + t + '] [' + kind + '] ' + txt);
+                if (buf.length > MAX) buf.shift();
+                var panel = document.getElementById('_dbgLogBody');
+                if (panel && document.getElementById('_dbgPanel').style.display !== 'none') {
+                    panel.textContent = buf.join('\n');
+                    panel.scrollTop = panel.scrollHeight;
+                }
+            } catch(_e) {}
+        }
+        var origLog = console.log, origWarn = console.warn, origErr = console.error;
+        console.log   = function() { push('log',   arguments); origLog.apply(console, arguments); };
+        console.warn  = function() { push('warn',  arguments); origWarn.apply(console, arguments); };
+        console.error = function() { push('error', arguments); origErr.apply(console, arguments); };
+        window._dbgGetLog = function() { return buf.join('\n'); };
+
+        function buildUI() {
+            var btn = document.createElement('button');
+            btn.id = '_dbgFab';
+            btn.textContent = '🐞';
+            btn.style.cssText = 'position:fixed;bottom:14px;right:14px;z-index:999999;width:44px;height:44px;border-radius:50%;background:#222;color:#fff;border:2px solid #ff6b00;font-size:20px;box-shadow:0 2px 10px rgba(0,0,0,0.4);';
+            var panel = document.createElement('div');
+            panel.id = '_dbgPanel';
+            panel.style.cssText = 'display:none;position:fixed;inset:0;z-index:999998;background:#111;color:#0f0;font:11px/1.4 monospace;';
+            panel.innerHTML =
+                '<div style="display:flex;gap:8px;padding:8px;background:#000;position:sticky;top:0;">' +
+                  '<button id="_dbgCopy" style="flex:1;padding:10px;background:#ff6b00;color:#fff;border:none;border-radius:6px;font-weight:bold;">📋 Copiar tudo</button>' +
+                  '<button id="_dbgClear" style="padding:10px;background:#444;color:#fff;border:none;border-radius:6px;">Limpar</button>' +
+                  '<button id="_dbgClose" style="padding:10px;background:#444;color:#fff;border:none;border-radius:6px;">Fechar ✕</button>' +
+                '</div>' +
+                '<pre id="_dbgLogBody" style="white-space:pre-wrap;word-break:break-all;padding:8px;margin:0;height:calc(100vh - 60px);overflow:auto;"></pre>';
+            document.addEventListener('DOMContentLoaded', function() {
+                document.body.appendChild(btn);
+                document.body.appendChild(panel);
+                btn.onclick = function() {
+                    panel.style.display = 'block';
+                    document.getElementById('_dbgLogBody').textContent = buf.join('\n');
+                };
+                document.getElementById('_dbgClose').onclick = function() { panel.style.display = 'none'; };
+                document.getElementById('_dbgClear').onclick = function() { buf = []; document.getElementById('_dbgLogBody').textContent = ''; };
+                document.getElementById('_dbgCopy').onclick = function() {
+                    var text = buf.join('\n');
+                    function fallback() {
+                        var ta = document.createElement('textarea');
+                        ta.value = text; ta.style.position='fixed'; ta.style.opacity='0';
+                        document.body.appendChild(ta); ta.select();
+                        try { document.execCommand('copy'); } catch(_e) {}
+                        document.body.removeChild(ta);
+                    }
+                    if (navigator.clipboard && navigator.clipboard.writeText) {
+                        navigator.clipboard.writeText(text).then(function(){
+                            document.getElementById('_dbgCopy').textContent = '✅ Copiado!';
+                            setTimeout(function(){ document.getElementById('_dbgCopy').textContent = '📋 Copiar tudo'; }, 1500);
+                        }).catch(fallback);
+                    } else { fallback(); }
+                };
+            });
+        }
+        buildUI();
+    })();
+    </script>
     <!-- ===== MANIFEST E ÍCONES PWA (inline) ===== -->
     <script>
     (function() {
