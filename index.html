@@ -7556,6 +7556,7 @@ body.dark-mode,
                             </div>
                         </div>
                         <span class="sales-count-badge" id="salesCountBadge">0 OS</span>
+                        <button class="btn btn-danger btn-sm" onclick="Sales.removeDuplicates()" title="Detectar e remover vendas duplicadas (mesma Nº O.S, data, total e forma de pagamento)"><i class="fas fa-broom"></i> Remover Duplicatas</button>
                     </div>
                     <div class="sales-search-bar mv-filter-row">
                         <div class="sh-search-field">
@@ -28281,6 +28282,84 @@ ${container.innerHTML}
                     Dashboard.update().catch(()=>{});
                     Toast.show('Venda excluída com sucesso!');
                 });
+            },
+
+            // ── Remove vendas duplicadas (mesmo Nº O.S + data + total + forma de pagamento) ──
+            // Cenário típico: importação do MarketUP feita duas vezes, gerando OS repetidas
+            // com IDs diferentes. Mantém o registro mais completo/recente de cada grupo
+            // duplicado, devolve o estoque dos itens das demais e remove-as (local + nuvem).
+            removeDuplicates() {
+                const sales = state.sales || [];
+
+                // Agrupa por chave Nº O.S + data + total + forma de pagamento (normalizados).
+                // Ignora clientId de propósito: em importações duplicadas cada rodada pode
+                // ter criado um cliente novo, então o clientId muda mas a venda é a mesma.
+                const norm = v => (v === undefined || v === null) ? '' : v.toString().trim().toLowerCase();
+                const groups = new Map();
+                sales.forEach(s => {
+                    const key = norm(s.number) + '|' + norm(s.date) + '|' + Math.round((Number(s.total) || 0) * 100) + '|' + norm(s.paymentMethod);
+                    if (!groups.has(key)) groups.set(key, []);
+                    groups.get(key).push(s);
+                });
+
+                const duplicateGroups = Array.from(groups.values()).filter(g => g.length > 1);
+
+                if (duplicateGroups.length === 0) {
+                    Toast.show('Nenhuma venda duplicada encontrada.', 'info');
+                    return;
+                }
+
+                const totalDuplicatas = duplicateGroups.reduce((sum, g) => sum + (g.length - 1), 0);
+
+                Modal.showConfirm(
+                    `Foram encontradas ${totalDuplicatas} venda(s) duplicada(s) em ${duplicateGroups.length} grupo(s) ` +
+                    `(mesma Nº O.S, data, total e forma de pagamento). ` +
+                    `Deseja remover as duplicatas, mantendo apenas um registro de cada?`,
+                    () => {
+                        const idsParaRemover = [];
+
+                        duplicateGroups.forEach(group => {
+                            // Escolhe qual manter: prioriza a venda com mais itens/dados
+                            // preenchidos, depois a mais recentemente atualizada.
+                            const melhor = group.reduce((best, cur) => {
+                                if (!best) return cur;
+                                const bestScore = (best.items?.length || 0) + (best.notes ? 1 : 0);
+                                const curScore = (cur.items?.length || 0) + (cur.notes ? 1 : 0);
+                                if (curScore !== bestScore) return curScore > bestScore ? cur : best;
+                                const bestDate = new Date(best.updated_at || best.createdAt || 0).getTime();
+                                const curDate = new Date(cur.updated_at || cur.createdAt || 0).getTime();
+                                return curDate > bestDate ? cur : best;
+                            }, null);
+
+                            group.forEach(s => {
+                                if (s.id !== melhor.id) idsParaRemover.push(s.id);
+                            });
+                        });
+
+                        // Devolve ao estoque os itens das vendas duplicadas removidas,
+                        // igual ao fluxo de exclusão individual (Sales.delete).
+                        idsParaRemover.forEach(id => {
+                            try {
+                                const saleToDelete = sales.find(s => s.id === id);
+                                (saleToDelete?.items || []).forEach(it => {
+                                    if (!it.productId) return;
+                                    const prod = state.products.find(p => p.id === it.productId);
+                                    if (!prod || prod.qty === undefined) return;
+                                    prod.qty = (prod.qty || 0) + (it.qty || 0);
+                                    prod._updatedAt = new Date().toISOString();
+                                    SupaSync.upsertProduto(prod).catch(() => {});
+                                });
+                            } catch(_stockErr) { console.warn('[Sales.removeDuplicates] Aviso: falha ao restaurar estoque:', _stockErr?.message); }
+                        });
+
+                        state.sales = state.sales.filter(s => !idsParaRemover.includes(s.id));
+                        App.saveData();
+                        idsParaRemover.forEach(id => { try { LocalFirst.deleteItem('sales', id); } catch(e) {} });
+                        this.renderHistory();
+                        Dashboard.update().catch(()=>{});
+                        Toast.show(`${idsParaRemover.length} venda(s) duplicada(s) removida(s) com sucesso!`);
+                    }
+                );
             }
         };
 
