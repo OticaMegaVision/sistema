@@ -6639,8 +6639,12 @@ body.dark-mode,
                         
                         <div class="presc-profissionais">
                             <div>
-                                <label style="font-weight: 600; color: var(--primary);"><i class="fas fa-user-md"></i> Optometrista</label>
-                                <input type="text" id="prescOptometrist" class="form-control" placeholder="Nome do optometrista">
+                                <label style="font-weight: 600; color: var(--primary);"><i class="fas fa-user-md"></i> <span id="prescProfTypeLabel">Optometrista</span></label>
+                                <input type="text" id="prescOptometrist" class="form-control" placeholder="Nome do profissional" readonly>
+                            </div>
+                            <div>
+                                <label style="font-weight: 600; color: var(--primary);"><i class="fas fa-id-card"></i> <span id="prescRegLabel">CROO</span></label>
+                                <input type="text" id="prescReg" class="form-control" placeholder="Número do registro" readonly>
                             </div>
                         </div>
 
@@ -7789,8 +7793,19 @@ body.dark-mode,
                     
                     <div class="presc-profissionais">
                         <div>
-                            <label style="font-weight: 600; color: var(--primary);"><i class="fas fa-user-md"></i> Optometrista</label>
-                            <input type="text" id="clientPrescOptometrist" class="form-control" placeholder="Nome do optometrista">
+                            <label style="font-weight: 600; color: var(--primary);"><i class="fas fa-user-md"></i> Profissional</label>
+                            <select id="clientPrescProfType" class="form-control" onchange="Clients.updatePrescRegLabel('client')">
+                                <option value="optometrista">Optometrista</option>
+                                <option value="medico">Médico(a) Oftalmologista</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label style="font-weight: 600; color: var(--primary);"><i class="fas fa-signature"></i> Nome</label>
+                            <input type="text" id="clientPrescOptometrist" class="form-control" placeholder="Nome do profissional">
+                        </div>
+                        <div>
+                            <label style="font-weight: 600; color: var(--primary);" id="clientPrescRegLabel"><i class="fas fa-id-card"></i> CROO</label>
+                            <input type="text" id="clientPrescReg" class="form-control" placeholder="Número do registro">
                         </div>
                         <div>
                             <label style="font-weight: 600; color: var(--primary);"><i class="fas fa-calendar"></i> Data da Consulta</label>
@@ -10194,8 +10209,19 @@ body.dark-mode,
 
                     <div class="presc-profissionais">
                         <div>
-                            <label style="font-weight: 600; color: var(--primary);"><i class="fas fa-user-md"></i> Optometrista</label>
-                            <input type="text" id="qcPrescOptometrist" class="form-control" placeholder="Nome do optometrista">
+                            <label style="font-weight: 600; color: var(--primary);"><i class="fas fa-user-md"></i> Profissional</label>
+                            <select id="qcPrescProfType" class="form-control" onchange="Clients.updatePrescRegLabel('qc')">
+                                <option value="optometrista">Optometrista</option>
+                                <option value="medico">Médico(a) Oftalmologista</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label style="font-weight: 600; color: var(--primary);"><i class="fas fa-signature"></i> Nome</label>
+                            <input type="text" id="qcPrescOptometrist" class="form-control" placeholder="Nome do profissional">
+                        </div>
+                        <div>
+                            <label style="font-weight: 600; color: var(--primary);" id="qcPrescRegLabel"><i class="fas fa-id-card"></i> CROO</label>
+                            <input type="text" id="qcPrescReg" class="form-control" placeholder="Número do registro">
                         </div>
                         <div>
                             <label style="font-weight: 600; color: var(--primary);"><i class="fas fa-calendar"></i> Data da Consulta</label>
@@ -18038,6 +18064,10 @@ body.dark-mode,
                 const birthDate    = document.getElementById('clientBirthDate')?.value;
                 const consultDate  = document.getElementById('clientPrescDate')?.value || new Date().toISOString().slice(0,10);
                 const optometrist  = document.getElementById('clientPrescOptometrist')?.value || '___________________';
+                const profType     = document.getElementById('clientPrescProfType')?.value || 'optometrista';
+                const profTypeLabel = Clients.profTypeLabel(profType);
+                const regAbbrev    = Clients.profRegAbbrev(profType);
+                const regNum       = document.getElementById('clientPrescReg')?.value || '';
 
                 const odSph    = document.getElementById('clientOdSph')?.value    || '0.00';
                 const odCyl    = document.getElementById('clientOdCyl')?.value    || '0.00';
@@ -18152,8 +18182,8 @@ tbody tr td{border:1.5px solid #000;padding:2mm;text-align:center;font-weight:70
       <div class="rec-campo-valor">${birthDate ? fmtD(birthDate) : '___/___/_____'}</div>
     </div>
     <div>
-      <div class="rec-campo-label">Optometrista / Oftalmologista</div>
-      <div class="rec-campo-valor">${Utils.sanitizeHTML(optometrist)}</div>
+      <div class="rec-campo-label">${Utils.sanitizeHTML(profTypeLabel)}</div>
+      <div class="rec-campo-valor">${Utils.sanitizeHTML(optometrist)}${regNum ? ' &nbsp;|&nbsp; '+Utils.sanitizeHTML(regAbbrev)+': '+Utils.sanitizeHTML(regNum) : ''}</div>
     </div>
   </div>
 
@@ -18255,7 +18285,7 @@ tbody tr td{border:1.5px solid #000;padding:2mm;text-align:center;font-weight:70
   <div class="rec-assinatura-bloco">
     <div class="rec-linha-assinatura"></div>
     <div class="rec-assinatura-nome">${Utils.sanitizeHTML(optometrist)}</div>
-    <div class="rec-assinatura-info">Optometrista / Oftalmologista &nbsp;|&nbsp; CRO/CBO: _______________</div>
+    <div class="rec-assinatura-info">${Utils.sanitizeHTML(profTypeLabel)} &nbsp;|&nbsp; ${Utils.sanitizeHTML(regAbbrev)}: ${regNum ? Utils.sanitizeHTML(regNum) : '_______________'}</div>
     <div class="rec-assinatura-obs">Assinatura e Carimbo obrigatórios para validade do documento</div>
   </div>
 
@@ -18286,6 +18316,7 @@ tbody tr td{border:1.5px solid #000;padding:2mm;text-align:center;font-weight:70
                 // Preencher temporariamente os campos do formulário com os dados da receita
                 const originalValues = {};
                 const fields = ['clientName', 'clientBirthDate', 'clientPrescDate', 'clientPrescOptometrist',
+                    'clientPrescProfType', 'clientPrescReg',
                     'clientOdSph', 'clientOdCyl', 'clientOdAxis', 'clientOdAdd', 'clientOdDnp',
                     'clientOeSph', 'clientOeCyl', 'clientOeAxis', 'clientOeAdd', 'clientOeDnp',
                     'clientPrescDp', 'clientPrescHeight', 'clientPrescNotes'];
@@ -18302,6 +18333,9 @@ tbody tr td{border:1.5px solid #000;padding:2mm;text-align:center;font-weight:70
                 document.getElementById('clientBirthDate').value = client.birthDate || '';
                 document.getElementById('clientPrescDate').value = presc.date || '';
                 document.getElementById('clientPrescOptometrist').value = presc.optometrist || '';
+                if (document.getElementById('clientPrescProfType')) document.getElementById('clientPrescProfType').value = presc.profType || 'optometrista';
+                if (document.getElementById('clientPrescReg')) document.getElementById('clientPrescReg').value = presc.regNum || '';
+                Clients.updatePrescRegLabel('client');
                 document.getElementById('clientOdSph').value = presc.od?.sph || '0.00';
                 document.getElementById('clientOdCyl').value = presc.od?.cyl || '0.00';
                 document.getElementById('clientOdAxis').value = presc.od?.axis || '';
@@ -19831,6 +19865,27 @@ tbody tr td{border:1.5px solid #000;padding:2mm;text-align:center;font-weight:70
 
         // ==================== CLIENTES ====================
         const Clients = {
+            // Atualiza o rótulo do campo de registro (CRM para médico, CROO para optometrista)
+            updatePrescRegLabel(prefix) {
+                const typeEl  = document.getElementById(prefix + 'PrescProfType');
+                const labelEl = document.getElementById(prefix + 'PrescRegLabel');
+                const regEl   = document.getElementById(prefix + 'PrescReg');
+                if (!typeEl || !labelEl) return;
+                const isMedico = typeEl.value === 'medico';
+                labelEl.innerHTML = `<i class="fas fa-id-card"></i> ${isMedico ? 'CRM' : 'CROO'}`;
+                if (regEl) regEl.placeholder = isMedico ? 'Número do CRM' : 'Número do CROO';
+            },
+
+            // Retorna o rótulo por extenso do tipo de profissional (para receituário/PDF/WhatsApp)
+            profTypeLabel(profType) {
+                return profType === 'medico' ? 'Médico(a) Oftalmologista' : 'Optometrista';
+            },
+
+            // Retorna a sigla do registro (CRM/CROO) para o tipo de profissional
+            profRegAbbrev(profType) {
+                return profType === 'medico' ? 'CRM' : 'CROO';
+            },
+
             // Upload/remoção da foto do cliente (mesmo padrão de Products.uploadImage/removeImage)
             uploadPhoto(event) {
                 const file = event.target.files[0];
@@ -20200,6 +20255,8 @@ tbody tr td{border:1.5px solid #000;padding:2mm;text-align:center;font-weight:70
                     clientId: client.id,
                     date: document.getElementById('clientPrescDate').value,
                     optometrist: document.getElementById('clientPrescOptometrist').value,
+                    profType: document.getElementById('clientPrescProfType')?.value || 'optometrista',
+                    regNum: document.getElementById('clientPrescReg')?.value || '',
                     od: {
                         sph: document.getElementById('clientOdSph').value,
                         cyl: document.getElementById('clientOdCyl').value,
@@ -20304,6 +20361,9 @@ tbody tr td{border:1.5px solid #000;padding:2mm;text-align:center;font-weight:70
                 if (presc) {
                     document.getElementById('clientPrescDate').value = presc.date || '';
                     document.getElementById('clientPrescOptometrist').value = presc.optometrist || '';
+                    document.getElementById('clientPrescProfType').value = presc.profType || 'optometrista';
+                    document.getElementById('clientPrescReg').value = presc.regNum || '';
+                    Clients.updatePrescRegLabel('client');
                     document.getElementById('clientOdSph').value = presc.od?.sph || '0.00';
                     document.getElementById('clientOdCyl').value = presc.od?.cyl || '0.00';
                     document.getElementById('clientOdAxis').value = presc.od?.axis || '';
@@ -20408,7 +20468,7 @@ tbody tr td{border:1.5px solid #000;padding:2mm;text-align:center;font-weight:70
                     <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:0.5rem;font-size:0.85rem;">
                       <div><small style="color:var(--gray);">DP TOTAL</small><br><strong>${presc.dp || '—'} mm</strong></div>
                       <div><small style="color:var(--gray);">ALTURA</small><br><strong>${presc.height || '—'} mm</strong></div>
-                      <div><small style="color:var(--gray);">PROFISSIONAL</small><br><strong>${presc.optometrist || '—'}</strong></div>
+                      <div><small style="color:var(--gray);">PROFISSIONAL</small><br><strong>${presc.optometrist || '—'}</strong>${presc.regNum ? ` <span style="color:var(--gray);font-weight:400;">(${Clients.profRegAbbrev(presc.profType)}: ${presc.regNum})</span>` : ''}</div>
                     </div>
                     ${presc.notes ? `<div style="margin-top:0.5rem;background:#fffbe6;border-left:3px solid #ffc107;padding:0.5rem;border-radius:4px;font-size:0.85rem;"><small style="color:var(--gray);">OBSERVAÇÕES</small><br>${presc.notes}</div>` : ''}
                   </div>`;
@@ -20500,10 +20560,12 @@ tbody tr td{border:1.5px solid #000;padding:2mm;text-align:center;font-weight:70
                 });
                 ['clientOdAxis','clientOeAxis','clientOdDnp','clientOeDnp',
                  'clientOdNearAxis','clientOdNearDnp','clientOeNearAxis','clientOeNearDnp',
-                 'clientPrescDp','clientPrescHeight','clientPrescNotes','clientPrescOptometrist'].forEach(id => {
+                 'clientPrescDp','clientPrescHeight','clientPrescNotes','clientPrescOptometrist','clientPrescReg'].forEach(id => {
                     const el = document.getElementById(id); if (el) el.value = '';
                 });
                 document.getElementById('clientPrescDate').value = new Date().toISOString().slice(0,10);
+                document.getElementById('clientPrescProfType').value = 'optometrista';
+                Clients.updatePrescRegLabel('client');
             },
 
             // Botão LIMPAR manual — pede confirmação
@@ -24720,10 +24782,12 @@ ${container.innerHTML}
 
             // Zera o receituário do modal de Cliente Rápido
             clearQuickClientPresc() {
-                ['qcPrescOptometrist','qcPrescDate','qcOdAxis','qcOeAxis',
+                ['qcPrescOptometrist','qcPrescReg','qcPrescDate','qcOdAxis','qcOeAxis',
                  'qcOdDnp','qcOeDnp','qcPrescHeight','qcPrescNotes'].forEach(id => {
                     const el = document.getElementById(id); if (el) el.value = '';
                 });
+                const qcType = document.getElementById('qcPrescProfType');
+                if (qcType) { qcType.value = 'optometrista'; Clients.updatePrescRegLabel('qc'); }
                 ['qcOdSph','qcOdCyl','qcOdAdd','qcOeSph','qcOeCyl','qcOeAdd'].forEach(id => {
                     const el = document.getElementById(id); if (el) { el.value = '0.00'; Presc.updateColor(el, id); }
                 });
@@ -24795,6 +24859,8 @@ ${container.innerHTML}
                     clientId: client.id,
                     date: document.getElementById('qcPrescDate').value,
                     optometrist: document.getElementById('qcPrescOptometrist').value,
+                    profType: document.getElementById('qcPrescProfType')?.value || 'optometrista',
+                    regNum: document.getElementById('qcPrescReg')?.value || '',
                     od: {
                         sph: document.getElementById('qcOdSph').value,
                         cyl: document.getElementById('qcOdCyl').value,
@@ -24875,6 +24941,9 @@ ${container.innerHTML}
                 document.getElementById('prescClientName').innerText = client.name || '';
                 document.getElementById('prescDate').innerText = Utils.formatDate(presc.date);
                 document.getElementById('prescOptometrist').value = presc.optometrist || '';
+                document.getElementById('prescReg').value = presc.regNum || '';
+                document.getElementById('prescProfTypeLabel').innerText = Clients.profTypeLabel(presc.profType);
+                document.getElementById('prescRegLabel').innerText = Clients.profRegAbbrev(presc.profType);
                 
                 document.getElementById('odSph').value = presc.od?.sph || '0.00';
                 document.getElementById('odCyl').value = presc.od?.cyl || '0.00';
@@ -26438,8 +26507,8 @@ ${container.innerHTML}
                         </tbody>
                       </table>
                       <div class="os-receita-extra">
-                        <span>Optometrista: <strong>${presc.optometrist||'______'}</strong></span>
-                        <span>CRO: <strong>${presc.cro||'______'}</strong></span>
+                        <span>${Clients.profTypeLabel(presc.profType)}: <strong>${presc.optometrist||'______'}</strong></span>
+                        <span>${Clients.profRegAbbrev(presc.profType)}: <strong>${presc.regNum||presc.cro||'______'}</strong></span>
                         <span>DP Longe: <strong>${presc.dp||'—'} mm</strong></span>
                         <span>DP Perto: <strong>${presc.dpNear||'—'} mm</strong></span>
                         <span>Altura: <strong>${presc.height||'—'} mm</strong></span>
@@ -27411,7 +27480,7 @@ ${container.innerHTML}
                         presc.dp          ? `📏 *DP Total:* ${presc.dp} mm`           : '',
                         presc.height      ? `📐 *Altura:* ${presc.height} mm`         : '',
                         presc.notes       ? `📝 *Obs:* ${presc.notes}`                : '',
-                        presc.optometrist ? `🩺 *Profissional:* ${presc.optometrist}` : ''
+                        presc.optometrist ? `🩺 *${Clients.profTypeLabel(presc.profType)}:* ${presc.optometrist}${presc.regNum ? ' ('+Clients.profRegAbbrev(presc.profType)+': '+presc.regNum+')' : ''}` : ''
                     ].filter(Boolean).join('\n');
                 } else {
                     dadosOD = '_(não informado)_';
@@ -27954,7 +28023,7 @@ ${container.innerHTML}
                                         <div style="font-weight:800;color:#2b5aa8;margin-bottom:3px;">👓 Receituário do cliente</div>
                                         <div>OD: Esf ${od.sph||'—'} Cil ${od.cyl||'—'} Eixo ${od.axis||'—'}° Ad ${od.add||'—'}</div>
                                         <div>OE: Esf ${oe.sph||'—'} Cil ${oe.cyl||'—'} Eixo ${oe.axis||'—'}° Ad ${oe.add||'—'}</div>
-                                        <div>DP: ${_clientPresc.dp||'—'}mm${_clientPresc.optometrist ? ' · '+Utils.sanitizeHTML(_clientPresc.optometrist) : ''}${_clientPresc.date ? ' — '+fd(_clientPresc.date) : ''}</div>
+                                        <div>DP: ${_clientPresc.dp||'—'}mm${_clientPresc.optometrist ? ' · '+Utils.sanitizeHTML(_clientPresc.optometrist)+(_clientPresc.regNum ? ' ('+Clients.profRegAbbrev(_clientPresc.profType)+' '+Utils.sanitizeHTML(_clientPresc.regNum)+')' : '') : ''}${_clientPresc.date ? ' — '+fd(_clientPresc.date) : ''}</div>
                                     </div>`;
                             } else {
                                 extra = `<div style="margin-top:6px;padding:6px 9px;background:#fff8e8;border:1px solid #ffe6ad;border-radius:7px;font-size:10px;color:#8a5a00;font-weight:600;">⚠️ Cliente sem receituário cadastrado</div>`;
