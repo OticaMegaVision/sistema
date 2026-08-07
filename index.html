@@ -6395,7 +6395,6 @@ body.dark-mode,
             <header class="header no-print">
                 <div class="header-left">
                     <h1 id="pageTitle">Dashboard</h1>
-                    <div id="pageSubtitle"></div>
                     <div id="pageGreeting" style="font-size:0.82rem;color:var(--gray);margin-top:2px;font-weight:500;"></div>
                 </div>
                 <div class="header-right">
@@ -6413,6 +6412,8 @@ body.dark-mode,
                             </div>
                         </div>
                     </div>
+                    <!-- BADGE "Loja X" — agrupado junto com o seletor de loja -->
+                    <div id="pageSubtitle" style="display:flex;align-items:center;"></div>
                     <!-- SELETOR DE LOJA — sempre visível, em qualquer aba -->
                     <div id="storeSelectorWrap" class="header-store-btn" onclick="StoreManager.openModal()" title="Trocar de loja">
                         <i class="fas fa-store"></i>
@@ -29884,24 +29885,48 @@ ${container.innerHTML}
 <!-- ═══ MOBILE OVERRIDE — aplicado por último ═══ -->
 <style>
 @media screen and (max-width: 640px) {
-    /* Relógio/data fixado no canto superior direito do cabeçalho (dentro do toolbar) */
-    .header               { position:relative !important; padding:.5rem .75rem !important; }
-    .header-toolbar       {
-        position:absolute !important;
-        top:.15rem !important;
-        right:0 !important;
-        padding:.25rem !important;
-        z-index:5 !important;
+    /* Toolbar (usuário + relógio) — no mobile fica no fluxo normal, abaixo do
+       título, para não sobrepor o menu hambúrguer nem o cabeçalho (bug corrigido) */
+    .header               { padding:.5rem .75rem !important; }
+
+    /* Cabeçalho mobile — Opção B aprovada: título + saudação na mesma linha;
+       embaixo, usuário + relógio + botão de loja juntos numa linha só,
+       compacto, quebrando para a 2ª linha automaticamente se faltar espaço */
+    .header-left          {
+        display:flex !important;
+        align-items:baseline !important;
+        justify-content:space-between !important;
+        flex-wrap:wrap !important;
+        gap:6px !important;
+        width:100% !important;
     }
-    .header-toolbar .datetime-widget {
-        padding:.25rem .55rem !important;
+    #pageGreeting          { margin-top:0 !important; }
+    .header-right          {
+        width:100% !important;
+        flex-wrap:wrap !important;
         gap:6px !important;
     }
-    .datetime-widget .clock-ring { width:24px !important; height:24px !important; }
-    .datetime-widget .clock-ring i { width:18px !important; height:18px !important; font-size:.55rem !important; }
-    .datetime-widget .time { font-size:.85rem !important; line-height:1.1 !important; }
-    .datetime-widget .date { font-size:.62rem !important; line-height:1.1 !important; }
-    .header-left          { padding-right:100px !important; }
+    .header-toolbar       {
+        padding:.2rem !important;
+        max-width: 100%;
+        overflow-x: auto;
+    }
+    .header-toolbar .datetime-widget {
+        padding:.2rem .5rem !important;
+        gap:5px !important;
+    }
+    #headerUserBadge      {
+        font-size:.72rem !important;
+        padding:4px 7px !important;
+    }
+    .header-store-btn     {
+        padding:6px 11px !important;
+        font-size:.76rem !important;
+    }
+    .datetime-widget .clock-ring { width:22px !important; height:22px !important; }
+    .datetime-widget .clock-ring i { width:16px !important; height:16px !important; font-size:.52rem !important; }
+    .datetime-widget .time { font-size:.8rem !important; line-height:1.1 !important; }
+    .datetime-widget .date { font-size:.6rem !important; line-height:1.1 !important; }
     .backup-buttons       { display:none !important; }
     .header-left h1       { font-size:1rem !important; }
 
