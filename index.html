@@ -253,6 +253,18 @@
                 var q = _xlsxQueue.splice(0); q.forEach(function(fn){ try{fn();}catch(e){} });
             });
         };
+        // Chart.js — usado pelo comparativo de desempenho (OS/Meta) no dashboard
+        var _chartQueue = [];
+        window._ensureChartJS = function(cb) {
+            if (window.Chart) { cb(true); return; }
+            _chartQueue.push(cb);
+            if (_chartQueue.length > 1) return;
+            window._lazyLoad('https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js', function() {
+                var q = _chartQueue.splice(0); q.forEach(function(fn){ try{fn(!!window.Chart);}catch(e){} });
+            }, function(){
+                var q = _chartQueue.splice(0); q.forEach(function(fn){ try{fn(false);}catch(e){} });
+            });
+        };
     })();
     </script>
     <style>
@@ -934,18 +946,18 @@
             margin-bottom: 1.75rem;
         }
 
-        /* Card combinado OS em Aberto + Meta do Mês */
+        /* Card combinado OS em Aberto + Meta do Mês — um abaixo do outro */
         .dash-os-meta-split {
             display: flex;
-            gap: 1.5rem;
+            flex-direction: column;
+            gap: 1rem;
         }
         .dash-os-meta-col { flex: 1; min-width: 0; }
         .dash-os-meta-divider {
-            width: 1px;
+            height: 1px;
+            width: 100%;
             background: var(--light-gray);
-            align-self: stretch;
         }
-
         /* Card da Empresa: base = igual ao que já era (celular não muda) */
         .empresa-nome { font-size: 0.8rem; }
         .dash-empresa-info-wrap { font-size: 0.8rem; }
@@ -980,7 +992,7 @@
             }
         }
 
-        /* ✅ Mobile: 2 colunas side-by-side, valor não cortado, sem espaço sobrando */
+        /* ✅ Mobile: 2 colunas pros 4 KPIs de cima; OS/Meta e Empresa ocupam a largura toda */
         @media (max-width: 576px) {
             .dashboard-cards {
                 grid-template-columns: 1fr 1fr;
@@ -992,11 +1004,74 @@
                 grid-column: span 2;
             }
             .dash-os-meta-split {
-                flex-direction: column;
-                gap: 0.75rem;
+                gap: 0.85rem;
             }
-            .dash-os-meta-divider { display: none; }
         }
+
+        /* ===== Card OS/Meta modernizado (eyebrow + valor grande) ===== */
+        .dashv2-eyebrow { display:flex; align-items:center; justify-content:space-between; margin-bottom:8px; }
+        .dashv2-eyebrow-label { font-size:0.68rem; font-weight:700; color:var(--gray); text-transform:uppercase; letter-spacing:.04em; display:flex; align-items:center; gap:6px; }
+        .dashv2-big-value { font-size:1.9rem; font-weight:800; line-height:1; letter-spacing:-.02em; margin-bottom:4px; }
+        .dashv2-sub-value { font-size:0.74rem; color:var(--gray); margin-bottom:10px; }
+        .dashv2-edit-hint { font-size:0.6rem; color:var(--gray); margin-top:6px; display:flex; align-items:center; gap:4px; }
+        @media (max-width:576px) { .dashv2-big-value { font-size:1.5rem; } }
+
+        /* ===== Card Comparativo de Desempenho (OS / Meta) ===== */
+        .card-chart-comparativo { grid-column: 1 / -1; }
+        .dashv2-chart-head { display:flex; align-items:center; justify-content:space-between; margin-bottom:14px; }
+        .dashv2-chart-title { font-size:0.88rem; font-weight:700; display:flex; align-items:center; gap:7px; color:var(--dark); }
+        .dashv2-chart-title i { color: var(--primary); }
+        .dark-mode .dashv2-chart-title { color: var(--dark); }
+
+        .dashv2-period-tabs { display:flex; background:var(--light); border-radius:10px; padding:3px; gap:2px; margin-bottom:14px; max-width:400px; }
+        .dark-mode .dashv2-period-tabs { background:#1a1a1a; }
+        .dashv2-period-tab { flex:1; text-align:center; padding:7px 0; border-radius:8px; font-size:0.72rem; font-weight:600; color:var(--gray); cursor:pointer; transition:var(--transition); user-select:none; }
+        .dashv2-period-tab.active { background:#fff; color:var(--primary-dark); box-shadow:0 2px 6px rgba(16,24,40,.08); }
+        .dark-mode .dashv2-period-tab.active { background:#2d2d2d; color:#ffb27a; }
+        .dashv2-period-tab.custom-tab { flex:0.6; display:flex; align-items:center; justify-content:center; }
+
+        .dashv2-custom-range { display:none; align-items:center; gap:10px; flex-wrap:wrap; background:var(--light); border-radius:10px; padding:10px 12px; margin-bottom:14px; }
+        .dashv2-custom-range.show { display:flex; }
+        .dark-mode .dashv2-custom-range { background:#1a1a1a; }
+        .dashv2-custom-range label { font-size:0.68rem; color:var(--gray); font-weight:600; display:flex; align-items:center; gap:6px; }
+        .dashv2-custom-range input[type=date] { border:1px solid var(--light-gray); border-radius:7px; padding:5px 7px; font-size:0.72rem; font-family:inherit; color:var(--dark); background:#fff; }
+        .dark-mode .dashv2-custom-range input[type=date] { background:#2d2d2d; color:var(--dark); border-color:#3a3a3a; }
+        .dashv2-custom-range button { border:none; background:var(--primary); color:#fff; font-weight:700; font-size:0.7rem; padding:7px 14px; border-radius:7px; cursor:pointer; margin-left:auto; }
+        .dashv2-custom-range button:hover { background:var(--primary-dark); }
+
+        .dashv2-metric-toggle { display:flex; gap:8px; margin-bottom:14px; }
+        .dashv2-metric-chip { font-size:0.68rem; font-weight:600; padding:5px 11px; border-radius:20px; border:1px solid var(--light-gray); color:var(--gray); cursor:pointer; display:flex; align-items:center; gap:5px; transition:var(--transition); }
+        .dashv2-metric-chip.active { border-color:var(--primary); color:var(--primary-dark); background:#fff5ee; }
+        .dark-mode .dashv2-metric-chip.active { background:#3a2213; color:#ffb27a; }
+        .dashv2-metric-chip .dashv2-dot { width:7px; height:7px; border-radius:50%; }
+
+        .dashv2-compare-row { display:flex; align-items:center; gap:10px; background:var(--light); border-radius:12px; padding:12px 14px; margin-bottom:14px; }
+        .dark-mode .dashv2-compare-row { background:#1a1a1a; }
+        .dashv2-compare-box { flex:1; min-width:0; }
+        .dashv2-compare-box.prev { opacity:.75; }
+        .dashv2-compare-label { font-size:0.62rem; color:var(--gray); font-weight:600; margin-bottom:3px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+        .dashv2-compare-value { font-size:1.05rem; font-weight:800; color:var(--dark); }
+        .dashv2-compare-box.prev .dashv2-compare-value { font-size:0.92rem; font-weight:700; color:var(--gray); }
+        .dashv2-compare-vs { color:var(--light-gray); font-size:0.8rem; flex-shrink:0; }
+        .dashv2-compare-diff { flex-shrink:0; font-size:0.68rem; font-weight:700; padding:4px 9px; border-radius:20px; display:flex; align-items:center; gap:4px; white-space:nowrap; }
+        .dashv2-compare-diff.up { background:#dcfce7; color:#15803d; }
+        .dashv2-compare-diff.down { background:#fee2e2; color:#b91c1c; }
+        .dark-mode .dashv2-compare-diff.up { background:#14532d; color:#86efac; }
+        .dark-mode .dashv2-compare-diff.down { background:#450a0a; color:#fca5a5; }
+
+        .dashv2-canvas-wrap { position:relative; height:190px; margin-bottom:6px; transition:height .2s ease; }
+        @media (max-width:576px) { .dashv2-canvas-wrap { height:160px; } }
+
+        .dashv2-insight-row { display:flex; gap:10px; margin-top:14px; flex-wrap:wrap; }
+        .dashv2-insight-box { flex:1; min-width:120px; background:var(--light); border-radius:10px; padding:10px 12px; }
+        .dark-mode .dashv2-insight-box { background:#1a1a1a; }
+        .dashv2-insight-label { font-size:0.62rem; color:var(--gray); font-weight:600; text-transform:uppercase; letter-spacing:.03em; margin-bottom:4px; }
+        .dashv2-insight-value { font-size:0.95rem; font-weight:800; color:var(--dark); display:flex; align-items:center; gap:5px; }
+        .dashv2-insight-value small { font-size:0.62rem; font-weight:600; color:var(--gray); }
+
+        .dashv2-ai-note { margin-top:14px; padding:10px 12px; background:linear-gradient(135deg,#fff5ee,#fffaf5); border-radius:10px; border:1px solid #ffe4cc; font-size:0.72rem; color:#8a5a1f; display:flex; gap:8px; align-items:flex-start; }
+        .dashv2-ai-note i { color:var(--primary); margin-top:1px; }
+        .dark-mode .dashv2-ai-note { background:linear-gradient(135deg,#2e1f10,#231a10); border-color:#4a331a; color:#ffcb94; }
 
         .card {
             background: white;
@@ -3101,6 +3176,48 @@
         .dark-mode .dash-period-btn:hover { background: rgba(255,255,255,0.08); color: #e0e0e0; }
         .dark-mode .dash-period-btn.active { background: var(--primary); color: white; }
         .dark-mode .dash-period-custom input { background: #2d2d2d; border-color: #444; color: #e0e0e0; }
+
+        /* ===== Abas do Dashboard (Visão Geral / Comparativo / Financeiro / Alertas / Histórico) ===== */
+        .dashboard-tabs {
+            display: flex;
+            gap: 4px;
+            background: #fff;
+            border-radius: 12px;
+            padding: 4px;
+            box-shadow: 0 1px 3px rgba(16,24,40,.06);
+            margin-bottom: 1rem;
+            overflow-x: auto;
+        }
+        .dark-mode .dashboard-tabs { background: #1e1e1e; }
+        .dashboard-tab {
+            flex: 1;
+            min-width: 84px;
+            text-align: center;
+            padding: 10px 6px;
+            border-radius: 9px;
+            cursor: pointer;
+            font-size: 0.78rem;
+            font-weight: 700;
+            color: var(--gray);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+            transition: var(--transition);
+            white-space: nowrap;
+        }
+        .dashboard-tab i { font-size: 0.85rem; }
+        .dashboard-tab.active {
+            background: var(--primary);
+            color: #fff;
+            box-shadow: 0 3px 10px rgba(255,107,0,.3);
+        }
+        .dashboard-tab:not(.active):hover { background: var(--light); }
+        .dark-mode .dashboard-tab:not(.active):hover { background: rgba(255,255,255,0.06); }
+        @media (max-width: 640px) {
+            .dashboard-tab span { display: none; }
+            .dashboard-tab { min-width: 0; padding: 10px 4px; }
+        }
 
         /* ===== MODAL WHATSAPP CONFIRMAÇÃO ===== */
         .wpp-confirm-modal {
@@ -6009,7 +6126,7 @@ body.dark-mode,
 
 /* Card OS + Meta e Card Info da Loja acompanham o mesmo relevo */
 #dashboardCards .card-os-meta .dash-os-meta-divider {
-    background: linear-gradient(180deg, transparent, rgba(20,30,50,0.12), transparent) !important;
+    background: linear-gradient(90deg, transparent, rgba(20,30,50,0.12), transparent) !important;
 }
 </style>
 </head>
@@ -6168,9 +6285,26 @@ body.dark-mode,
                     </button>
                 </div>
 
-                <div class="dashboard-cards" id="dashboardCards"></div>
+                <!-- Abas do Dashboard — reduz a poluição visual: cada aba mostra só o que importa,
+                     "Últimas Vendas" fica fora das abas (visível sempre, logo abaixo) -->
+                <div class="dashboard-tabs" id="dashboardTabs">
+                    <div class="dashboard-tab active" data-tab="geral" onclick="Dashboard.setDashTab('geral')"><i class="fas fa-gauge"></i><span>Visão Geral</span></div>
+                    <div class="dashboard-tab" data-tab="comparativo" onclick="Dashboard.setDashTab('comparativo')"><i class="fas fa-chart-column"></i><span>Comparativo</span></div>
+                    <div class="dashboard-tab" data-tab="financeiro" onclick="Dashboard.setDashTab('financeiro')"><i class="fas fa-hand-holding-dollar"></i><span>Financeiro</span></div>
+                    <div class="dashboard-tab" data-tab="alertas" onclick="Dashboard.setDashTab('alertas')"><i class="fas fa-bell"></i><span>Alertas</span></div>
+                    <div class="dashboard-tab" data-tab="historico" onclick="Dashboard.setDashTab('historico')"><i class="fas fa-chart-simple"></i><span>Histórico</span></div>
+                </div>
+
+                <div class="dash-tabpanel" data-tabpanel="geral">
+                    <div class="dashboard-cards" id="dashboardCards"></div>
+                </div>
+
+                <div class="dash-tabpanel" data-tabpanel="comparativo" style="display:none;">
+                    <div id="dashboardComparativo"></div>
+                </div>
 
                 <!-- CONTAS A RECEBER E A PAGAR -->
+                <div class="dash-tabpanel" data-tabpanel="financeiro" style="display:none;">
                 <div class="dashboard-charts" id="contasPaineis" style="margin-bottom: 1rem;">
                     <!-- Contas a Receber -->
                     <div class="chart-container" style="padding:0;overflow:hidden;">
@@ -6432,6 +6566,9 @@ body.dark-mode,
                         </div>
                     </div>
                 </div>
+                </div>
+
+                <div class="dash-tabpanel" data-tabpanel="alertas" style="display:none;">
                 <div class="dashboard-charts" id="dashAlertPanels">
                     <!-- Aniversariantes do dia -->
                     <div class="dash-alert-panel">
@@ -6468,7 +6605,9 @@ body.dark-mode,
                         </div>
                     </div>
                 </div>
+                </div>
 
+                <div class="dash-tabpanel" data-tabpanel="historico" style="display:none;">
                 <div class="dashboard-charts">
                     <div class="chart-container">
                         <div class="chart-title">Vendas por Dia (últimos 7 dias)</div>
@@ -6479,6 +6618,9 @@ body.dark-mode,
                         <div class="bar-chart" id="productsChart"></div>
                     </div>
                 </div>
+                </div>
+
+                <!-- Últimas Vendas — sempre visível, independente da aba selecionada -->
                 <div class="table-container tf-ready" id="recentSalesPanel">
                     <div class="table-filtros">
                     <div class="sh-head">
@@ -19121,6 +19263,12 @@ tbody tr td{border:1.5px solid #000;padding:2mm;text-align:center;font-weight:70
             _to: null,
             _glassesPeriod: 'all', // filtro do painel de óculos: 'day' | 'week' | 'month' | 'all'
 
+            // Estado do card "Comparativo de Desempenho" (OS / Meta)
+            _cmpPeriod: 'dia',   // 'dia' | 'semana' | 'mes' | 'ano' | 'custom'
+            _cmpFrom: null,      // usado apenas quando _cmpPeriod === 'custom'
+            _cmpTo: null,
+            _cmpChart: null,     // instância do Chart.js
+
             setGlassesPeriod(period, btn) {
                 this._glassesPeriod = period;
                 // Atualiza estilo dos botões
@@ -19154,6 +19302,7 @@ tbody tr td{border:1.5px solid #000;padding:2mm;text-align:center;font-weight:70
                     }
                     // Atualiza os cards IMEDIATAMENTE — dados locais
                     this.updateCards();
+                    this.renderComparativo();
                     this.updateSalesChart();
                     this.updateProductsChart();
                     this.updateRecentSales();
@@ -19685,32 +19834,26 @@ tbody tr td{border:1.5px solid #000;padding:2mm;text-align:center;font-weight:70
                     <div class="card card-os-meta" style="--card-accent:#ff6b00;">
                         <div class="dash-os-meta-split">
                             <div class="dash-os-meta-col">
-                                <div class="card-header">
-                                    <span class="card-title">OS em Aberto</span>
-                                    <div style="display:flex;align-items:center;gap:6px;">
-                                        <div class="card-icon" style="background:#fbf3df;color:#d4a017;"><i class="fas fa-file-alt"></i></div>
-                                        <span class="kpi-trend-badge neu">${salesEntregues} entregues</span>
-                                    </div>
+                                <div class="dashv2-eyebrow">
+                                    <span class="dashv2-eyebrow-label"><i class="fas fa-file-alt" style="color:#d4a017;"></i>OS em Aberto</span>
+                                    <span class="kpi-trend-badge neu">${salesEntregues} entregues</span>
                                 </div>
-                                <div class="card-value" style="color:#d4a017;">${salesPendentes}</div>
-                                <div id="dash-sub-os" style="font-size:0.76rem;color:var(--gray);">${salesEntregues} entregue${salesEntregues !== 1 ? 's' : ''} no período</div>
+                                <div class="dashv2-big-value" style="color:#d4a017;">${salesPendentes}</div>
+                                <div id="dash-sub-os" class="dashv2-sub-value">${salesEntregues} entregue${salesEntregues !== 1 ? 's' : ''} no período</div>
                                 <div class="kpi-progress-wrap"><div class="kpi-progress-bar" style="width:${(salesPendentes+salesEntregues)>0?Math.round(salesEntregues/(salesPendentes+salesEntregues)*100):0}%;background:#d4a017;"></div></div>
                             </div>
                             <div class="dash-os-meta-divider"></div>
                             <div class="dash-os-meta-col" style="cursor:pointer;" onclick="Dashboard.editGoal()" title="Clique para definir/editar a meta">
-                                <div class="card-header">
-                                    <span class="card-title">Meta do Mês</span>
+                                <div class="dashv2-eyebrow">
+                                    <span class="dashv2-eyebrow-label"><i class="fas fa-bullseye" style="color:#ff6b00;"></i>Meta do Mês</span>
                                     <div style="display:flex;align-items:center;gap:6px;">
-                                        <div class="card-icon" style="background:#fff5ee;color:#ff6b00;"><i class="fas fa-bullseye"></i></div>
                                         ${goal > 0 ? `<span class="kpi-trend-badge ${onPace ? 'up' : 'down'}">${onPace ? '▲' : '▼'} ${onPace ? 'No ritmo' : 'Abaixo do ritmo'}</span>` : ''}
                                         <i class="fas fa-pen" style="font-size:0.62rem;color:var(--gray);" title="Editar meta"></i>
                                     </div>
                                 </div>
                                 ${goal > 0 ? `
-                                    <div style="display:flex;align-items:baseline;gap:8px;">
-                                        <div class="card-value" style="color:#ff6b00;">${goalPct}%</div>
-                                        <div id="dash-sub-meta" style="font-size:0.72rem;color:var(--gray);">${Utils.formatCurrency(monthSales)} de ${Utils.formatCurrency(goal)}</div>
-                                    </div>
+                                    <div class="dashv2-big-value" style="color:#ff6b00;">${goalPct}%</div>
+                                    <div id="dash-sub-meta" class="dashv2-sub-value">${Utils.formatCurrency(monthSales)} de ${Utils.formatCurrency(goal)}</div>
                                     <div class="kpi-progress-wrap"><div class="kpi-progress-bar" style="width:${Math.min(100, goalPct)}%;background:${onPace ? '#ff6b00' : '#dc3545'};"></div></div>
                                     <div class="dash-meta-details" style="display:flex;flex-wrap:wrap;gap:4px 14px;font-size:0.68rem;color:var(--gray);margin-top:6px;">
                                         <span><i class="fas fa-calendar-day" style="margin-right:3px;color:#ff6b00;"></i>${daysLeft} dia${daysLeft !== 1 ? 's' : ''} restante${daysLeft !== 1 ? 's' : ''}</span>
@@ -19718,13 +19861,15 @@ tbody tr td{border:1.5px solid #000;padding:2mm;text-align:center;font-weight:70
                                         ${dailyNeeded > 0 ? `<span><i class="fas fa-gauge-high" style="margin-right:3px;color:#ff6b00;"></i>${Utils.formatCurrency(dailyNeeded)}/dia p/ bater</span>` : ''}
                                         ${vsPrevMonth !== null ? `<span style="color:${vsPrevMonth >= 0 ? '#22c55e' : '#dc3545'};"><i class="fas fa-${vsPrevMonth >= 0 ? 'arrow-up' : 'arrow-down'}" style="margin-right:3px;"></i>${Math.abs(vsPrevMonth)}% vs mês passado</span>` : ''}
                                     </div>
+                                    <div class="dashv2-edit-hint"><i class="fas fa-pen"></i> toque para editar</div>
                                 ` : `
-                                    <div class="card-value" style="color:#ff6b00;font-size:1.15rem;">Definir meta</div>
-                                    <div style="font-size:0.76rem;color:var(--gray);">Clique aqui para configurar a meta de vendas do mês</div>
+                                    <div class="dashv2-big-value" style="color:#ff6b00;font-size:1.15rem;">Definir meta</div>
+                                    <div class="dashv2-sub-value">Clique aqui para configurar a meta de vendas do mês</div>
                                 `}
                             </div>
                         </div>
                     </div>
+
                     <div class="card card-info-loja" style="--card-accent:#8b6b3d;">
                         <div class="card-header">
                             <span class="card-title empresa-nome" style="font-weight:700;color:var(--dark);">${company.name || 'ÓticaVision Pro'}</span>
@@ -19741,6 +19886,55 @@ tbody tr td{border:1.5px solid #000;padding:2mm;text-align:center;font-weight:70
                         </div>
                     </div>
                 `;
+
+                this.renderComparativoMarkup();
+            },
+
+            // Injeta o card "Comparativo de Desempenho" na aba própria (fora de #dashboardCards)
+            renderComparativoMarkup() {
+                const el = document.getElementById('dashboardComparativo');
+                if (!el) return;
+                el.innerHTML = `
+                    <div class="card card-chart-comparativo" style="--card-accent:#ff6b00;">
+                        <div class="dashv2-chart-head">
+                            <span class="dashv2-chart-title"><i class="fas fa-chart-column"></i>Comparativo de Desempenho</span>
+                        </div>
+
+                        <div class="dashv2-period-tabs" id="dashCmpTabs">
+                            <div class="dashv2-period-tab ${this._cmpPeriod==='dia'?'active':''}" onclick="Dashboard.setCmpPeriod('dia')">Dia</div>
+                            <div class="dashv2-period-tab ${this._cmpPeriod==='semana'?'active':''}" onclick="Dashboard.setCmpPeriod('semana')">Semana</div>
+                            <div class="dashv2-period-tab ${this._cmpPeriod==='mes'?'active':''}" onclick="Dashboard.setCmpPeriod('mes')">Mês</div>
+                            <div class="dashv2-period-tab ${this._cmpPeriod==='ano'?'active':''}" onclick="Dashboard.setCmpPeriod('ano')">Ano</div>
+                            <div class="dashv2-period-tab custom-tab ${this._cmpPeriod==='custom'?'active':''}" onclick="Dashboard.setCmpPeriod('custom')" title="Período personalizado"><i class="fas fa-calendar-week" style="font-size:0.68rem;"></i></div>
+                        </div>
+
+                        <div class="dashv2-custom-range ${this._cmpPeriod==='custom'?'show':''}" id="dashCmpCustomRange">
+                            <label>De <input type="date" id="dashCmpFrom" value="${this._cmpFrom || ''}"></label>
+                            <label>Até <input type="date" id="dashCmpTo" value="${this._cmpTo || ''}"></label>
+                            <button onclick="Dashboard.applyCmpCustomRange()">Aplicar</button>
+                        </div>
+
+                        <div class="dashv2-compare-row" id="dashCmpCompareRow"></div>
+
+                        <div class="dashv2-canvas-wrap" id="dashCmpCanvasWrap"><canvas id="dashCmpCanvas"></canvas></div>
+
+                        <div class="dashv2-insight-row" id="dashCmpInsights"></div>
+
+                        <div class="dashv2-ai-note" id="dashCmpAiNote" style="display:none;"></div>
+                    </div>
+                `;
+            },
+
+            // Controla qual aba do Dashboard está visível (Visão Geral / Comparativo / Financeiro / Alertas / Histórico).
+            // "Últimas Vendas" (#recentSalesPanel) fica fora do sistema de abas — sempre visível.
+            _activeDashTab: 'geral',
+            setDashTab(tab) {
+                this._activeDashTab = tab;
+                document.querySelectorAll('.dashboard-tab').forEach(t => t.classList.toggle('active', t.dataset.tab === tab));
+                document.querySelectorAll('.dash-tabpanel').forEach(p => { p.style.display = (p.dataset.tabpanel === tab) ? '' : 'none'; });
+                // O gráfico do comparativo só é desenhado quando a aba fica visível
+                // (Chart.js não mede corretamente um canvas dentro de um elemento display:none)
+                if (tab === 'comparativo') this.renderComparativo();
             },
 
             async editGoal() {
@@ -19755,7 +19949,317 @@ tbody tr td{border:1.5px solid #000;padding:2mm;text-align:center;font-weight:70
                 state.company.salesGoal = parsed;
                 await App.saveData();
                 this.updateCards();
+                this.renderComparativo();
                 Toast.show('✅ Meta atualizada!', 'success', 2500);
+            },
+
+            // ===================================================================
+            // COMPARATIVO DE DESEMPENHO (OS / Meta) — card abaixo de OS em Aberto
+            // ===================================================================
+
+            // Formata um objeto Date (horário local) como 'YYYY-MM-DD' sem risco de
+            // deslocar o dia por causa de fuso horário (evita usar toISOString() direto
+            // em datas de meia-noite local, que em UTC-3 pode "voltar" um dia).
+            _isoLocal(d) {
+                const y = d.getFullYear(), m = String(d.getMonth() + 1).padStart(2, '0'), day = String(d.getDate()).padStart(2, '0');
+                return `${y}-${m}-${day}`;
+            },
+            _shiftDays(iso, n) {
+                const d = new Date(iso + 'T12:00:00');
+                d.setDate(d.getDate() + n);
+                return this._isoLocal(d);
+            },
+            _shiftMonths(iso, n) {
+                const d = new Date(iso + 'T12:00:00');
+                const day = d.getDate();
+                d.setDate(1);
+                d.setMonth(d.getMonth() + n);
+                const lastDay = new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate();
+                d.setDate(Math.min(day, lastDay));
+                return this._isoLocal(d);
+            },
+            _shiftYears(iso, n) {
+                const d = new Date(iso + 'T12:00:00');
+                d.setFullYear(d.getFullYear() + n);
+                return this._isoLocal(d);
+            },
+            // Vendas válidas (exclui orçamento/cancelado) no intervalo [fromISO, toExclusiveISO)
+            _salesInRange(fromISO, toExclusiveISO) {
+                return (state.sales || []).filter(s => {
+                    if (s.status === 'orcamento' || s.status === 'cancelado') return false;
+                    const d = (s.date || '').slice(0, 10);
+                    return d >= fromISO && d < toExclusiveISO;
+                });
+            },
+            _cmpTotal(fromISO, toExclusiveISO) {
+                return this._salesInRange(fromISO, toExclusiveISO).reduce((a, s) => a + (s.total || 0), 0);
+            },
+            // metric: 'os' -> quantidade de OS | 'meta' -> % da meta mensal, proporcional aos dias do intervalo
+            _cmpAggregate(fromISO, toExclusiveISO, metric) {
+                const sales = this._salesInRange(fromISO, toExclusiveISO);
+                if (metric === 'os') return sales.length;
+                const goal = parseFloat(state.company?.salesGoal) || 0;
+                if (goal <= 0) return 0;
+                const total = sales.reduce((a, s) => a + (s.total || 0), 0);
+                const days = Math.max(1, Math.round((new Date(toExclusiveISO) - new Date(fromISO)) / 86400000));
+                const now = new Date();
+                const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+                // Aproximação: meta proporcional aos dias do intervalo em relação ao mês atual
+                const proratedGoal = goal * (days / daysInMonth);
+                return proratedGoal > 0 ? Math.round((total / proratedGoal) * 100) : 0;
+            },
+            // Monta os buckets (barras) do gráfico conforme a aba de período selecionada
+            _cmpBuildDataset(period) {
+                const today = this._isoLocal(new Date());
+                const buckets = [];
+                if (period === 'dia') {
+                    const dowShort = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
+                    for (let i = 6; i >= 0; i--) {
+                        const d = this._shiftDays(today, -i);
+                        const dt = new Date(d + 'T12:00:00');
+                        buckets.push({ label: dowShort[dt.getDay()], from: d, to: this._shiftDays(d, 1) });
+                    }
+                } else if (period === 'semana') {
+                    for (let i = 7; i >= 0; i--) {
+                        const to = this._shiftDays(today, -7 * i + 1);
+                        const from = this._shiftDays(to, -7);
+                        const dt = new Date(from + 'T12:00:00');
+                        buckets.push({ label: `${String(dt.getDate()).padStart(2, '0')}/${String(dt.getMonth() + 1).padStart(2, '0')}`, from, to });
+                    }
+                } else if (period === 'mes') {
+                    const mesesShort = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
+                    const now = new Date();
+                    for (let i = 5; i >= 0; i--) {
+                        const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+                        const toDate = new Date(d.getFullYear(), d.getMonth() + 1, 1);
+                        buckets.push({ label: mesesShort[d.getMonth()], from: this._isoLocal(d), to: this._isoLocal(toDate) });
+                    }
+                } else if (period === 'ano') {
+                    const now = new Date();
+                    for (let i = 4; i >= 0; i--) {
+                        const y = now.getFullYear() - i;
+                        buckets.push({ label: String(y), from: `${y}-01-01`, to: `${y + 1}-01-01` });
+                    }
+                } else if (period === 'custom') {
+                    const from = this._cmpFrom, to = this._cmpTo;
+                    if (!from || !to) return [];
+                    const toExclusive = this._shiftDays(to, 1);
+                    const totalDays = Math.max(1, Math.round((new Date(toExclusive) - new Date(from)) / 86400000));
+                    const bucketDays = totalDays <= 14 ? 1 : (totalDays <= 90 ? 7 : 30);
+                    let cursor = from;
+                    while (cursor < toExclusive) {
+                        let bTo = this._shiftDays(cursor, bucketDays);
+                        if (bTo > toExclusive) bTo = toExclusive;
+                        const dt = new Date(cursor + 'T12:00:00');
+                        buckets.push({ label: `${String(dt.getDate()).padStart(2, '0')}/${String(dt.getMonth() + 1).padStart(2, '0')}`, from: cursor, to: bTo });
+                        cursor = bTo;
+                    }
+                }
+                return buckets;
+            },
+            // Define os intervalos "agora" vs "mesmo ponto do ciclo anterior" pro compare-row
+            _cmpCompareData(period) {
+                const today = this._isoLocal(new Date());
+                let nowFrom, nowTo, prevFrom, prevTo, labelNow, labelPrev;
+                if (period === 'dia') {
+                    nowFrom = today; nowTo = this._shiftDays(today, 1);
+                    const prevDay = this._shiftMonths(today, -1);
+                    prevFrom = prevDay; prevTo = this._shiftDays(prevDay, 1);
+                    labelNow = 'Hoje'; labelPrev = 'Mesmo dia mês passado';
+                } else if (period === 'semana') {
+                    const dt = new Date(today + 'T12:00:00');
+                    const dow = (dt.getDay() + 6) % 7; // 0 = segunda
+                    nowFrom = this._shiftDays(today, -dow); nowTo = this._shiftDays(today, 1);
+                    prevFrom = this._shiftDays(nowFrom, -28); prevTo = this._shiftDays(nowTo, -28);
+                    labelNow = 'Esta semana'; labelPrev = 'Mesma semana mês passado';
+                } else if (period === 'mes') {
+                    const now = new Date();
+                    nowFrom = this._isoLocal(new Date(now.getFullYear(), now.getMonth(), 1));
+                    nowTo = this._shiftDays(today, 1);
+                    const daysSoFar = Math.round((new Date(nowTo) - new Date(nowFrom)) / 86400000);
+                    prevFrom = this._shiftYears(nowFrom, -1);
+                    prevTo = this._shiftDays(prevFrom, daysSoFar);
+                    labelNow = 'Este mês'; labelPrev = 'Mesmo mês ano passado';
+                } else if (period === 'ano') {
+                    const now = new Date();
+                    nowFrom = `${now.getFullYear()}-01-01`;
+                    nowTo = this._shiftDays(today, 1);
+                    const daysSoFar = Math.round((new Date(nowTo) - new Date(nowFrom)) / 86400000);
+                    prevFrom = `${now.getFullYear() - 1}-01-01`;
+                    prevTo = this._shiftDays(prevFrom, daysSoFar);
+                    const dt = new Date(today + 'T12:00:00');
+                    labelNow = `Este ano (até ${String(dt.getDate()).padStart(2, '0')}/${String(dt.getMonth() + 1).padStart(2, '0')})`;
+                    labelPrev = 'Mesmo período ano passado';
+                } else { // custom
+                    nowFrom = this._cmpFrom || today; nowTo = this._shiftDays(this._cmpTo || today, 1);
+                    const days = Math.max(1, Math.round((new Date(nowTo) - new Date(nowFrom)) / 86400000));
+                    prevTo = nowFrom; prevFrom = this._shiftDays(prevTo, -days);
+                    labelNow = 'Período selecionado'; labelPrev = 'Mesmo nº de dias, período anterior';
+                }
+                return { nowFrom, nowTo, prevFrom, prevTo, labelNow, labelPrev };
+            },
+
+            setCmpPeriod(period) {
+                this._cmpPeriod = period;
+                if (period === 'custom' && !this._cmpFrom) {
+                    const to = new Date(); const from = new Date(); from.setDate(from.getDate() - 30);
+                    this._cmpTo = this._isoLocal(to);
+                    this._cmpFrom = this._isoLocal(from);
+                }
+                this.updateCards();
+                this.renderComparativo();
+            },
+            applyCmpCustomRange() {
+                const from = document.getElementById('dashCmpFrom')?.value;
+                const to = document.getElementById('dashCmpTo')?.value;
+                if (!from || !to || from > to) {
+                    Toast.show('⚠️ Selecione um intervalo de datas válido.', 'danger', 3000);
+                    return;
+                }
+                this._cmpFrom = from; this._cmpTo = to;
+                this.updateCards();
+                this.renderComparativo();
+            },
+
+            // Carrega Chart.js sob demanda e (re)desenha o gráfico comparativo
+            renderComparativo() {
+                if (this._activeDashTab !== 'comparativo') return; // evita desenhar canvas escondido (display:none)
+                const canvas = document.getElementById('dashCmpCanvas');
+                if (!canvas) return;
+                window._ensureChartJS((ok) => {
+                    if (!ok) return; // CDN indisponível — card fica sem o gráfico, sem quebrar o resto
+                    this._doRenderComparativo();
+                });
+            },
+            // Gráfico horizontal único: barra = qtd. de OS; rótulo ao lado = valor em R$ e % da meta
+            _doRenderComparativo() {
+                const canvas = document.getElementById('dashCmpCanvas');
+                if (!canvas || !window.Chart) return;
+                const buckets = this._cmpBuildDataset(this._cmpPeriod);
+                const goal = parseFloat(state.company?.salesGoal) || 0;
+                const osValues = buckets.map(b => this._cmpAggregate(b.from, b.to, 'os'));
+                const metaValues = buckets.map(b => this._cmpAggregate(b.from, b.to, 'meta'));
+                const totalsRS = buckets.map(b => this._cmpTotal(b.from, b.to));
+                const isDark = document.body.classList.contains('dark-mode');
+                const color = '#d4a017';
+
+                // Altura dinâmica: ~34px por barra, com um mínimo pra não ficar espremido
+                const wrap = document.getElementById('dashCmpCanvasWrap');
+                if (wrap) wrap.style.height = Math.max(160, buckets.length * 34) + 'px';
+
+                if (this._cmpChart) { try { this._cmpChart.destroy(); } catch (e) {} this._cmpChart = null; }
+                const ctx = canvas.getContext('2d');
+                this._cmpChart = new Chart(ctx, {
+                    type: 'bar',
+                    data: { labels: buckets.map(b => b.label), datasets: [{ data: osValues, backgroundColor: color + 'cc', hoverBackgroundColor: color, borderRadius: 6, maxBarThickness: 22 }] },
+                    options: {
+                        indexAxis: 'y', // gráfico horizontal
+                        responsive: true, maintainAspectRatio: false, layout: { padding: { right: 78 } },
+                        plugins: {
+                            legend: { display: false },
+                            tooltip: {
+                                backgroundColor: '#212529', padding: 8, cornerRadius: 8,
+                                callbacks: { label: c => `${c.parsed.x} OS · ${goal > 0 ? metaValues[c.dataIndex] + '% · ' : ''}${Utils.formatCurrency(totalsRS[c.dataIndex])}` }
+                            }
+                        },
+                        scales: {
+                            x: { grid: { color: isDark ? 'rgba(255,255,255,.08)' : 'rgba(108,117,125,.15)' }, ticks: { font: { size: 10 }, color: '#6c757d' }, beginAtZero: true },
+                            y: { grid: { display: false }, ticks: { font: { size: 10 }, color: '#6c757d' } }
+                        }
+                    },
+                    plugins: [{
+                        // Escreve "R$ valor (X%)" à direita de cada barra
+                        id: 'dashv2ValueLabel',
+                        afterDatasetsDraw: (chart) => {
+                            const { ctx } = chart;
+                            const dsMeta = chart.getDatasetMeta(0);
+                            ctx.save();
+                            ctx.font = '600 9px Inter, sans-serif';
+                            ctx.fillStyle = isDark ? '#ffcb94' : '#8a5a1f';
+                            ctx.textAlign = 'left';
+                            ctx.textBaseline = 'middle';
+                            dsMeta.data.forEach((bar, i) => {
+                                const txt = goal > 0
+                                    ? `${Utils.formatCurrency(totalsRS[i])} (${metaValues[i]}%)`
+                                    : Utils.formatCurrency(totalsRS[i]);
+                                ctx.fillText(txt, bar.x + 8, bar.y);
+                            });
+                            ctx.restore();
+                        }
+                    }]
+                });
+
+                this._renderCmpCompareRow();
+                this._renderCmpInsights(buckets, osValues, metaValues, totalsRS, goal);
+            },
+            _renderCmpCompareRow() {
+                const el = document.getElementById('dashCmpCompareRow');
+                if (!el) return;
+                const cd = this._cmpCompareData(this._cmpPeriod);
+                const goal = parseFloat(state.company?.salesGoal) || 0;
+                const nowOS = this._cmpAggregate(cd.nowFrom, cd.nowTo, 'os');
+                const prevOS = this._cmpAggregate(cd.prevFrom, cd.prevTo, 'os');
+                const nowRS = this._cmpTotal(cd.nowFrom, cd.nowTo);
+                const prevRS = this._cmpTotal(cd.prevFrom, cd.prevTo);
+                const nowMeta = this._cmpAggregate(cd.nowFrom, cd.nowTo, 'meta');
+                const prevMeta = this._cmpAggregate(cd.prevFrom, cd.prevTo, 'meta');
+                const fmtVal = (os, rs, pct) => `${os} OS · ${Utils.formatCurrency(rs)}${goal > 0 ? ` (${pct}%)` : ''}`;
+                const diffPct = prevOS > 0 ? Math.round(((nowOS - prevOS) / prevOS) * 100) : (nowOS > 0 ? 100 : 0);
+                const positive = diffPct >= 0;
+                el.innerHTML = `
+                    <div class="dashv2-compare-box">
+                        <div class="dashv2-compare-label">${cd.labelNow}</div>
+                        <div class="dashv2-compare-value">${fmtVal(nowOS, nowRS, nowMeta)}</div>
+                    </div>
+                    <div class="dashv2-compare-vs"><i class="fas fa-code-compare"></i></div>
+                    <div class="dashv2-compare-box prev">
+                        <div class="dashv2-compare-label">${cd.labelPrev}</div>
+                        <div class="dashv2-compare-value">${fmtVal(prevOS, prevRS, prevMeta)}</div>
+                    </div>
+                    <div class="dashv2-compare-diff ${positive ? 'up' : 'down'}"><i class="fas fa-arrow-${positive ? 'up' : 'down'}" style="font-size:0.65rem;"></i>${positive ? '+' : ''}${diffPct}%</div>
+                `;
+            },
+            _renderCmpInsights(buckets, osValues, metaValues, totalsRS, goal) {
+                const el = document.getElementById('dashCmpInsights');
+                if (!el) return;
+                const hasData = osValues.length > 0;
+                const maxIdx = hasData ? osValues.indexOf(Math.max(...osValues)) : -1;
+                const avgOS = hasData ? osValues.reduce((a, b) => a + b, 0) / osValues.length : 0;
+                const periodoLabel = this._cmpPeriod === 'dia' ? 'dia' : this._cmpPeriod === 'semana' ? 'semana' : this._cmpPeriod === 'mes' ? 'mês' : this._cmpPeriod === 'ano' ? 'ano' : 'intervalo';
+                const bestLabel = maxIdx >= 0 ? buckets[maxIdx].label : '-';
+                const bestFmt = maxIdx >= 0
+                    ? `${osValues[maxIdx]} OS · ${Utils.formatCurrency(totalsRS[maxIdx])}${goal > 0 ? ` (${metaValues[maxIdx]}%)` : ''}`
+                    : '—';
+                el.innerHTML = `
+                    <div class="dashv2-insight-box">
+                        <div class="dashv2-insight-label">melhor ${periodoLabel}</div>
+                        <div class="dashv2-insight-value">${bestLabel} <small>· ${bestFmt}</small></div>
+                    </div>
+                    <div class="dashv2-insight-box">
+                        <div class="dashv2-insight-label">média</div>
+                        <div class="dashv2-insight-value">${avgOS.toFixed(1).replace('.', ',')}<small> OS/${periodoLabel}</small></div>
+                    </div>
+                `;
+
+                // Projeção de meta — sempre visível quando há meta configurada
+                const noteEl = document.getElementById('dashCmpAiNote');
+                if (!noteEl) return;
+                if (goal > 0) {
+                    const now = new Date();
+                    const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+                    const daysLeft = Math.max(0, daysInMonth - now.getDate());
+                    const monthFrom = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`;
+                    const monthTo = this._shiftDays(this._isoLocal(now), 1);
+                    const monthSalesNow = this._cmpTotal(monthFrom, monthTo);
+                    const remaining = Math.max(0, goal - monthSalesNow);
+                    const dailyNeeded = daysLeft > 0 ? remaining / daysLeft : 0;
+                    noteEl.style.display = 'flex';
+                    noteEl.innerHTML = remaining > 0
+                        ? `<i class="fas fa-sparkles"></i> No ritmo atual de <strong>${Utils.formatCurrency(dailyNeeded)}/dia</strong>, faltam <strong>${Utils.formatCurrency(remaining)}</strong> para bater a meta em ${daysLeft} dia${daysLeft !== 1 ? 's' : ''}.`
+                        : `<i class="fas fa-sparkles"></i> Meta do mês batida! 🎉`;
+                } else {
+                    noteEl.style.display = 'none';
+                }
             },
 
             updateSalesChart() {
