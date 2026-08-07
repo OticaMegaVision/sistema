@@ -3177,6 +3177,124 @@
         .dark-mode .dash-period-btn.active { background: var(--primary); color: white; }
         .dark-mode .dash-period-custom input { background: #2d2d2d; border-color: #444; color: #e0e0e0; }
 
+        /* ===== Filtro de período compacto (dropdown) — mesma linha do botão Ocultar ===== */
+        .dash-period-bar.compact {
+            padding: 0.45rem 0.5rem;
+            gap: 0.5rem;
+            flex-wrap: nowrap;
+        }
+        .dash-period-wrap { position: relative; }
+        .dash-period-trigger {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            background: rgba(255,107,0,0.1);
+            border: 1.5px solid rgba(255,107,0,0.3);
+            color: var(--primary);
+            font-weight: 700;
+            font-size: 0.8rem;
+            padding: 6px 11px;
+            border-radius: 20px;
+            cursor: pointer;
+            white-space: nowrap;
+            transition: all 0.15s;
+        }
+        .dash-period-trigger:hover { background: rgba(255,107,0,0.18); }
+        .dash-period-trigger i.fa-chevron-down { font-size: 0.62rem; margin-left: 1px; transition: transform 0.2s; }
+        .dash-period-trigger.open i.fa-chevron-down { transform: rotate(180deg); }
+        .dash-period-pop {
+            display: none;
+            position: absolute;
+            top: calc(100% + 6px);
+            left: 0;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 8px 28px rgba(16,24,40,.16);
+            border: 1px solid rgba(0,0,0,0.06);
+            padding: 6px;
+            z-index: 50;
+            min-width: 190px;
+        }
+        .dash-period-pop.show { display: block; }
+        .dash-period-pop .dash-period-btn {
+            display: block;
+            width: 100%;
+            text-align: left;
+            border-radius: 8px;
+            padding: 8px 10px;
+        }
+        .dash-period-pop .dash-period-custom { padding: 8px 6px 4px; }
+        .dash-hide-btn {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            background: var(--light-gray);
+            border: 1.5px solid transparent;
+            color: var(--gray);
+            border-radius: 20px;
+            padding: 6px 12px;
+            cursor: pointer;
+            font-size: 0.8rem;
+            font-weight: 700;
+            transition: all 0.2s;
+            white-space: nowrap;
+            margin-left: auto;
+        }
+        .dash-hide-btn:hover { background: #dfe3e7; }
+        .dash-hide-btn.ativo { background: var(--primary); color: #fff; }
+        .dark-mode .dash-period-trigger { background: rgba(255,107,0,0.16); border-color: rgba(255,107,0,0.35); }
+        .dark-mode .dash-period-pop { background: #1e1e1e; border-color: rgba(255,255,255,0.08); }
+        .dark-mode .dash-hide-btn { background: rgba(255,255,255,0.08); color: #ccc; }
+        .dark-mode .dash-hide-btn.ativo { background: var(--primary); color: #fff; }
+
+        /* ===== Abas internas de seção (Nova O.S./Histórico em Vendas, Cadastro/Histórico em Clientes) ===== */
+        .section-subtabs {
+            display: flex;
+            gap: 6px;
+            background: #fff;
+            border-radius: 12px;
+            padding: 4px;
+            box-shadow: 0 1px 3px rgba(16,24,40,.06);
+            margin-bottom: 1.2rem;
+        }
+        .section-subtab {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+            padding: 9px 10px;
+            border-radius: 9px;
+            font-size: 0.82rem;
+            font-weight: 700;
+            color: var(--gray);
+            cursor: pointer;
+            transition: all 0.15s;
+            white-space: nowrap;
+        }
+        .section-subtab:hover { background: var(--light-gray); }
+        .section-subtab.active {
+            background: var(--primary);
+            color: #fff;
+            box-shadow: 0 2px 8px rgba(255,107,0,0.3);
+        }
+        .section-subtab-badge {
+            background: rgba(0,0,0,0.08);
+            border-radius: 10px;
+            padding: 1px 8px;
+            font-size: 0.7rem;
+        }
+        .section-subtab.active .section-subtab-badge { background: rgba(255,255,255,0.28); }
+        .section-subpanel { display: none; }
+        .section-subpanel.active { display: block; }
+        .dark-mode .section-subtabs { background: #1e1e1e; }
+        .dark-mode .section-subtab { color: #999; }
+        .dark-mode .section-subtab:hover { background: rgba(255,255,255,0.08); }
+        .dark-mode .section-subtab.active { background: var(--primary); color: #fff; }
+        @media (max-width: 480px) {
+            .section-subtab span:not(.section-subtab-badge) { font-size: 0.78rem; }
+        }
+
         /* ===== Abas do Dashboard (Visão Geral / Comparativo / Financeiro / Alertas / Histórico) ===== */
         .dashboard-tabs {
             display: flex;
@@ -6264,22 +6382,29 @@ body.dark-mode,
             <!-- Seção Dashboard -->
             <section id="dashboard" class="section active" aria-labelledby="pageTitle">
 
-                <!-- Filtro de período -->
-                <div class="dash-period-bar">
-                    <span class="dash-period-label"><i class="fas fa-calendar-alt"></i> Período:</span>
-                    <button class="dash-period-btn" data-period="today" onclick="Dashboard.setPeriod('today',this)">Hoje</button>
-                    <button class="dash-period-btn active" data-period="month" onclick="Dashboard.setPeriod('month',this)">Este Mês</button>
-                    <button class="dash-period-btn" data-period="lastMonth" onclick="Dashboard.setPeriod('lastMonth',this)">Mês Anterior</button>
-                    <button class="dash-period-btn" data-period="year" onclick="Dashboard.setPeriod('year',this)">Este Ano</button>
-                    <button class="dash-period-btn" data-period="all" onclick="Dashboard.setPeriod('all',this)">Tudo</button>
-                    <button class="dash-period-btn" data-period="custom" onclick="Dashboard.setPeriod('custom',this)">Personalizado</button>
-                    <div class="dash-period-custom" id="dashCustomRange">
-                        <input type="date" id="dashDateFrom" onchange="Dashboard.applyCustomPeriod()">
-                        <span style="color:var(--gray);font-size:0.85rem;">até</span>
-                        <input type="date" id="dashDateTo" onchange="Dashboard.applyCustomPeriod()">
+                <!-- Filtro de período — compacto, uma linha só, visível apenas na aba "Visão Geral" -->
+                <div class="dash-period-bar compact" id="dashPeriodBar">
+                    <div class="dash-period-wrap">
+                        <div class="dash-period-trigger" id="dashPeriodTrigger" onclick="Dashboard.togglePeriodPop()">
+                            <i class="fas fa-calendar-alt"></i>
+                            <span id="dashPeriodTriggerLabel">Este Mês</span>
+                            <i class="fas fa-chevron-down"></i>
+                        </div>
+                        <div class="dash-period-pop" id="dashPeriodPop">
+                            <button class="dash-period-btn" data-period="today" onclick="Dashboard.setPeriod('today',this)">Hoje</button>
+                            <button class="dash-period-btn active" data-period="month" onclick="Dashboard.setPeriod('month',this)">Este Mês</button>
+                            <button class="dash-period-btn" data-period="lastMonth" onclick="Dashboard.setPeriod('lastMonth',this)">Mês Anterior</button>
+                            <button class="dash-period-btn" data-period="year" onclick="Dashboard.setPeriod('year',this)">Este Ano</button>
+                            <button class="dash-period-btn" data-period="all" onclick="Dashboard.setPeriod('all',this)">Tudo</button>
+                            <button class="dash-period-btn" data-period="custom" onclick="Dashboard.setPeriod('custom',this)">Personalizado</button>
+                            <div class="dash-period-custom" id="dashCustomRange">
+                                <input type="date" id="dashDateFrom" onchange="Dashboard.applyCustomPeriod()">
+                                <span style="color:var(--gray);font-size:0.85rem;">até</span>
+                                <input type="date" id="dashDateTo" onchange="Dashboard.applyCustomPeriod()">
+                            </div>
+                        </div>
                     </div>
-                    <button id="btnHideValues" onclick="Dashboard.toggleHideValues()" title="Ocultar/Mostrar valores"
-                        style="margin-left:auto;background:rgba(255,255,255,0.18);border:1.5px solid rgba(255,255,255,0.35);color:#fff;border-radius:8px;padding:5px 13px;cursor:pointer;font-size:0.82rem;font-weight:700;display:flex;align-items:center;gap:6px;transition:all .2s;white-space:nowrap;">
+                    <button id="btnHideValues" class="dash-hide-btn" onclick="Dashboard.toggleHideValues()" title="Ocultar/Mostrar valores">
                         <i class="fas fa-eye" id="hideValuesIcon"></i>
                         <span id="hideValuesLabel">Ocultar</span>
                     </button>
@@ -6660,6 +6785,14 @@ body.dark-mode,
 
             <!-- Seção Vendas -->
             <section id="sales" class="section" aria-labelledby="pageTitle">
+
+                <!-- Abas: separa o formulário de Nova OS do Histórico, para não poluir a tela -->
+                <div class="section-subtabs">
+                    <div class="section-subtab active" data-subtab="sales-nova" onclick="Sales.setSubTab('sales-nova')"><i class="fas fa-plus"></i><span>Nova O.S.</span></div>
+                    <div class="section-subtab" data-subtab="sales-historico" onclick="Sales.setSubTab('sales-historico')"><i class="fas fa-clock-rotate-left"></i><span>Histórico</span><span class="section-subtab-badge" id="salesSubtabBadge">0</span></div>
+                </div>
+
+                <div class="section-subpanel active" data-subpanel="sales-nova">
                 <div class="form-container no-print">
                     <h2 class="section-title">NOVA ORDEM DE SERVIÇO</h2>
 
@@ -7689,7 +7822,9 @@ body.dark-mode,
                         </div>
                     </div>
                 </div>
+                </div><!-- /section-subpanel sales-nova -->
 
+                <div class="section-subpanel" data-subpanel="sales-historico">
                 <!-- Histórico de Vendas -->
                 <div class="table-container no-print tf-ready" id="salesHistoryPanel">
                     <div class="table-filtros">
@@ -7789,10 +7924,19 @@ body.dark-mode,
                         <tbody></tbody>
                     </table>
                 </div>
+                </div><!-- /section-subpanel sales-historico -->
             </section>
 
             <!-- Seção Clientes -->
             <section id="clients" class="section" aria-labelledby="pageTitle">
+
+                <!-- Abas: separa o Cadastro do Histórico, para não poluir a tela -->
+                <div class="section-subtabs">
+                    <div class="section-subtab active" data-subtab="clients-cadastro" onclick="Clients.setSubTab('clients-cadastro')"><i class="fas fa-user-plus"></i><span>Cadastro</span></div>
+                    <div class="section-subtab" data-subtab="clients-historico" onclick="Clients.setSubTab('clients-historico')"><i class="fas fa-clock-rotate-left"></i><span>Histórico</span><span class="section-subtab-badge" id="clientsSubtabBadge">0</span></div>
+                </div>
+
+                <div class="section-subpanel active" data-subpanel="clients-cadastro">
                 <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:1rem;margin-bottom:1.5rem;">
                     <div>
                         <h2 class="section-title" style="margin-bottom:0.25rem;border-bottom:none;"><i class="fas fa-users" style="margin-right:6px;"></i>Clientes</h2>
@@ -8116,7 +8260,9 @@ body.dark-mode,
                         </button>
                     </div>
                 </div>
+                </div><!-- /section-subpanel clients-cadastro -->
 
+                <div class="section-subpanel" data-subpanel="clients-historico">
                 <!-- Tabela de Clientes (com coluna Receita) -->
                 <div class="table-container tf-ready" id="clientsHistoryPanel">
                     <div class="table-filtros">
@@ -8176,6 +8322,7 @@ body.dark-mode,
                     <!-- Paginação de clientes -->
                     <div id="clientsPagination" style="display:flex;align-items:center;justify-content:center;gap:0.5rem;margin-top:1rem;flex-wrap:wrap;"></div>
                 </div>
+                </div><!-- /section-subpanel clients-historico -->
             </section>
 
             <!-- ==================== SEÇÃO CRM ==================== -->
@@ -19322,22 +19469,40 @@ tbody tr td{border:1.5px solid #000;padding:2mm;text-align:center;font-weight:70
                 this._period = period;
                 document.querySelectorAll('.dash-period-btn').forEach(b => b.classList.remove('active'));
                 btn?.classList.add('active');
+                const triggerLabel = document.getElementById('dashPeriodTriggerLabel');
+                if (triggerLabel) triggerLabel.textContent = this._periodLabel() || btn?.textContent || '';
                 const custom = document.getElementById('dashCustomRange');
                 if (period === 'custom') {
                     custom?.classList.add('show');
-                    return; // aguarda datas
+                    return; // aguarda datas — mantém o menu aberto para o usuário escolher as datas
                 } else {
                     custom?.classList.remove('show');
                     this._from = null;
                     this._to   = null;
+                    this.togglePeriodPop(false); // fecha o menu ao escolher um período pronto
                 }
                 this.update();
+            },
+
+            // Abre/fecha o menu compacto do filtro de período
+            togglePeriodPop(force) {
+                const pop = document.getElementById('dashPeriodPop');
+                const trigger = document.getElementById('dashPeriodTrigger');
+                if (!pop || !trigger) return;
+                const show = force !== undefined ? force : !pop.classList.contains('show');
+                pop.classList.toggle('show', show);
+                trigger.classList.toggle('open', show);
             },
 
             applyCustomPeriod() {
                 this._from = document.getElementById('dashDateFrom')?.value || null;
                 this._to   = document.getElementById('dashDateTo')?.value   || null;
-                if (this._from && this._to) this.update();
+                if (this._from && this._to) {
+                    const triggerLabel = document.getElementById('dashPeriodTriggerLabel');
+                    if (triggerLabel) triggerLabel.textContent = 'Personalizado';
+                    this.togglePeriodPop(false);
+                    this.update();
+                }
             },
 
             toggleHideValues() {
@@ -19932,6 +20097,9 @@ tbody tr td{border:1.5px solid #000;padding:2mm;text-align:center;font-weight:70
                 this._activeDashTab = tab;
                 document.querySelectorAll('.dashboard-tab').forEach(t => t.classList.toggle('active', t.dataset.tab === tab));
                 document.querySelectorAll('.dash-tabpanel').forEach(p => { p.style.display = (p.dataset.tabpanel === tab) ? '' : 'none'; });
+                // O filtro de período só faz sentido na aba "Visão Geral" — nas demais ele fica oculto
+                const periodBar = document.getElementById('dashPeriodBar');
+                if (periodBar) periodBar.style.display = (tab === 'geral') ? '' : 'none';
                 // O gráfico do comparativo só é desenhado quando a aba fica visível
                 // (Chart.js não mede corretamente um canvas dentro de um elemento display:none)
                 if (tab === 'comparativo') this.renderComparativo();
@@ -20369,6 +20537,10 @@ tbody tr td{border:1.5px solid #000;padding:2mm;text-align:center;font-weight:70
 
         // ==================== CLIENTES ====================
         const Clients = {
+            setSubTab(subtab) {
+                SectionSubTabs_set(document.getElementById('clients'), subtab);
+            },
+
             // Atualiza o rótulo do campo de registro (CRM para médico, CROO para optometrista)
             updatePrescRegLabel(prefix) {
                 const typeEl  = document.getElementById(prefix + 'PrescProfType');
@@ -20529,6 +20701,8 @@ tbody tr td{border:1.5px solid #000;padding:2mm;text-align:center;font-weight:70
 
                 const badge = document.getElementById('clientsCountBadge');
                 if (badge) badge.textContent = total + ' cliente' + (total !== 1 ? 's' : '');
+                const subtabBadge = document.getElementById('clientsSubtabBadge');
+                if (subtabBadge) subtabBadge.textContent = (state.clients || []).length;
 
                 // --- PERFORMANCE: renderizar apenas a página atual ---
                 const start = (this._page - 1) * this._pageSize;
@@ -24642,12 +24816,25 @@ ${container.innerHTML}
         };
 
         // ==================== VENDAS (COM PDF) ====================
+        // Alterna as abas internas (ex: "Nova O.S." / "Histórico" em Vendas,
+        // "Cadastro" / "Histórico" em Clientes) sem interferir em nenhuma lógica
+        // existente — apenas troca a visibilidade dos painéis dentro da seção.
+        function SectionSubTabs_set(sectionEl, subtab) {
+            if (!sectionEl) return;
+            sectionEl.querySelectorAll('.section-subtab').forEach(t => t.classList.toggle('active', t.dataset.subtab === subtab));
+            sectionEl.querySelectorAll('.section-subpanel').forEach(p => p.classList.toggle('active', p.dataset.subpanel === subtab));
+        }
+
         const Sales = {
             init() {
                 this.clearForm(); // garante form limpo a cada inicialização
                 this.populateSaleSelects();
                 this.renderHistory();
                 Utils.updatePixKey();
+            },
+
+            setSubTab(subtab) {
+                SectionSubTabs_set(document.getElementById('sales'), subtab);
             },
 
             // ===== Searchable Select (busca por nome/código nos itens da venda) =====
@@ -25000,6 +25187,8 @@ ${container.innerHTML}
 
                 const badge = document.getElementById('salesCountBadge');
                 if (badge) badge.textContent = `${filtered.length} OS${filtered.length !== state.sales.length ? ` de ${state.sales.length}` : ''}`;
+                const subtabBadge = document.getElementById('salesSubtabBadge');
+                if (subtabBadge) subtabBadge.textContent = (state.sales || []).length;
 
                 tbody.innerHTML = '';
                 if (filtered.length === 0) {
@@ -28935,6 +29124,14 @@ ${container.innerHTML}
                 );
             }
         };
+
+        // Fecha o menu compacto do filtro de período ao clicar fora dele
+        document.addEventListener('click', (e) => {
+            const wrap = document.querySelector('.dash-period-wrap');
+            if (wrap && !wrap.contains(e.target)) {
+                try { Dashboard.togglePeriodPop(false); } catch(e2) {}
+            }
+        });
 
         // ==================== INICIALIZAÇÃO ====================
         document.addEventListener('DOMContentLoaded', async () => {
