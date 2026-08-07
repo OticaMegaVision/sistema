@@ -907,6 +907,50 @@
             font-weight: 500;
         }
 
+        /* ===== HEADER PROFISSIONAL — toolbar (relógio + usuário) e botão de loja ===== */
+        .header-toolbar {
+            display: flex;
+            align-items: center;
+            gap: 0;
+            background: white;
+            border-radius: 12px;
+            padding: 3px;
+            box-shadow: 0 1px 8px rgba(0,0,0,0.06);
+            border: 1px solid rgba(0,0,0,0.05);
+        }
+        .header-toolbar .datetime-widget {
+            box-shadow: none;
+            border: none;
+            padding: 0.35rem 0.7rem 0.35rem 0.4rem;
+        }
+        .header-toolbar-divider {
+            width: 1px;
+            height: 22px;
+            background: rgba(0,0,0,0.08);
+            margin: 0 2px;
+        }
+        .header-store-btn {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            background: linear-gradient(135deg, var(--primary), #ffaa00);
+            color: #fff;
+            border-radius: 10px;
+            padding: 7px 13px;
+            cursor: pointer;
+            transition: all 0.2s;
+            white-space: nowrap;
+            font-size: 0.8rem;
+            font-weight: 700;
+            box-shadow: 0 3px 10px rgba(255,107,0,0.28);
+        }
+        .header-store-btn:hover { box-shadow: 0 4px 14px rgba(255,107,0,0.4); transform: translateY(-1px); }
+        .header-store-btn i.fa-chevron-down { font-size: 0.65rem; opacity: 0.9; }
+        .dark-mode .header-toolbar { background: #1a1d27; border-color: rgba(255,255,255,0.07); }
+        .dark-mode .header-toolbar-divider { background: rgba(255,255,255,0.1); }
+        /* Nas abas que não são o Dashboard, só o botão de loja fica visível */
+        body.nao-dashboard .header-toolbar { display: none !important; }
+
         .backup-buttons {
             display: flex;
             gap: 0.4rem;
@@ -6355,23 +6399,27 @@ body.dark-mode,
                     <div id="pageGreeting" style="font-size:0.82rem;color:var(--gray);margin-top:2px;font-weight:500;"></div>
                 </div>
                 <div class="header-right">
-                    <!-- BADGE USUÁRIO LOGADO -->
-                    <div id="headerUserBadge" style="display:none;align-items:center;gap:4px;background:rgba(40,167,69,0.1);border:1.5px solid rgba(40,167,69,0.3);border-radius:10px;padding:5px 10px;font-size:0.78rem;font-weight:700;color:#28a745;white-space:nowrap;max-width:180px;overflow:hidden;text-overflow:ellipsis;"></div>
-                    <!-- /BADGE USUÁRIO LOGADO -->
-                    <!-- SELETOR DE LOJA -->
-                    <div id="storeSelectorWrap" style="display:flex;align-items:center;gap:6px;background:rgba(255,107,0,0.08);border:1.5px solid rgba(255,107,0,0.3);border-radius:10px;padding:5px 10px;cursor:pointer;transition:all .2s;" onclick="StoreManager.openModal()" title="Trocar de loja">
-                        <i class="fas fa-store" style="color:#ff6b00;font-size:0.9rem;"></i>
-                        <span id="storeCurrentLabel" style="font-size:0.8rem;font-weight:700;color:#ff6b00;white-space:nowrap;">Barueri</span>
-                        <i class="fas fa-chevron-down" style="color:#ff6b00;font-size:0.65rem;"></i>
-                    </div>
-                    <!-- /SELETOR DE LOJA -->
-                    <div class="datetime-widget" aria-live="polite">
-                        <div class="clock-ring"><i class="fas fa-clock"></i></div>
-                        <div>
-                            <div class="time" id="currentTime"></div>
-                            <div class="date" id="currentDate"></div>
+                    <!-- Agrupamento visual (relógio + usuário logado) — só aparece no Dashboard -->
+                    <div class="header-toolbar" id="headerToolbar">
+                        <!-- BADGE USUÁRIO LOGADO -->
+                        <div id="headerUserBadge" style="display:none;align-items:center;gap:4px;font-size:0.78rem;font-weight:700;color:#28a745;white-space:nowrap;max-width:180px;overflow:hidden;text-overflow:ellipsis;padding:5px 10px;"></div>
+                        <!-- /BADGE USUÁRIO LOGADO -->
+                        <div class="header-toolbar-divider" id="headerToolbarDivider" style="display:none;"></div>
+                        <div class="datetime-widget" id="datetimeWidget" aria-live="polite">
+                            <div class="clock-ring"><i class="fas fa-clock"></i></div>
+                            <div>
+                                <div class="time" id="currentTime"></div>
+                                <div class="date" id="currentDate"></div>
+                            </div>
                         </div>
                     </div>
+                    <!-- SELETOR DE LOJA — sempre visível, em qualquer aba -->
+                    <div id="storeSelectorWrap" class="header-store-btn" onclick="StoreManager.openModal()" title="Trocar de loja">
+                        <i class="fas fa-store"></i>
+                        <span id="storeCurrentLabel">Barueri</span>
+                        <i class="fas fa-chevron-down"></i>
+                    </div>
+                    <!-- /SELETOR DE LOJA -->
                     <div class="backup-buttons">
                         <input type="file" id="importBackup" class="d-none" accept=".json" onchange="App.importBackup(event)" aria-hidden="true">
                     </div>
@@ -19009,6 +19057,8 @@ tbody tr td{border:1.5px solid #000;padding:2mm;text-align:center;font-weight:70
                         document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
                         document.getElementById(section).classList.add('active');
                         document.getElementById('pageTitle').innerText = item.querySelector('span').innerText;
+                        // Fora do Dashboard, o cabeçalho fica simplificado: só o botão de trocar loja
+                        document.body.classList.toggle('nao-dashboard', section !== 'dashboard');
                         
                         if (section === 'dashboard') {
                             Dashboard.update().catch(()=>{});
@@ -29834,16 +29884,18 @@ ${container.innerHTML}
 <!-- ═══ MOBILE OVERRIDE — aplicado por último ═══ -->
 <style>
 @media screen and (max-width: 640px) {
-    /* Relógio/data fixado no canto superior direito do cabeçalho */
+    /* Relógio/data fixado no canto superior direito do cabeçalho (dentro do toolbar) */
     .header               { position:relative !important; padding:.5rem .75rem !important; }
-    .datetime-widget      {
+    .header-toolbar       {
         position:absolute !important;
         top:.15rem !important;
         right:0 !important;
+        padding:.25rem !important;
+        z-index:5 !important;
+    }
+    .header-toolbar .datetime-widget {
         padding:.25rem .55rem !important;
         gap:6px !important;
-        border-radius:8px !important;
-        z-index:5 !important;
     }
     .datetime-widget .clock-ring { width:24px !important; height:24px !important; }
     .datetime-widget .clock-ring i { width:18px !important; height:18px !important; font-size:.55rem !important; }
@@ -31125,6 +31177,7 @@ const AuthSystem = {
     _updateUserBadge() {
         const session = this._getSession();
         const el = document.getElementById('headerUserBadge');
+        const divider = document.getElementById('headerToolbarDivider');
         if (!el || !session) return;
         el.innerHTML = `<i class="fas fa-user-circle" style="margin-right:5px;"></i>${session.fullName}
             <button onclick="AuthSystem.logout()" title="Sair"
@@ -31132,6 +31185,7 @@ const AuthSystem = {
               <i class="fas fa-sign-out-alt"></i>
             </button>`;
         el.style.display = 'flex';
+        if (divider) divider.style.display = '';
     },
 
     // ── Verifica sessão no boot ──
