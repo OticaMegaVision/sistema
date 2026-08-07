@@ -20413,6 +20413,33 @@ tbody tr td{border:1.5px solid #000;padding:2mm;text-align:center;font-weight:70
                 const wrap = document.getElementById('dashCmpCanvasWrap');
                 if (wrap) wrap.style.height = Math.max(160, buckets.length * 34) + 'px';
 
+                // ✅ FIX "gráfico do Comparativo pisca": Dashboard.update() roda com
+                // muita frequência em segundo plano (sync a cada 30s, após qualquer
+                // venda/despesa/baixa etc) e chamava renderComparativo() sempre que
+                // esta aba estava aberta. Antes, isso destruía e recriava o Chart.js
+                // do zero a cada vez — visível como um "piscar". Os valores mais
+                // recentes ficam guardados em `this._cmp*` para o tooltip e o plugin
+                // de rótulo (abaixo) sempre lerem os dados atuais, mesmo quando o
+                // gráfico não é recriado — só atualizamos os dados existentes
+                // (sem animação) em vez de destruir/recriar, exceto quando a
+                // quantidade de barras ou o tema claro/escuro realmente mudou.
+                this._cmpLastTotals = totalsRS;
+                this._cmpLastMeta   = metaValues;
+                this._cmpLastGoal   = goal;
+                const sameShape = this._cmpChart
+                    && this._cmpChart.data.labels.length === buckets.length
+                    && this._cmpLastIsDark === isDark;
+                this._cmpLastIsDark = isDark;
+
+                if (sameShape) {
+                    this._cmpChart.data.labels = buckets.map(b => b.label);
+                    this._cmpChart.data.datasets[0].data = osValues;
+                    this._cmpChart.update('none'); // sem animação — sem "piscar"
+                    this._renderCmpCompareRow();
+                    this._renderCmpInsights(buckets, osValues, metaValues, totalsRS, goal);
+                    return;
+                }
+
                 if (this._cmpChart) { try { this._cmpChart.destroy(); } catch (e) {} this._cmpChart = null; }
                 const ctx = canvas.getContext('2d');
                 this._cmpChart = new Chart(ctx, {
@@ -20425,7 +20452,7 @@ tbody tr td{border:1.5px solid #000;padding:2mm;text-align:center;font-weight:70
                             legend: { display: false },
                             tooltip: {
                                 backgroundColor: '#212529', padding: 8, cornerRadius: 8,
-                                callbacks: { label: c => `${c.parsed.x} OS · ${goal > 0 ? metaValues[c.dataIndex] + '% · ' : ''}${Utils.formatCurrency(totalsRS[c.dataIndex])}` }
+                                callbacks: { label: c => `${c.parsed.x} OS · ${this._cmpLastGoal > 0 ? this._cmpLastMeta[c.dataIndex] + '% · ' : ''}${Utils.formatCurrency(this._cmpLastTotals[c.dataIndex])}` }
                             }
                         },
                         scales: {
@@ -20445,9 +20472,10 @@ tbody tr td{border:1.5px solid #000;padding:2mm;text-align:center;font-weight:70
                             ctx.textAlign = 'left';
                             ctx.textBaseline = 'middle';
                             dsMeta.data.forEach((bar, i) => {
-                                const txt = goal > 0
-                                    ? `${Utils.formatCurrency(totalsRS[i])} (${metaValues[i]}%)`
-                                    : Utils.formatCurrency(totalsRS[i]);
+                                const g = this._cmpLastGoal, mv = this._cmpLastMeta, tr = this._cmpLastTotals;
+                                const txt = g > 0
+                                    ? `${Utils.formatCurrency(tr[i])} (${mv[i]}%)`
+                                    : Utils.formatCurrency(tr[i]);
                                 ctx.fillText(txt, bar.x + 8, bar.y);
                             });
                             ctx.restore();
