@@ -16224,8 +16224,15 @@ body.dark-mode,
                             // qual versão é a mais recente. Sem ele, um dispositivo que
                             // sincroniza atrasado pode "ressuscitar" a conta como não paga.
                             contasAgora[idx2]._updatedAt = new Date().toISOString();
+                            // ✅ FIX "precisa dar baixa 2x": antes o modal fechava e mostrava
+                            // sucesso ANTES de saveAll() (que faz ida e volta ao servidor)
+                            // terminar — a lista continuava mostrando "não pago" por um
+                            // tempo, parecendo que o 1º clique não funcionou. Agora aguarda
+                            // o salvamento de fato terminar antes de fechar o modal.
+                            try { await ContasManager.saveAll(contasAgora); } catch(e) {}
                             overlay.remove();
-                            ContasManager.saveAll(contasAgora).then(() => { ContasManager.renderAll().catch(()=>{}); Dashboard.update().catch(()=>{}); }).catch(()=>{});
+                            ContasManager.renderAll().catch(()=>{});
+                            Dashboard.update().catch(()=>{});
                             Toast.show(`💰 Pagamento parcial de R$ ${paidVal.toFixed(2).replace('.',',')} registrado. Saldo restante: R$ ${saldo.toFixed(2).replace('.',',')}`, 'warning', 5000);
                             // ✅ Comprovante do pagamento parcial — mostra o valor efetivamente
                             // pago nesta baixa (não o saldo remanescente) e informa quanto falta.
@@ -16249,8 +16256,11 @@ body.dark-mode,
                             if (obs) contasAgora[idx2].obs = obs;
                             // ✅ FIX SYNC: idem — carimba _updatedAt também na baixa total.
                             contasAgora[idx2]._updatedAt = new Date().toISOString();
+                            // ✅ FIX "precisa dar baixa 2x": ver comentário acima (mesmo problema).
+                            try { await ContasManager.saveAll(contasAgora); } catch(e) {}
                             overlay.remove();
-                            ContasManager.saveAll(contasAgora).then(() => { ContasManager.renderAll().catch(()=>{}); Dashboard.update().catch(()=>{}); }).catch(()=>{});
+                            ContasManager.renderAll().catch(()=>{});
+                            Dashboard.update().catch(()=>{});
                             Toast.show('Baixa registrada! ✅', 'success');
                             ContasManager.gerarComprovante(id);
                         }
@@ -19466,6 +19476,10 @@ tbody tr td{border:1.5px solid #000;padding:2mm;text-align:center;font-weight:70
             _cmpFrom: null,      // usado apenas quando _cmpPeriod === 'custom'
             _cmpTo: null,
             _cmpChart: null,     // instância do Chart.js
+            _cmpMarkupBuilt: false, // ✅ FIX bug "datas voltam sozinhas": controla se o HTML do
+                                     // card (com os inputs de data) já foi criado, para não
+                                     // recriá-lo — e apagar o que o usuário está digitando —
+                                     // toda vez que updateCards() roda em segundo plano
 
             setGlassesPeriod(period, btn) {
                 this._glassesPeriod = period;
@@ -20103,7 +20117,31 @@ tbody tr td{border:1.5px solid #000;padding:2mm;text-align:center;font-weight:70
                     </div>
                 `;
 
-                this.renderComparativoMarkup();
+                // ✅ FIX bug "datas do comparativo voltam sozinhas / fica piscando":
+                // updateCards() roda com muita frequência (sync a cada 30s, após
+                // qualquer venda/despesa/baixa etc). Recriar o innerHTML inteiro do
+                // card Comparativo (renderComparativoMarkup) a cada chamada apagava
+                // e recriava os <input type="date"> — inclusive o que o usuário
+                // estava digitando naquele momento, antes de clicar em "Aplicar".
+                // Agora o markup só é criado UMA vez; atualizações seguintes apenas
+                // sincronizam a aba ativa / visibilidade, sem tocar nos inputs.
+                if (!this._cmpMarkupBuilt || !document.getElementById('dashCmpTabs')) {
+                    this.renderComparativoMarkup();
+                    this._cmpMarkupBuilt = true;
+                } else {
+                    this._syncCmpTabsUI();
+                }
+            },
+
+            // Sincroniza apenas a aba ativa e a visibilidade do range customizado do
+            // Comparativo, sem recriar os <input type="date"> (preserva o que o
+            // usuário estiver digitando neles).
+            _syncCmpTabsUI() {
+                document.querySelectorAll('#dashCmpTabs .dashv2-period-tab').forEach(t => {
+                    t.classList.toggle('active', t.dataset.period === this._cmpPeriod);
+                });
+                const custom = document.getElementById('dashCmpCustomRange');
+                if (custom) custom.classList.toggle('show', this._cmpPeriod === 'custom');
             },
 
             // Injeta o card "Comparativo de Desempenho" na aba própria (fora de #dashboardCards)
@@ -20117,11 +20155,11 @@ tbody tr td{border:1.5px solid #000;padding:2mm;text-align:center;font-weight:70
                         </div>
 
                         <div class="dashv2-period-tabs" id="dashCmpTabs">
-                            <div class="dashv2-period-tab ${this._cmpPeriod==='dia'?'active':''}" onclick="Dashboard.setCmpPeriod('dia')">Dia</div>
-                            <div class="dashv2-period-tab ${this._cmpPeriod==='semana'?'active':''}" onclick="Dashboard.setCmpPeriod('semana')">Semana</div>
-                            <div class="dashv2-period-tab ${this._cmpPeriod==='mes'?'active':''}" onclick="Dashboard.setCmpPeriod('mes')">Mês</div>
-                            <div class="dashv2-period-tab ${this._cmpPeriod==='ano'?'active':''}" onclick="Dashboard.setCmpPeriod('ano')">Ano</div>
-                            <div class="dashv2-period-tab custom-tab ${this._cmpPeriod==='custom'?'active':''}" onclick="Dashboard.setCmpPeriod('custom')" title="Período personalizado"><i class="fas fa-calendar-week" style="font-size:0.68rem;"></i></div>
+                            <div class="dashv2-period-tab ${this._cmpPeriod==='dia'?'active':''}" data-period="dia" onclick="Dashboard.setCmpPeriod('dia')">Dia</div>
+                            <div class="dashv2-period-tab ${this._cmpPeriod==='semana'?'active':''}" data-period="semana" onclick="Dashboard.setCmpPeriod('semana')">Semana</div>
+                            <div class="dashv2-period-tab ${this._cmpPeriod==='mes'?'active':''}" data-period="mes" onclick="Dashboard.setCmpPeriod('mes')">Mês</div>
+                            <div class="dashv2-period-tab ${this._cmpPeriod==='ano'?'active':''}" data-period="ano" onclick="Dashboard.setCmpPeriod('ano')">Ano</div>
+                            <div class="dashv2-period-tab custom-tab ${this._cmpPeriod==='custom'?'active':''}" data-period="custom" onclick="Dashboard.setCmpPeriod('custom')" title="Período personalizado"><i class="fas fa-calendar-week" style="font-size:0.68rem;"></i></div>
                         </div>
 
                         <div class="dashv2-custom-range ${this._cmpPeriod==='custom'?'show':''}" id="dashCmpCustomRange">
@@ -20326,6 +20364,15 @@ tbody tr td{border:1.5px solid #000;padding:2mm;text-align:center;font-weight:70
                     this._cmpFrom = this._isoLocal(from);
                 }
                 this.updateCards();
+                // Ação explícita do usuário (abriu a aba "Personalizado" agora) — é seguro
+                // preencher os campos de data aqui, diferente das atualizações em segundo
+                // plano (updateCards/_syncCmpTabsUI), que não tocam nesses inputs.
+                if (period === 'custom') {
+                    const fromEl = document.getElementById('dashCmpFrom');
+                    const toEl   = document.getElementById('dashCmpTo');
+                    if (fromEl) fromEl.value = this._cmpFrom || '';
+                    if (toEl)   toEl.value   = this._cmpTo || '';
+                }
                 this.renderComparativo();
             },
             applyCmpCustomRange() {
