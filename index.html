@@ -8714,7 +8714,20 @@ body.dark-mode,
 
             <!-- Seção Produtos -->
             <section id="products" class="section" aria-labelledby="pageTitle">
-                <h2 class="section-title">Produtos</h2>
+
+                <!-- Abas: separa o Cadastro do Histórico, para não poluir a tela -->
+                <div class="section-subtabs">
+                    <div class="section-subtab active" data-subtab="products-cadastro" onclick="Products.setSubTab('products-cadastro')"><i class="fas fa-box-open"></i><span>Cadastro</span></div>
+                    <div class="section-subtab" data-subtab="products-historico" onclick="Products.setSubTab('products-historico')"><i class="fas fa-clock-rotate-left"></i><span>Histórico</span><span class="section-subtab-badge" id="productsSubtabBadge">0</span></div>
+                </div>
+
+                <div class="section-subpanel active" data-subpanel="products-cadastro">
+                <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:1rem;margin-bottom:1.5rem;">
+                    <div>
+                        <h2 class="section-title" style="margin-bottom:0.25rem;border-bottom:none;"><i class="fas fa-box" style="margin-right:6px;"></i>Produtos</h2>
+                        <span style="font-size:0.85rem;color:var(--gray);">Cadastro do catálogo de lentes, armações e tratamentos</span>
+                    </div>
+                </div>
                 <div class="form-container">
                     <form id="productForm" novalidate>
                         <div class="form-row">
@@ -8793,6 +8806,9 @@ body.dark-mode,
                         </div>
                     </form>
                 </div>
+                </div><!-- /section-subpanel products-cadastro -->
+
+                <div class="section-subpanel" data-subpanel="products-historico">
                 <div class="table-container tf-ready" id="productsPanel">
                     <div class="table-filtros">
                     <div class="sh-head">
@@ -8859,8 +8875,7 @@ body.dark-mode,
                         <tbody></tbody>
                     </table>
                 </div>
-            </section>
-
+                </div><!-- /section-subpanel products-historico -->
             </section>
 
 
@@ -19165,8 +19180,14 @@ tbody tr td{border:1.5px solid #000;padding:2mm;text-align:center;font-weight:70
                     if (titleEl && titleEl.innerText.trim() === 'Dashboard') {
                         const h = now.getHours();
                         const saudacao = h < 12 ? 'Bom dia' : h < 18 ? 'Boa tarde' : 'Boa noite';
-                        const loja = (document.getElementById('storeCurrentLabel') || {}).innerText || '';
-                        greetingEl.innerText = `${saudacao}${loja ? ', ' + loja : ''} 👋`;
+                        // ✅ Mostra o cargo (Administrador/Vendedor) + nome do usuário logado
+                        const profileLabels = { admin: 'Administrador', seller: 'Vendedor' };
+                        const profileLabel = (window._authUser && profileLabels[window._authUser.profile]) || '';
+                        const usuario = (window._authUser && window._authUser.fullName)
+                            ? window._authUser.fullName
+                            : (window._authUser && window._authUser.username) || '';
+                        const quemSaudar = [profileLabel, usuario].filter(Boolean).join(' ');
+                        greetingEl.innerText = `${saudacao}${quemSaudar ? ', ' + quemSaudar : ''} 👋`;
                         greetingEl.style.display = '';
                     } else {
                         greetingEl.style.display = 'none';
@@ -21746,6 +21767,10 @@ tbody tr td{border:1.5px solid #000;padding:2mm;text-align:center;font-weight:70
 
         // ==================== PRODUTOS ====================
         const Products = {
+            setSubTab(subtab) {
+                SectionSubTabs_set(document.getElementById('products'), subtab);
+            },
+
             renderTable() {
                 const tbody = document.querySelector('#productsTable tbody');
                 if (!tbody) return;
@@ -21760,6 +21785,8 @@ tbody tr td{border:1.5px solid #000;padding:2mm;text-align:center;font-weight:70
                 // Atualiza badge de contagem
                 const badge = document.getElementById('productsCountBadge');
                 if (badge) badge.textContent = list.length + ' produto' + (list.length !== 1 ? 's' : '');
+                const subtabBadge = document.getElementById('productsSubtabBadge');
+                if (subtabBadge) subtabBadge.textContent = (state.products || []).length;
                 // Renderiza com DocumentFragment — suporta 2700+ produtos sem travar
                 const PAGE = 200; // renderiza os primeiros 200, busca mostra todos filtrados
                 const toRender = list.slice(0, term ? list.length : PAGE);
