@@ -9859,6 +9859,12 @@ body.dark-mode,
                                     <button class="btn btn-sm" style="background:#21262d;color:#a78bfa;border:1px solid #30363d;font-size:0.7rem;padding:4px 10px;" onclick="RxDBPanel.cleanTombstones()" title="Remover tombstones expirados (>7 dias)">
                                         <i class="fas fa-broom"></i> Compactar
                                     </button>
+                                    <button class="btn btn-sm" style="background:#21262d;color:#fb923c;border:1px solid #30363d;font-size:0.7rem;padding:4px 10px;" onclick="RxDBPanel.archiveOldData()" title="Exporta e remove vendas/despesas antigas — reduz o tamanho do banco na nuvem">
+                                        <i class="fas fa-box-archive"></i> Arquivar Antigos
+                                    </button>
+                                    <button class="btn btn-sm" style="background:#21262d;color:#4ade80;border:1px solid #30363d;font-size:0.7rem;padding:4px 10px;" onclick="RxDBPanel.migrateImagesToStorage()" title="Move fotos de produtos e logo (base64) para o Supabase Storage — reduz drasticamente o que é sincronizado a cada mudança">
+                                        <i class="fas fa-images"></i> Migrar Fotos p/ Storage
+                                    </button>
                                 </div>
                             </div>
 
@@ -12815,6 +12821,126 @@ body.dark-mode,
                 } catch(e) {
                     Toast.show('❌ Erro ao compactar: ' + e.message, 'danger');
                 }
+            },
+
+            // ── Arquivar dados antigos (vendas/despesas) ────────────────────────
+            // ✅ NOVO: exporta (download .json) e depois remove vendas e despesas
+            // mais antigas que o corte escolhido pelo usuário. Nunca roda sozinho —
+            // é sempre uma ação manual, com preview do total de registros e
+            // confirmação explícita antes de apagar qualquer coisa. Ajuda a manter
+            // o tamanho do banco no Supabase sob controle (menos dados = menos
+            // Egress a cada sync/push do snapshot).
+            async archiveOldData() {
+                const anosStr = prompt('Arquivar vendas e despesas com mais de quantos anos?\n\n(Elas serão exportadas para um arquivo .json antes de serem removidas)', '3');
+                if (anosStr === null) return;
+                const anos = parseFloat(anosStr.replace(',', '.'));
+                if (!anos || anos <= 0) { Toast.show('❌ Informe um número de anos válido', 'danger'); return; }
+
+                const corte = new Date();
+                corte.setFullYear(corte.getFullYear() - anos);
+                const corteISO = corte.toISOString();
+
+                const getDate = (item) => item?.date || item?.data || item?.createdAt || item?._updatedAt || item?.dueDate || null;
+
+                const oldSales    = (state.sales    || []).filter(s => { const d = getDate(s); return d && d < corteISO; });
+                const oldExpenses = (state.expenses || []).filter(e => { const d = getDate(e); return d && d < corteISO; });
+                const total = oldSales.length + oldExpenses.length;
+
+                if (total === 0) {
+                    Toast.show('✅ Nenhum registro de venda/despesa mais antigo que ' + anos + ' ano(s)', 'info', 4000);
+                    return;
+                }
+
+                if (!confirm(`📦 Arquivar dados antigos\n\nEncontrados: ${oldSales.length} venda(s) e ${oldExpenses.length} despesa(s) anteriores a ${corte.toLocaleDateString('pt-BR')}.\n\nEles serão baixados em um arquivo .json e DEPOIS removidos do sistema (local e nuvem).\n\nDeseja continuar?`)) return;
+
+                // 1) Exporta primeiro (backup de segurança) — nunca apaga sem exportar antes
+                try {
+                    const storeId = window._currentStore || 'barueri';
+                    const payload = { _arquivo: 'otica-arquivo-antigo', _store: storeId, _geradoEm: new Date().toISOString(), corte: corteISO, sales: oldSales, expenses: oldExpenses };
+                    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = `arquivo_antigo_${storeId}_${new Date().toISOString().slice(0,10)}.json`;
+                    a.click();
+                    setTimeout(() => URL.revokeObjectURL(url), 3000);
+                } catch(e) {
+                    Toast.show('❌ Falha ao gerar o arquivo de exportação — nada foi apagado: ' + e.message, 'danger', 6000);
+                    return;
+                }
+
+                // 2) Remove em lotes (não trava a UI, e o push pra nuvem fica
+                // debounced/coalescido em um único envio no final, não um por item)
+                Toast.show(`🗑️ Removendo ${total} registro(s) arquivado(s)...`, 'info', 3000);
+                let removidos = 0;
+                const BATCH = 25;
+                const processInBatches = async (items, table, stateKey) => {
+                    for (let i = 0; i < items.length; i += BATCH) {
+                        const chunk = items.slice(i, i + BATCH);
+                        for (const item of chunk) {
+                            try { await window.LocalFirst.deleteItem(table, item.id); removidos++; } catch(_e) {}
+                        }
+                        state[stateKey] = (state[stateKey] || []).filter(x => !chunk.some(c => c.id === x.id));
+                        // Pequena pausa entre lotes para não travar a aba nem disparar
+                        // dezenas de eventos de push de uma vez
+                        await new Promise(r => setTimeout(r, 50));
+                    }
+                };
+                await processInBatches(oldSales, 'sales', 'sales');
+                await processInBatches(oldExpenses, 'expenses', 'expenses');
+
+                try { Sales.renderTable?.(); } catch(_e) {}
+                try { Finance.renderTable?.(); } catch(_e) {}
+                try { Dashboard.render?.(); } catch(_e) {}
+
+                Toast.show(`✅ Arquivamento concluído: ${removidos} registro(s) removido(s) (backup salvo em .json)`, 'success', 5000);
+            },
+
+            // ── Migrar fotos existentes (base64) para o Supabase Storage ────────
+            // ✅ NOVO (Fase B, 09/08/2026): roda no navegador do usuário — ele tem
+            // acesso real à internet/Supabase (diferente de um ambiente de análise
+            // de código). Percorre produtos + logo já salvos, sobe para o bucket
+            // `media` só o que ainda está em base64, e troca pela URL. Idempotente:
+            // rodar de novo não faz nada com o que já foi migrado.
+            async migrateImagesToStorage() {
+                if (!window.CloudSync?.storageReady) {
+                    Toast.show('⚠️ Conecte o Supabase primeiro (Configurações → Backup) para migrar as fotos', 'warning', 5000);
+                    return;
+                }
+                const storeId = window._currentStore || 'barueri';
+                const pendentes = (state.products || []).filter(p => p.image && typeof p.image === 'string' && p.image.startsWith('data:'));
+                const logoPendente = state.company?.logo && typeof state.company.logo === 'string' && state.company.logo.startsWith('data:');
+                const total = pendentes.length + (logoPendente ? 1 : 0);
+
+                if (total === 0) {
+                    Toast.show('✅ Nenhuma foto em base64 pendente — tudo já está no Storage', 'info', 4000);
+                    return;
+                }
+                if (!confirm(`📤 Migrar fotos para o Supabase Storage\n\nEncontradas: ${pendentes.length} foto(s) de produto${logoPendente ? ' + logo da empresa' : ''}.\n\nIsso reduz bastante o tamanho do que é sincronizado a cada mudança. Pode levar alguns minutos. Continuar?`)) return;
+
+                Toast.show(`📤 Migrando ${total} imagem(ns)... não feche esta aba`, 'info', 5000);
+                let ok = 0, falhas = 0;
+
+                if (logoPendente) {
+                    const url = await window.CloudSync.uploadImageToStorage(state.company.logo, `${storeId}/logo`);
+                    if (url) { state.company.logo = url; ok++; } else { falhas++; }
+                }
+
+                for (let i = 0; i < pendentes.length; i++) {
+                    const p = pendentes[i];
+                    const url = await window.CloudSync.uploadImageToStorage(p.image, `${storeId}/products/${p.id}`);
+                    if (url) { p.image = url; ok++; } else { falhas++; }
+                    // pausa curta a cada 10 fotos, pra não sobrecarregar a conexão
+                    if (i % 10 === 9) await new Promise(r => setTimeout(r, 300));
+                }
+
+                App.saveData();
+                try { Products.renderTable?.(); } catch(_e) {}
+                try { App.updateCompanyDisplay?.(); } catch(_e) {}
+                try { await window.CloudSync?.pushMediaNow?.(); } catch(_e) {}
+                try { window.CloudSync?.autoSync?.(); } catch(_e) {}
+
+                Toast.show(`✅ Migração concluída: ${ok} imagem(ns) movida(s) para o Storage${falhas ? `, ${falhas} falharam (mantidas locais)` : ''}`, falhas ? 'warning' : 'success', 6000);
             }
         };
 
@@ -12916,6 +13042,12 @@ body.dark-mode,
             let _sbClient       = null;   // cliente supabase-js (carregado sob demanda)
             let _sbUser         = null;   // usuário autenticado no Supabase Auth
             let _sbChannel      = null;   // canal Realtime ativo
+            // ✅ FIX ECONOMIA-EGRESS: true quando o canal Realtime está de fato
+            // 'SUBSCRIBED'. Usado por _silentPull() para pausar o polling REST de
+            // 5s enquanto o Realtime está funcionando — antes os dois rodavam
+            // sempre juntos, dobrando à toa o consumo de Egress/requisições no
+            // Supabase mesmo quando o Realtime estava saudável.
+            let _sbRealtimeConnected = false;
             let _pushing        = false;
             let _pulling        = false;
             let _pushTimer      = null;
@@ -12931,6 +13063,20 @@ body.dark-mode,
             let _lastPushTime   = 0;
             let _lastPullTime   = 0;
             let _syncCount      = 0;
+            // ✅ FIX ECONOMIA-EGRESS: guarda um "fingerprint" (hash leve) do último
+            // payload realmente enviado ao Supabase, por loja. Se nada mudou desde
+            // o último push bem-sucedido, supabasePush() pula o upsert — evita
+            // reenviar o snapshot inteiro (todos os clientes/vendas/produtos) por
+            // gatilhos redundantes (ex: re-salvar uma tela sem alterar nada).
+            let _lastPushedHash = {};
+            function _fingerprint(obj) {
+                try {
+                    const s = JSON.stringify(obj);
+                    let h = 0;
+                    for (let i = 0; i < s.length; i++) { h = (h * 31 + s.charCodeAt(i)) | 0; }
+                    return h + ':' + s.length;
+                } catch(e) { return null; }
+            }
             // ── FIX DELETE-SYNC: mapa de deleções pendentes (tombstones em memória) ──
             // Chave: 'storeId|col|id'  Valor: ISO timestamp da deleção
             // Protege contra race-condition pull→restaura item deletado
@@ -14041,7 +14187,9 @@ body.dark-mode,
                 if (_activeProvider === 'onedrive' && _onedriveToken) onedrivePullMedia(silent).catch((e)=>console.warn('[CloudSync] pull de mídia falhou:', e?.message));
                 // ✅ FIX SYNC-MEDIA-SUPABASE: idem — sem isso o polling nunca baixava
                 // logo/fotos enviados por outro aparelho quando conectado ao Supabase.
-                if (_activeProvider === 'supabase' && _sbUser)        supabasePullMedia(silent).catch((e)=>console.warn('[CloudSync] pull de mídia falhou:', e?.message));
+                // ✅ FIX ECONOMIA-EGRESS (Fase B): mesma lógica aplicada ao pull de
+                // dados — com o Realtime conectado, pula o polling REST daqui também.
+                if (_activeProvider === 'supabase' && _sbUser && !_sbRealtimeConnected) supabasePullMedia(silent).catch((e)=>console.warn('[CloudSync] pull de mídia falhou:', e?.message));
             }
 
             // ════════════════════════════════════════════════════════════════
@@ -14808,6 +14956,16 @@ body.dark-mode,
                 try {
                     const storeId = window._currentStore || 'barueri';
                     const payload = _collectAllData();
+                    // ✅ FIX ECONOMIA-EGRESS: pula o upload se o conteúdo é idêntico
+                    // ao último push bem-sucedido desta loja (ignorando o campo _ts,
+                    // que muda sempre e não representa mudança real de dados).
+                    const { _ts, ...payloadForHash } = payload;
+                    const fp = _fingerprint(payloadForHash);
+                    if (fp && _lastPushedHash[storeId] === fp) {
+                        _lastPushTime = Date.now();
+                        if (!silent) Toast.show('☁️ Nada novo para enviar', 'info', 1500);
+                        return;
+                    }
                     const { error } = await _sbClient.from('docs').upsert({
                         store_id:   storeId,
                         collection: '_cloudsync',
@@ -14816,6 +14974,7 @@ body.dark-mode,
                         updated_at: new Date().toISOString()
                     }, { onConflict: 'store_id,collection,doc_id' });
                     if (error) throw error;
+                    _lastPushedHash[storeId] = fp;
                     _lastPushTime = Date.now();
                     if (!silent) Toast.show('☁️ Enviado ao Supabase', 'success', 2000);
                 } catch(e) {
@@ -14848,7 +15007,43 @@ body.dark-mode,
                 }
             }
 
-            // ── Supabase: push/pull do arquivo de mídia (logo + fotos de produtos) ──
+            // ── Fase B (09/08/2026): upload de imagens para o Supabase Storage ──
+            // Antes: fotos de produto/logo viajavam como base64 dentro da tabela
+            // `docs` (um único registro chegou a 4MB, resincronizado a cada 5s).
+            // Agora: se o Supabase estiver conectado, a imagem sobe para o bucket
+            // `media` (bucket público de leitura, escrita restrita por loja via
+            // RLS) e só a URL (poucos bytes) fica salva no produto/config —
+            // continua funcionando normalmente em <img src="..."> como antes.
+            // Se o Supabase não estiver conectado (só Drive/OneDrive, ou uso
+            // 100% offline), mantém o comportamento antigo (base64 local) sem
+            // quebrar nada.
+            async function _uploadImageToStorage(dataUrl, path) {
+                if (!_sbClient || !_sbUser) return null;
+                if (!dataUrl || typeof dataUrl !== 'string' || !dataUrl.startsWith('data:')) return null;
+                try {
+                    const res = await fetch(dataUrl);
+                    const blob = await res.blob();
+                    const ext = (blob.type.split('/')[1] || 'jpg').replace('jpeg', 'jpg');
+                    const fullPath = `${path}.${ext}`;
+                    const { error } = await _sbClient.storage.from('media').upload(fullPath, blob, {
+                        upsert: true,
+                        contentType: blob.type || 'image/jpeg'
+                    });
+                    if (error) throw error;
+                    const { data: pub } = _sbClient.storage.from('media').getPublicUrl(fullPath);
+                    // cache-busting simples pra imagem trocada aparecer na hora
+                    return pub.publicUrl + '?v=' + Date.now();
+                } catch(e) {
+                    console.warn('[CloudSync] upload de imagem pro Storage falhou, mantendo base64 local:', e.message);
+                    return null;
+                }
+            }
+            async function _removeImageFromStorage(path) {
+                if (!_sbClient || !_sbUser) return;
+                try { await _sbClient.storage.from('media').remove([path]); } catch(_e) {}
+            }
+
+
             // ✅ FIX SYNC-MEDIA-SUPABASE: pushMediaNow()/_pullMediaNow() só conheciam
             // os provedores 'gdrive' e 'onedrive' — quando o Supabase era o provedor
             // ativo, o logo da empresa e as fotos de produtos NUNCA eram enviados nem
@@ -14960,13 +15155,16 @@ body.dark-mode,
                         supabasePullMedia(true).catch(()=>{});
                     })
                     .subscribe((status) => {
-                        // ✅ FASE 3 — RECONEXÃO AUTOMÁTICA: em celular é comum o
-                        // navegador suspender a conexão WebSocket quando o app vai
-                        // pra segundo plano. Sem isso, o canal caía silenciosamente e
-                        // o dispositivo passava a depender só do polling (mais lento)
-                        // até alguém recarregar a página manualmente — é uma causa
-                        // provável de sync "lento" mesmo com os tempos reduzidos.
+                        // ✅ FIX ECONOMIA-EGRESS: agora rastreamos o status do canal.
+                        // Enquanto o Realtime estiver de fato conectado (SUBSCRIBED),
+                        // o polling REST de 5s fica pausado — ele volta a rodar
+                        // automaticamente apenas quando o canal cai, servindo como
+                        // fallback de verdade (e não mais em paralelo o tempo todo).
+                        if (status === 'SUBSCRIBED') {
+                            _sbRealtimeConnected = true;
+                        }
                         if (status === 'CLOSED' || status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+                            _sbRealtimeConnected = false;
                             console.warn('[CloudSync] canal Realtime caiu (status: ' + status + ') — reconectando em 3s...');
                             if (_sbChannel) { try { _sbClient.removeChannel(_sbChannel); } catch(_e) {} }
                             _sbChannel = null;
@@ -14987,6 +15185,7 @@ body.dark-mode,
 
             function supabaseDisconnect() {
                 if (_sbChannel) { try { _sbClient.removeChannel(_sbChannel); } catch(e) {} _sbChannel = null; }
+                _sbRealtimeConnected = false;
                 if (_sbClient)  { try { _sbClient.auth.signOut(); } catch(e) {} }
                 _sbUser = null;
                 if (_activeProvider === 'supabase') _activeProvider = null;
@@ -15055,7 +15254,11 @@ body.dark-mode,
                 try {
                     if (_activeProvider === 'gdrive'   && _gdriveToken)                                  gdrivePull(true).catch(()=>{});
                     if (_activeProvider === 'onedrive' && _onedriveToken && !_isExpired(_onedriveToken)) onedrivePull(true).catch(()=>{});
-                    if (_activeProvider === 'supabase' && _sbUser)                                        supabasePull(true).catch(()=>{});
+                    // ✅ FIX ECONOMIA-EGRESS: só faz o pull REST (baixa a linha inteira
+                    // da tabela docs) quando o Realtime NÃO está conectado. Com o canal
+                    // saudável, as mudanças já chegam via WebSocket em tempo real — o
+                    // polling de 5s vira fallback de verdade, não duplicação.
+                    if (_activeProvider === 'supabase' && _sbUser && !_sbRealtimeConnected) supabasePull(true).catch(()=>{});
                 } catch(e) {}
             }
 
@@ -15561,6 +15764,10 @@ body.dark-mode,
                 _recordUserDeletion(username) { _recordUserDeletion(username); },
                 // ── Exposição pública do coletor de dados (para OPFS + exportação) ──
                 _collectAllDataPublic() { return _collectAllData(); },
+                // ✅ Fase B — exposto para uso em Products.save()/company logo save
+                uploadImageToStorage(dataUrl, path) { return _uploadImageToStorage(dataUrl, path); },
+                removeImageFromStorage(path)        { return _removeImageFromStorage(path); },
+                get storageReady() { return !!(_sbClient && _sbUser); },
                 get connected() { return !!(_gdriveToken || _onedriveToken); },
                 get provider()  { return _activeProvider; },
                 get syncCount() { return _syncCount; }
@@ -19202,7 +19409,15 @@ tbody tr td{border:1.5px solid #000;padding:2mm;text-align:center;font-weight:70
                     reader.onload = async (e) => {
                         // ✅ Comprime antes de guardar — reduz o peso do logo no
                         // snapshot sincronizado com a nuvem (ver Utils.compressImageDataUrl).
-                        state.company.logo = await Utils.compressImageDataUrl(e.target.result, 500, 0.8);
+                        let logo = await Utils.compressImageDataUrl(e.target.result, 500, 0.8);
+                        // ✅ Fase B (09/08/2026): sobe o logo pro Supabase Storage quando
+                        // conectado — troca o base64 (pesado) por uma URL curta.
+                        if (window.CloudSync?.storageReady) {
+                            const storeId = window._currentStore || 'barueri';
+                            const url = await window.CloudSync.uploadImageToStorage(logo, `${storeId}/logo`);
+                            if (url) logo = url;
+                        }
+                        state.company.logo = logo;
                         try { if (window.MediaCache) MediaCache.set('company', 'logo', state.company.logo); } catch(_e) {}
                         this.updateCompanyDisplay();
                         this.saveData();
@@ -22101,14 +22316,27 @@ tbody tr td{border:1.5px solid #000;padding:2mm;text-align:center;font-weight:70
                 delete document.getElementById('productImageInput').dataset.image;
             },
 
-            save() {
+            async save() {
                 if (!Utils.validateRequired('productForm')) {
                     Toast.show('Preencha todos os campos obrigatórios', 'warning');
                     return;
                 }
-                
+
+                const productId = state.editingId || 'PROD-' + (state.products.length + 1).toString().padStart(3, '0');
+                let image = document.getElementById('productImageInput').dataset.image || null;
+
+                // ✅ Fase B: se a imagem é nova (base64) e o Supabase está
+                // conectado, sobe pro Storage e usa a URL curta em vez do
+                // base64 gigante. Se falhar ou não estiver conectado, mantém
+                // o base64 local normalmente — nenhuma quebra de fluxo.
+                if (image && image.startsWith('data:') && window.CloudSync?.storageReady) {
+                    const storeId = window._currentStore || 'barueri';
+                    const url = await window.CloudSync.uploadImageToStorage(image, `${storeId}/products/${productId}`);
+                    if (url) image = url;
+                }
+
                 const product = {
-                    id: state.editingId || 'PROD-' + (state.products.length + 1).toString().padStart(3, '0'),
+                    id: productId,
                     code: document.getElementById('productCode').value,
                     category: document.getElementById('productCategory').value,
                     name: document.getElementById('productName').value,
@@ -22118,7 +22346,7 @@ tbody tr td{border:1.5px solid #000;padding:2mm;text-align:center;font-weight:70
                     minQty: parseInt(document.getElementById('productMinQty').value) || 5,
                     color: document.getElementById('productColor')?.value || '',
                     frameType: document.getElementById('productFrameType')?.value || '',
-                    image: document.getElementById('productImageInput').dataset.image || null,
+                    image: image,
                     updated_at: new Date().toISOString()
                 };
                 
@@ -24341,7 +24569,14 @@ tbody tr td{border:1.5px solid #000;padding:2mm;text-align:center;font-weight:70
                     const reader = new FileReader();
                     reader.onload = async (e) => {
                         // ✅ Comprime antes de guardar (ver Utils.compressImageDataUrl)
-                        const compressed = await Utils.compressImageDataUrl(e.target.result, 500, 0.8);
+                        let compressed = await Utils.compressImageDataUrl(e.target.result, 500, 0.8);
+                        // ✅ Fase B (09/08/2026): mesmo upload pro Storage do App.updateLogo,
+                        // pra qualquer um dos dois caminhos de troca de logo economizar igual.
+                        if (window.CloudSync?.storageReady) {
+                            const storeId = window._currentStore || 'barueri';
+                            const url = await window.CloudSync.uploadImageToStorage(compressed, `${storeId}/logo`);
+                            if (url) compressed = url;
+                        }
                         const prev = document.getElementById('configLogoPreview');
                         const ph   = document.getElementById('configLogoPlaceholder');
                         if (prev) { prev.src = compressed; prev.style.display = 'block'; }
