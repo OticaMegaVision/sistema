@@ -19139,6 +19139,8 @@ tbody tr td{border:1.5px solid #000;padding:2mm;text-align:center;font-weight:70
                             Sales.clearForm();
                             Sales.renderHistory();
                             Sales.populateSaleSelects();
+                            // ✅ Garante que a aba exibida seja sempre "Nova O.S." (não fica presa em "Histórico")
+                            Sales.setSubTab('sales-nova');
                             // Garante visualmente que o painel de cliente está limpo
                             const _sd = document.getElementById('selectedClientData');
                             if (_sd) _sd.style.display = 'none';
@@ -19180,14 +19182,11 @@ tbody tr td{border:1.5px solid #000;padding:2mm;text-align:center;font-weight:70
                     if (titleEl && titleEl.innerText.trim() === 'Dashboard') {
                         const h = now.getHours();
                         const saudacao = h < 12 ? 'Bom dia' : h < 18 ? 'Boa tarde' : 'Boa noite';
-                        // ✅ Mostra o cargo (Administrador/Vendedor) + nome do usuário logado
-                        const profileLabels = { admin: 'Administrador', seller: 'Vendedor' };
-                        const profileLabel = (window._authUser && profileLabels[window._authUser.profile]) || '';
+                        // ✅ Mostra somente o nome do usuário logado (sem o cargo)
                         const usuario = (window._authUser && window._authUser.fullName)
                             ? window._authUser.fullName
                             : (window._authUser && window._authUser.username) || '';
-                        const quemSaudar = [profileLabel, usuario].filter(Boolean).join(' ');
-                        greetingEl.innerText = `${saudacao}${quemSaudar ? ', ' + quemSaudar : ''} 👋`;
+                        greetingEl.innerText = `${saudacao}${usuario ? ', ' + usuario : ''} 👋`;
                         greetingEl.style.display = '';
                     } else {
                         greetingEl.style.display = 'none';
@@ -21174,6 +21173,8 @@ tbody tr td{border:1.5px solid #000;padding:2mm;text-align:center;font-weight:70
                 setTimeout(function() {
                     try {
                         if (typeof Sales !== 'undefined') {
+                            // Garante que a aba exibida seja "Nova O.S.", não "Histórico"
+                            Sales.setSubTab('sales-nova');
                             // Garante que o select foi populado com o novo cliente
                             Sales.populateSaleSelects();
                             // Seleciona o cliente automaticamente
