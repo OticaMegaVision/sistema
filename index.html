@@ -12844,16 +12844,27 @@ body.dark-mode,
 
                 Toast.show(`📤 Migrando ${total} imagem(ns)... não feche esta aba`, 'info', 5000);
                 let ok = 0, falhas = 0;
+                // ✅ FIX DIAGNÓSTICO (10/08/2026): antes, qualquer falha de upload
+                // desaparecia num console.warn que ninguém via — o resumo final era
+                // só um toast que passa rápido. Agora guardamos o motivo de CADA
+                // falha e mostramos um relatório que fica na tela até ser fechado.
+                const erros = [];
 
                 if (logoPendente) {
-                    const url = await window.CloudSync.uploadImageToStorage(state.company.logo, `${storeId}/logo`);
-                    if (url) { state.company.logo = url; ok++; } else { falhas++; }
+                    try {
+                        const url = await window.CloudSync.uploadImageToStorage(state.company.logo, `${storeId}/logo`);
+                        if (url) { state.company.logo = url; ok++; }
+                        else { falhas++; erros.push('Logo da empresa: ' + (window.CloudSync.lastUploadError || 'motivo desconhecido')); }
+                    } catch(e) { falhas++; erros.push('Logo da empresa: ' + e.message); }
                 }
 
                 for (let i = 0; i < pendentes.length; i++) {
                     const p = pendentes[i];
-                    const url = await window.CloudSync.uploadImageToStorage(p.image, `${storeId}/products/${p.id}`);
-                    if (url) { p.image = url; ok++; } else { falhas++; }
+                    try {
+                        const url = await window.CloudSync.uploadImageToStorage(p.image, `${storeId}/products/${p.id}`);
+                        if (url) { p.image = url; ok++; }
+                        else { falhas++; if (erros.length < 5) erros.push(`Produto ${p.id} (${p.name || ''}): ${window.CloudSync.lastUploadError || 'motivo desconhecido'}`); }
+                    } catch(e) { falhas++; if (erros.length < 5) erros.push(`Produto ${p.id} (${p.name || ''}): ${e.message}`); }
                     // pausa curta a cada 10 fotos, pra não sobrecarregar a conexão
                     if (i % 10 === 9) await new Promise(r => setTimeout(r, 300));
                 }
@@ -12864,7 +12875,20 @@ body.dark-mode,
                 try { await window.CloudSync?.pushMediaNow?.(); } catch(_e) {}
                 try { window.CloudSync?.autoSync?.(); } catch(_e) {}
 
-                Toast.show(`✅ Migração concluída: ${ok} imagem(ns) movida(s) para o Storage${falhas ? `, ${falhas} falharam (mantidas locais)` : ''}`, falhas ? 'warning' : 'success', 6000);
+                if (falhas === 0) {
+                    Toast.show(`✅ Migração concluída: ${ok} imagem(ns) movida(s) para o Storage`, 'success', 6000);
+                } else {
+                    // Falha visível de verdade — fica na tela até o usuário fechar,
+                    // em vez de um toast que pode passar despercebido.
+                    alert(
+                        `⚠️ Migração terminou com problemas\n\n` +
+                        `✅ ${ok} imagem(ns) migrada(s) com sucesso\n` +
+                        `❌ ${falhas} falharam e continuam salvas localmente (nada foi perdido)\n\n` +
+                        `Primeiros erros encontrados:\n` + erros.join('\n') +
+                        `\n\nTire um print desta mensagem e me mostre — isso ajuda a achar a causa exata.`
+                    );
+                    console.error('[migrateImagesToStorage] falhas:', erros);
+                }
             }
         };
 
@@ -15043,9 +15067,13 @@ body.dark-mode,
             // Se o Supabase não estiver conectado (só Drive/OneDrive, ou uso
             // 100% offline), mantém o comportamento antigo (base64 local) sem
             // quebrar nada.
+            // ✅ FIX DIAGNÓSTICO (10/08/2026): guarda o motivo do último upload que
+            // falhou, pra RxDBPanel.migrateImagesToStorage() conseguir mostrar o
+            // erro real pro usuário, não só "falhou" genérico.
+            let _lastUploadError = null;
             async function _uploadImageToStorage(dataUrl, path) {
-                if (!_sbClient || !_sbUser) return null;
-                if (!dataUrl || typeof dataUrl !== 'string' || !dataUrl.startsWith('data:')) return null;
+                if (!_sbClient || !_sbUser) { _lastUploadError = 'Supabase não conectado (sem sessão autenticada)'; return null; }
+                if (!dataUrl || typeof dataUrl !== 'string' || !dataUrl.startsWith('data:')) { _lastUploadError = 'Imagem de origem inválida (não é base64)'; return null; }
                 try {
                     const res = await fetch(dataUrl);
                     const blob = await res.blob();
@@ -15060,6 +15088,7 @@ body.dark-mode,
                     // cache-busting simples pra imagem trocada aparecer na hora
                     return pub.publicUrl + '?v=' + Date.now();
                 } catch(e) {
+                    _lastUploadError = e.message || String(e);
                     console.warn('[CloudSync] upload de imagem pro Storage falhou, mantendo base64 local:', e.message);
                     return null;
                 }
@@ -15830,6 +15859,7 @@ body.dark-mode,
                 _collectAllDataPublic() { return _collectAllData(); },
                 // ✅ Fase B — exposto para uso em Products.save()/company logo save
                 uploadImageToStorage(dataUrl, path) { return _uploadImageToStorage(dataUrl, path); },
+                get lastUploadError() { return _lastUploadError; },
                 removeImageFromStorage(path)        { return _removeImageFromStorage(path); },
                 get storageReady() { return !!(_sbClient && _sbUser); },
                 get connected() { return !!(_gdriveToken || _onedriveToken); },
