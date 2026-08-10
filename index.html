@@ -14979,9 +14979,23 @@ body.dark-mode,
             // volta), reconecta o canal na hora se ele tiver caído, em vez de
             // esperar o próximo poll — some com o "atraso ao voltar pro app" que é
             // quando o Realtime de celular mais costuma cair.
+            // ✅ FIX SYNC-SÓ-COM-F5: reconectar o canal Realtime NÃO recupera o que
+            // mudou enquanto a aba estava em segundo plano — o Postgres Realtime só
+            // entrega eventos que acontecem DEPOIS da reconexão, nunca um "replay"
+            // do que passou. Como no celular o navegador chega a congelar os timers
+            // (o polling de 5s) e derrubar o WebSocket quando a aba vai para trás,
+            // uma alteração feita em outro aparelho durante esse período nunca
+            // chegava sozinha — só aparecia depois de um F5 (que faz pull completo
+            // no boot) ou de clicar em "Enviar agora" (que ao menos re-renderiza).
+            // Agora, toda vez que a aba volta a ficar visível, forçamos um pull
+            // imediato (dados + mídia) além de reconectar o canal — igual ao que
+            // já acontece no boot via _sbResumeSession — garantindo que o app
+            // sempre "pega o atraso" sozinho, sem depender de F5 ou ação manual.
             document.addEventListener('visibilitychange', () => {
-                if (document.visibilityState === 'visible' && _sbUser && !_sbChannel) {
-                    _sbSubscribeRealtime();
+                if (document.visibilityState === 'visible' && _sbUser) {
+                    if (!_sbChannel) _sbSubscribeRealtime();
+                    supabasePull(true).catch(()=>{});
+                    supabasePullMedia(true).catch(()=>{});
                 }
             });
 
@@ -21193,7 +21207,6 @@ tbody tr td{border:1.5px solid #000;padding:2mm;text-align:center;font-weight:70
                 const client = state.clients.find(c => c.id === id);
                 if (!client) return;
                 
-                this.setSubTab('clients-cadastro');
                 state.editingId = id;
                 if (client.photo) {
                     document.getElementById('clientPhotoImg').src = client.photo;
@@ -22161,7 +22174,6 @@ tbody tr td{border:1.5px solid #000;padding:2mm;text-align:center;font-weight:70
                 const p = state.products.find(p => p.id === id);
                 if (!p) return;
                 
-                this.setSubTab('products-cadastro');
                 state.editingId = id;
                 document.getElementById('productCode').value = p.code;
                 document.getElementById('productCategory').value = p.category;
@@ -27209,7 +27221,6 @@ ${container.innerHTML}
                 const sale = state.sales.find(s => s.id === id);
                 if (!sale) return;
 
-                this.setSubTab('sales-nova');
                 state.editingSaleId = id;
                 // Copiar dados para currentSale
                 state.currentSale = {
