@@ -12916,6 +12916,12 @@ body.dark-mode,
             let _sbClient       = null;   // cliente supabase-js (carregado sob demanda)
             let _sbUser         = null;   // usuário autenticado no Supabase Auth
             let _sbChannel      = null;   // canal Realtime ativo
+            // ✅ FIX ECONOMIA-EGRESS: true quando o canal Realtime está de fato
+            // 'SUBSCRIBED'. Usado por _silentPull() para pausar o polling REST de
+            // 5s enquanto o Realtime está funcionando — antes os dois rodavam
+            // sempre juntos, dobrando à toa o consumo de Egress/requisições no
+            // Supabase mesmo quando o Realtime estava saudável.
+            let _sbRealtimeConnected = false;
             let _pushing        = false;
             let _pulling        = false;
             let _pushTimer      = null;
@@ -12931,6 +12937,38 @@ body.dark-mode,
             let _lastPushTime   = 0;
             let _lastPullTime   = 0;
             let _syncCount      = 0;
+            // ✅ FIX ECONOMIA-EGRESS: guarda um "fingerprint" (hash leve) do último
+            // payload realmente enviado ao Supabase, por loja. Se nada mudou desde
+            // o último push bem-sucedido, supabasePush() pula o upsert — evita
+            // reenviar o snapshot inteiro (todos os clientes/vendas/produtos) por
+            // gatilhos redundantes (ex: re-salvar uma tela sem alterar nada).
+            let _lastPushedHash = {};
+            function _fingerprint(obj) {
+                try {
+                    const s = JSON.stringify(obj);
+                    let h = 0;
+                    for (let i = 0; i < s.length; i++) { h = (h * 31 + s.charCodeAt(i)) | 0; }
+                    return h + ':' + s.length;
+                } catch(e) { return null; }
+            }
+            // ✅ FASE C (09/08/2026) — SINCRONIZAÇÃO ITEM-A-ITEM:
+            // Antes: qualquer alteração (1 cliente, 1 venda) reenviava/rebaixava
+            // TODO o banco daquela loja de uma vez (clientes+vendas+produtos+...
+            // juntos em um só registro). Agora cada coleção "quente" (clientes,
+            // vendas, produtos etc.) sincroniza registro-a-registro: só o item que
+            // mudou viaja pra nuvem, e só ele é aplicado quando chega em outro
+            // aparelho (via Realtime, sem nem precisar buscar de novo no banco).
+            // Coisas pequenas (config da empresa, contador de O.S., mensagens de
+            // WhatsApp etc.) continuam num pacote único ('meta'), só que agora
+            // sem os arrays grandes dentro — fica sempre pequeno.
+            const GRANULAR_COLS = ['clients','products','sales','expenses','prescriptions','suppliers','services','crmContatos','crmTarefas','crmNps'];
+            // Guarda o hash do último item de cada coleção realmente enviado —
+            // por loja, por coleção, por id. Usado só pra decidir o que mudou
+            // desde o último push (não precisa persistir entre sessões: na pior
+            // hipótese, reenvia tudo uma vez a mais depois de recarregar a página).
+            let _lastPushedItemHashes = {};
+            function _hashItem(item) { return _fingerprint(item); }
+
             // ── FIX DELETE-SYNC: mapa de deleções pendentes (tombstones em memória) ──
             // Chave: 'storeId|col|id'  Valor: ISO timestamp da deleção
             // Protege contra race-condition pull→restaura item deletado
@@ -14041,7 +14079,13 @@ body.dark-mode,
                 if (_activeProvider === 'onedrive' && _onedriveToken) onedrivePullMedia(silent).catch((e)=>console.warn('[CloudSync] pull de mídia falhou:', e?.message));
                 // ✅ FIX SYNC-MEDIA-SUPABASE: idem — sem isso o polling nunca baixava
                 // logo/fotos enviados por outro aparelho quando conectado ao Supabase.
-                if (_activeProvider === 'supabase' && _sbUser)        supabasePullMedia(silent).catch((e)=>console.warn('[CloudSync] pull de mídia falhou:', e?.message));
+                // ✅ FIX ECONOMIA-EGRESS (Fase B) + ✅ FIX SYNC-MOBILE-ZOMBIE: mesma
+                // lógica de segurança do pull de dados — reduz bastante a frequência
+                // quando o Realtime está conectado, mas nunca para 100%, pra não
+                // depender cegamente de um WebSocket que pode ter "zumbificado" (comum
+                // em celular com a tela bloqueada).
+                const supabaseMediaStale = !_sbRealtimeConnected || (Date.now() - _lastPullTime > 45000);
+                if (_activeProvider === 'supabase' && _sbUser && supabaseMediaStale) supabasePullMedia(silent).catch((e)=>console.warn('[CloudSync] pull de mídia falhou:', e?.message));
             }
 
             // ════════════════════════════════════════════════════════════════
@@ -14808,16 +14852,71 @@ body.dark-mode,
                 try {
                     const storeId = window._currentStore || 'barueri';
                     const payload = _collectAllData();
-                    const { error } = await _sbClient.from('docs').upsert({
-                        store_id:   storeId,
-                        collection: '_cloudsync',
-                        doc_id:     'snapshot',
-                        data:       payload,
-                        updated_at: new Date().toISOString()
-                    }, { onConflict: 'store_id,collection,doc_id' });
-                    if (error) throw error;
+                    const nowISO = new Date().toISOString();
+                    if (!_lastPushedItemHashes[storeId]) _lastPushedItemHashes[storeId] = {};
+                    const storeHashes = _lastPushedItemHashes[storeId];
+                    let itemsChanged = 0;
+
+                    // ── 1) Coleções "quentes" — só o que mudou, registro a registro ──
+                    for (const col of GRANULAR_COLS) {
+                        const arr = Array.isArray(payload[col]) ? payload[col] : [];
+                        if (!storeHashes[col]) storeHashes[col] = {};
+                        const colHashes = storeHashes[col];
+                        const seenIds = new Set();
+                        const upsertRows = [];
+
+                        for (const item of arr) {
+                            if (!item || !item.id) continue;
+                            seenIds.add(String(item.id));
+                            const h = _hashItem(item);
+                            if (colHashes[item.id] === h) continue; // sem mudança neste item
+                            upsertRows.push({
+                                store_id: storeId, collection: col, doc_id: String(item.id),
+                                data: item, updated_at: nowISO, deleted_at: null
+                            });
+                            colHashes[item.id] = h;
+                        }
+
+                        // Itens que sumiram do array local (excluídos) → soft-delete na nuvem
+                        const removedIds = Object.keys(colHashes).filter(id => !seenIds.has(id));
+
+                        // Envia em lotes de 50 pra não estourar o tamanho da requisição
+                        for (let i = 0; i < upsertRows.length; i += 50) {
+                            const chunk = upsertRows.slice(i, i + 50);
+                            const { error } = await _sbClient.from('docs').upsert(chunk, { onConflict: 'store_id,collection,doc_id' });
+                            if (error) throw error;
+                            itemsChanged += chunk.length;
+                        }
+                        if (removedIds.length > 0) {
+                            const { error } = await _sbClient.from('docs')
+                                .update({ deleted_at: nowISO, updated_at: nowISO })
+                                .eq('store_id', storeId).eq('collection', col).in('doc_id', removedIds);
+                            if (error) throw error;
+                            removedIds.forEach(id => delete colHashes[id]);
+                            itemsChanged += removedIds.length;
+                        }
+                    }
+
+                    // ── 2) "Meta" — tudo que não é array grande (config, contadores,
+                    // mensagens, tombstones...) continua num pacote único, só que
+                    // sem os arrays pesados, então fica sempre leve.
+                    const meta = { ...payload };
+                    GRANULAR_COLS.forEach(col => delete meta[col]);
+                    const { _ts, ...metaForHash } = meta;
+                    const metaFp = _fingerprint(metaForHash);
+                    if (!metaFp || _lastPushedHash[storeId] !== metaFp) {
+                        const { error } = await _sbClient.from('docs').upsert({
+                            store_id: storeId, collection: '_cloudsync', doc_id: 'meta',
+                            data: meta, updated_at: nowISO
+                        }, { onConflict: 'store_id,collection,doc_id' });
+                        if (error) throw error;
+                        _lastPushedHash[storeId] = metaFp;
+                    }
+
                     _lastPushTime = Date.now();
-                    if (!silent) Toast.show('☁️ Enviado ao Supabase', 'success', 2000);
+                    if (!silent) {
+                        Toast.show(itemsChanged > 0 ? `☁️ Enviado ao Supabase (${itemsChanged} registro(s))` : '☁️ Nada novo para enviar', 'success', 2000);
+                    }
                 } catch(e) {
                     console.warn('[CloudSync] supabasePush falhou:', e.message);
                     if (!silent) Toast.show('⚠️ Falha ao enviar ao Supabase: ' + e.message, 'warning');
@@ -14832,13 +14931,49 @@ body.dark-mode,
                 _pulling = true;
                 try {
                     const storeId = window._currentStore || 'barueri';
-                    const { data, error } = await _sbClient.from('docs')
+
+                    // ── 1) Busca todos os registros granulares desta loja de uma vez ──
+                    // (uma consulta só, não mais uma por coleção) — só roda por completo
+                    // na conexão/reconexão; o dia a dia é atualizado via Realtime item a
+                    // item, sem precisar repetir esta busca.
+                    const { data: rows, error: rowsErr } = await _sbClient.from('docs')
+                        .select('collection, doc_id, data')
+                        .eq('store_id', storeId)
+                        .neq('collection', '_cloudsync')
+                        .is('deleted_at', null);
+                    if (rowsErr) throw rowsErr;
+
+                    const grouped = {};
+                    (rows || []).forEach(r => {
+                        if (!grouped[r.collection]) grouped[r.collection] = [];
+                        grouped[r.collection].push(r.data);
+                    });
+
+                    // ── 2) Busca o "meta" (config, contadores, mensagens...) ──
+                    const { data: metaRow, error: metaErr } = await _sbClient.from('docs')
                         .select('data')
-                        .eq('store_id', storeId).eq('collection', '_cloudsync').eq('doc_id', 'snapshot')
+                        .eq('store_id', storeId).eq('collection', '_cloudsync').eq('doc_id', 'meta')
                         .maybeSingle();
-                    if (error) throw error;
-                    if (data && data.data) {
-                        await _withSyncLock('cloud:supabasePull', () => _applyCloudData(data.data, silent));
+                    if (metaErr) throw metaErr;
+
+                    let merged = null;
+                    if ((rows && rows.length > 0) || metaRow) {
+                        merged = { _rxdb: 'v17', _store: storeId, ...(metaRow?.data || {}), ...grouped };
+                    } else {
+                        // ✅ Compatibilidade: loja ainda não migrada pra sincronização
+                        // granular (nenhum registro em GRANULAR_COLS/meta ainda) — cai
+                        // pro pacote antigo (doc_id='snapshot') só desta vez. O próximo
+                        // supabasePush() já passa a gravar tudo no formato novo.
+                        const { data: legacy, error: legacyErr } = await _sbClient.from('docs')
+                            .select('data')
+                            .eq('store_id', storeId).eq('collection', '_cloudsync').eq('doc_id', 'snapshot')
+                            .maybeSingle();
+                        if (legacyErr) throw legacyErr;
+                        if (legacy && legacy.data) merged = legacy.data;
+                    }
+
+                    if (merged) {
+                        await _withSyncLock('cloud:supabasePull', () => _applyCloudData(merged, silent));
                     }
                     _lastPullTime = Date.now();
                 } catch(e) {
@@ -14848,7 +14983,17 @@ body.dark-mode,
                 }
             }
 
-            // ── Supabase: push/pull do arquivo de mídia (logo + fotos de produtos) ──
+            // ⏪ Fase B revertida (10/08/2026): o upload de fotos para o Supabase
+            // Storage foi desativado — o bucket rejeitava os uploads com erro de
+            // política de segurança (row-level security) mesmo com a configuração
+            // aparentemente correta, e não foi possível confirmar a causa exata
+            // sem acesso direto ao console de rede do navegador do usuário. Fotos
+            // de produto e logo voltam a ser salvas como base64, como antes.
+            // O bucket `media` e as políticas continuam criados no Supabase (não
+            // atrapalham nada ficando parados), caso se queira retomar isso no
+            // futuro com mais tempo para investigar a causa raiz.
+
+
             // ✅ FIX SYNC-MEDIA-SUPABASE: pushMediaNow()/_pullMediaNow() só conheciam
             // os provedores 'gdrive' e 'onedrive' — quando o Supabase era o provedor
             // ativo, o logo da empresa e as fotos de produtos NUNCA eram enviados nem
@@ -14947,26 +15092,60 @@ body.dark-mode,
                                 _lastPullTime = Date.now();
                                 return;
                             }
+                            if (row && row.collection === '_cloudsync' && row.doc_id === 'meta' && row.data) {
+                                // ✅ FASE C: pacote "meta" (config/contadores/mensagens, sem
+                                // os arrays grandes) — aplica direto, sem nenhuma coleção
+                                // GRANULAR_COLS junto (o merge ignora silenciosamente as
+                                // chaves ausentes, então nada é sobrescrito à toa).
+                                _withSyncLock('cloud:realtimeMeta', () => _applyCloudData({ _rxdb: 'v17', _store: storeId, ...row.data }, true));
+                                _lastPullTime = Date.now();
+                                return;
+                            }
                             if (row && row.collection === '_cloudsync' && row.doc_id === 'media' && row.data) {
                                 _withSyncLock('cloud:realtimeMedia', () => _applyMediaData(row.data, true));
                                 if (row.updated_at) localStorage.setItem(_lsMediaFingerprintKey('supabase'), row.updated_at);
                                 return;
                             }
+                            // ✅ FASE C (09/08/2026) — SINCRONIZAÇÃO ITEM-A-ITEM: um
+                            // registro de uma coleção "quente" (cliente, venda, produto...)
+                            // mudou em outro aparelho. O dado completo já veio junto no
+                            // evento (row.data) — aplica direto, sem nenhuma consulta
+                            // extra ao banco. Exclusão soft-delete (deleted_at preenchido)
+                            // vira um tombstone, removendo o item aqui também.
+                            if (row && GRANULAR_COLS.includes(row.collection)) {
+                                if (row.deleted_at) {
+                                    _withSyncLock('cloud:realtimeDelete', () => _applyCloudData({
+                                        _rxdb: 'v17', _store: storeId,
+                                        [row.collection]: [],
+                                        tombstones: [{ storeId, col: row.collection, id: row.doc_id, deletedAt: row.deleted_at }]
+                                    }, true));
+                                } else if (row.data) {
+                                    _withSyncLock('cloud:realtimeItem', () => _applyCloudData({
+                                        _rxdb: 'v17', _store: storeId, [row.collection]: [row.data]
+                                    }, true));
+                                }
+                                _lastPullTime = Date.now();
+                                return;
+                            }
                         } catch(e) {
                             console.warn('[CloudSync] falha ao aplicar payload em tempo real, caindo para pull tradicional:', e && e.message);
                         }
-                        // Fallback (evento sem payload utilizável, DELETE, ou erro acima)
+                        // Fallback (evento sem payload utilizável, formato desconhecido,
+                        // ou erro acima) — busca tudo de novo por segurança.
                         supabasePull(true);
                         supabasePullMedia(true).catch(()=>{});
                     })
                     .subscribe((status) => {
-                        // ✅ FASE 3 — RECONEXÃO AUTOMÁTICA: em celular é comum o
-                        // navegador suspender a conexão WebSocket quando o app vai
-                        // pra segundo plano. Sem isso, o canal caía silenciosamente e
-                        // o dispositivo passava a depender só do polling (mais lento)
-                        // até alguém recarregar a página manualmente — é uma causa
-                        // provável de sync "lento" mesmo com os tempos reduzidos.
+                        // ✅ FIX ECONOMIA-EGRESS: agora rastreamos o status do canal.
+                        // Enquanto o Realtime estiver de fato conectado (SUBSCRIBED),
+                        // o polling REST de 5s fica pausado — ele volta a rodar
+                        // automaticamente apenas quando o canal cai, servindo como
+                        // fallback de verdade (e não mais em paralelo o tempo todo).
+                        if (status === 'SUBSCRIBED') {
+                            _sbRealtimeConnected = true;
+                        }
                         if (status === 'CLOSED' || status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+                            _sbRealtimeConnected = false;
                             console.warn('[CloudSync] canal Realtime caiu (status: ' + status + ') — reconectando em 3s...');
                             if (_sbChannel) { try { _sbClient.removeChannel(_sbChannel); } catch(_e) {} }
                             _sbChannel = null;
@@ -14975,25 +15154,29 @@ body.dark-mode,
                     });
             }
 
-            // ✅ FASE 3: quando a aba volta a ficar visível (usuário troca de app e
-            // volta), reconecta o canal na hora se ele tiver caído, em vez de
-            // esperar o próximo poll — some com o "atraso ao voltar pro app" que é
-            // quando o Realtime de celular mais costuma cair.
-            // ✅ FIX SYNC-SÓ-COM-F5: reconectar o canal Realtime NÃO recupera o que
-            // mudou enquanto a aba estava em segundo plano — o Postgres Realtime só
-            // entrega eventos que acontecem DEPOIS da reconexão, nunca um "replay"
-            // do que passou. Como no celular o navegador chega a congelar os timers
-            // (o polling de 5s) e derrubar o WebSocket quando a aba vai para trás,
-            // uma alteração feita em outro aparelho durante esse período nunca
-            // chegava sozinha — só aparecia depois de um F5 (que faz pull completo
-            // no boot) ou de clicar em "Enviar agora" (que ao menos re-renderiza).
-            // Agora, toda vez que a aba volta a ficar visível, forçamos um pull
-            // imediato (dados + mídia) além de reconectar o canal — igual ao que
-            // já acontece no boot via _sbResumeSession — garantindo que o app
-            // sempre "pega o atraso" sozinho, sem depender de F5 ou ação manual.
+            // ✅ FASE 3 + ✅ FIX SYNC-VOLTA-DE-BACKGROUND (11/08/2026): quando a aba
+            // volta a ficar visível (usuário troca de app/tela e volta), SEMPRE
+            // força uma busca imediata e recria o canal — não confia mais em
+            // "!_sbChannel" para decidir. Motivo real do bug "só sincroniza com F5
+            // ou Enviar agora": o navegador (principalmente em celular) throttla ou
+            // congela os timers (setTimeout) e o WebSocket quando a aba fica em
+            // segundo plano/tela bloqueada — o canal `_sbChannel` costuma continuar
+            // com um valor "preenchido" (não vira null sozinho), então a versão
+            // antiga desta correção nunca via motivo pra reconectar, e o polling de
+            // 45s também podia não disparar por estar throttled em segundo plano.
+            // Resultado: nada chegava automaticamente até um F5 (recarrega tudo do
+            // zero) ou clique manual em "Enviar agora". Agora, ao voltar a ficar
+            // visível, SEMPRE: (1) descarta o canal antigo (pode estar zumbi) e
+            // reconecta do zero, (2) puxa os dados e a mídia na hora, sem esperar
+            // nenhum timer — exatamente o que um F5 faria, só que automático.
             document.addEventListener('visibilitychange', () => {
                 if (document.visibilityState === 'visible' && _sbUser) {
-                    if (!_sbChannel) _sbSubscribeRealtime();
+                    if (_sbChannel) {
+                        try { _sbClient.removeChannel(_sbChannel); } catch(_e) {}
+                        _sbChannel = null;
+                        _sbRealtimeConnected = false;
+                    }
+                    _sbSubscribeRealtime();
                     supabasePull(true).catch(()=>{});
                     supabasePullMedia(true).catch(()=>{});
                 }
@@ -15001,6 +15184,7 @@ body.dark-mode,
 
             function supabaseDisconnect() {
                 if (_sbChannel) { try { _sbClient.removeChannel(_sbChannel); } catch(e) {} _sbChannel = null; }
+                _sbRealtimeConnected = false;
                 if (_sbClient)  { try { _sbClient.auth.signOut(); } catch(e) {} }
                 _sbUser = null;
                 if (_activeProvider === 'supabase') _activeProvider = null;
@@ -15069,7 +15253,18 @@ body.dark-mode,
                 try {
                     if (_activeProvider === 'gdrive'   && _gdriveToken)                                  gdrivePull(true).catch(()=>{});
                     if (_activeProvider === 'onedrive' && _onedriveToken && !_isExpired(_onedriveToken)) onedrivePull(true).catch(()=>{});
-                    if (_activeProvider === 'supabase' && _sbUser)                                        supabasePull(true).catch(()=>{});
+                    // ✅ FIX ECONOMIA-EGRESS + ✅ FIX SYNC-MOBILE-ZOMBIE (10/08/2026):
+                    // Com o Realtime conectado, o pull REST fica bem mais espaçado (só
+                    // a cada ~45s) em vez de parar 100%. Motivo: em celular, quando a
+                    // tela bloqueia ou o app vai pra segundo plano, o WebSocket às vezes
+                    // fica "zumbi" — o navegador não dispara CLOSED/TIMED_OUT (então
+                    // _sbRealtimeConnected nunca vira false), mas o canal já parou de
+                    // entregar eventos de verdade. Sem esse poll de segurança, uma
+                    // alteração feita nesse estado (ex: mudar status de uma venda) podia
+                    // nunca chegar no outro aparelho. Ainda é ~9x menos chamadas que o
+                    // poll de 5s de antes, mas garante que nada fica pra trás.
+                    const supabaseStale = !_sbRealtimeConnected || (Date.now() - _lastPullTime > 45000);
+                    if (_activeProvider === 'supabase' && _sbUser && supabaseStale) supabasePull(true).catch(()=>{});
                 } catch(e) {}
             }
 
@@ -19153,8 +19348,6 @@ tbody tr td{border:1.5px solid #000;padding:2mm;text-align:center;font-weight:70
                             Sales.clearForm();
                             Sales.renderHistory();
                             Sales.populateSaleSelects();
-                            // ✅ Garante que a aba exibida seja sempre "Nova O.S." (não fica presa em "Histórico")
-                            Sales.setSubTab('sales-nova');
                             // Garante visualmente que o painel de cliente está limpo
                             const _sd = document.getElementById('selectedClientData');
                             if (_sd) _sd.style.display = 'none';
@@ -19196,7 +19389,7 @@ tbody tr td{border:1.5px solid #000;padding:2mm;text-align:center;font-weight:70
                     if (titleEl && titleEl.innerText.trim() === 'Dashboard') {
                         const h = now.getHours();
                         const saudacao = h < 12 ? 'Bom dia' : h < 18 ? 'Boa tarde' : 'Boa noite';
-                        // ✅ Mostra somente o nome do usuário logado (sem o cargo)
+                        // ✅ Mostra só o nome do usuário logado (sem cargo/perfil)
                         const usuario = (window._authUser && window._authUser.fullName)
                             ? window._authUser.fullName
                             : (window._authUser && window._authUser.username) || '';
@@ -19215,7 +19408,10 @@ tbody tr td{border:1.5px solid #000;padding:2mm;text-align:center;font-weight:70
                     reader.onload = async (e) => {
                         // ✅ Comprime antes de guardar — reduz o peso do logo no
                         // snapshot sincronizado com a nuvem (ver Utils.compressImageDataUrl).
-                        state.company.logo = await Utils.compressImageDataUrl(e.target.result, 500, 0.8);
+                        // ⏪ Revertido (10/08/2026): upload pro Storage removido, volta
+                        // a salvar o logo como base64 (comprimido).
+                        const logo = await Utils.compressImageDataUrl(e.target.result, 500, 0.8);
+                        state.company.logo = logo;
                         try { if (window.MediaCache) MediaCache.set('company', 'logo', state.company.logo); } catch(_e) {}
                         this.updateCompanyDisplay();
                         this.saveData();
@@ -21183,12 +21379,16 @@ tbody tr td{border:1.5px solid #000;padding:2mm;text-align:center;font-weight:70
                 if (!client) return;
                 var menuSales = document.querySelector('.menu-item[data-section="sales"]');
                 if (menuSales) menuSales.click();
+                // ✅ FIX NAVEGAÇÃO: abrir a seção Vendas não muda sozinho pra aba
+                // "Nova O.S." — se a última aba vista era "Histórico", o clique em
+                // "Adicionar Venda" caía lá em vez da tela de cadastro da venda.
+                if (typeof Sales !== 'undefined' && Sales.setSubTab) {
+                    try { Sales.setSubTab('sales-nova'); } catch(e) {}
+                }
                 // Aguarda a seção abrir, clearForm() rodar, e depois seleciona o cliente recém-salvo
                 setTimeout(function() {
                     try {
                         if (typeof Sales !== 'undefined') {
-                            // Garante que a aba exibida seja "Nova O.S.", não "Histórico"
-                            Sales.setSubTab('sales-nova');
                             // Garante que o select foi populado com o novo cliente
                             Sales.populateSaleSelects();
                             // Seleciona o cliente automaticamente
@@ -21207,6 +21407,12 @@ tbody tr td{border:1.5px solid #000;padding:2mm;text-align:center;font-weight:70
                 const client = state.clients.find(c => c.id === id);
                 if (!client) return;
                 
+                // ✅ FIX TELA-DE-EDIÇÃO-NÃO-ABRE (11/08/2026): desde que a seção
+                // Clientes ganhou as abas Cadastro/Histórico, editar um cliente a
+                // partir da lista (Histórico) preenchia o formulário certinho, mas
+                // a aba visível continuava em "Histórico" — parecia que nada tinha
+                // acontecido. Agora troca para "Cadastro" automaticamente.
+                this.setSubTab('clients-cadastro');
                 state.editingId = id;
                 if (client.photo) {
                     document.getElementById('clientPhotoImg').src = client.photo;
@@ -22116,14 +22322,21 @@ tbody tr td{border:1.5px solid #000;padding:2mm;text-align:center;font-weight:70
                 delete document.getElementById('productImageInput').dataset.image;
             },
 
-            save() {
+            async save() {
                 if (!Utils.validateRequired('productForm')) {
                     Toast.show('Preencha todos os campos obrigatórios', 'warning');
                     return;
                 }
-                
+
+                const productId = state.editingId || 'PROD-' + (state.products.length + 1).toString().padStart(3, '0');
+                // ⏪ Revertido (10/08/2026): upload pro Supabase Storage removido —
+                // voltou a salvar a foto direto como base64, como era antes da
+                // Fase B (o upload estava sendo bloqueado por política de segurança
+                // do bucket sem uma causa clara o suficiente pra manter em produção).
+                const image = document.getElementById('productImageInput').dataset.image || null;
+
                 const product = {
-                    id: state.editingId || 'PROD-' + (state.products.length + 1).toString().padStart(3, '0'),
+                    id: productId,
                     code: document.getElementById('productCode').value,
                     category: document.getElementById('productCategory').value,
                     name: document.getElementById('productName').value,
@@ -22133,7 +22346,7 @@ tbody tr td{border:1.5px solid #000;padding:2mm;text-align:center;font-weight:70
                     minQty: parseInt(document.getElementById('productMinQty').value) || 5,
                     color: document.getElementById('productColor')?.value || '',
                     frameType: document.getElementById('productFrameType')?.value || '',
-                    image: document.getElementById('productImageInput').dataset.image || null,
+                    image: image,
                     updated_at: new Date().toISOString()
                 };
                 
@@ -22174,6 +22387,10 @@ tbody tr td{border:1.5px solid #000;padding:2mm;text-align:center;font-weight:70
                 const p = state.products.find(p => p.id === id);
                 if (!p) return;
                 
+                // ✅ FIX TELA-DE-EDIÇÃO-NÃO-ABRE (11/08/2026): mesma correção do
+                // Clients.edit — editar um produto a partir do Histórico preenchia
+                // o formulário mas ficava escondido atrás da aba "Histórico".
+                this.setSubTab('products-cadastro');
                 state.editingId = id;
                 document.getElementById('productCode').value = p.code;
                 document.getElementById('productCategory').value = p.category;
@@ -24356,6 +24573,7 @@ tbody tr td{border:1.5px solid #000;padding:2mm;text-align:center;font-weight:70
                     const reader = new FileReader();
                     reader.onload = async (e) => {
                         // ✅ Comprime antes de guardar (ver Utils.compressImageDataUrl)
+                        // ⏪ Revertido (10/08/2026): upload pro Storage removido.
                         const compressed = await Utils.compressImageDataUrl(e.target.result, 500, 0.8);
                         const prev = document.getElementById('configLogoPreview');
                         const ph   = document.getElementById('configLogoPlaceholder');
@@ -27221,6 +27439,10 @@ ${container.innerHTML}
                 const sale = state.sales.find(s => s.id === id);
                 if (!sale) return;
 
+                // ✅ FIX TELA-DE-EDIÇÃO-NÃO-ABRE (11/08/2026): mesma correção de
+                // Clients/Products.edit — editar uma venda a partir do Histórico
+                // preenchia o formulário mas ficava escondido atrás da aba "Histórico".
+                this.setSubTab('sales-nova');
                 state.editingSaleId = id;
                 // Copiar dados para currentSale
                 state.currentSale = {
@@ -27286,8 +27508,12 @@ ${container.innerHTML}
                     if (cashDescCb) { cashDescCb.checked = !!sale.methodDiscount; this.PAY.cashCalc.call(this.PAY); }
                 }
 
-                // Restaurar profissional
-                if (profEl) profEl.value = sale.professional || '';
+                // ✅ FIX CRASH Sales.edit(): "profEl" nunca existiu (nem elemento no
+                // HTML, nem variável declarada) — toda vez que alguém clicava em
+                // editar uma venda, essa linha lançava um ReferenceError e travava
+                // o restante da função (o que vinha depois, como restaurar parcelas
+                // de crediário, nunca chegava a rodar). Campo "profissional" não
+                // existe mais no formulário de venda; linha removida.
 
                 // Se for crediário, restaurar campos de parcelas e recalcular
                 if (sale.paymentMethod === 'installment' && sale.paymentDetails) {
