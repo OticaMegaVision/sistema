@@ -21207,6 +21207,7 @@ tbody tr td{border:1.5px solid #000;padding:2mm;text-align:center;font-weight:70
                 const client = state.clients.find(c => c.id === id);
                 if (!client) return;
                 
+                this.setSubTab('clients-cadastro');
                 state.editingId = id;
                 if (client.photo) {
                     document.getElementById('clientPhotoImg').src = client.photo;
@@ -22174,6 +22175,7 @@ tbody tr td{border:1.5px solid #000;padding:2mm;text-align:center;font-weight:70
                 const p = state.products.find(p => p.id === id);
                 if (!p) return;
                 
+                this.setSubTab('products-cadastro');
                 state.editingId = id;
                 document.getElementById('productCode').value = p.code;
                 document.getElementById('productCategory').value = p.category;
@@ -27221,6 +27223,7 @@ ${container.innerHTML}
                 const sale = state.sales.find(s => s.id === id);
                 if (!sale) return;
 
+                this.setSubTab('sales-nova');
                 state.editingSaleId = id;
                 // Copiar dados para currentSale
                 state.currentSale = {
