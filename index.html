@@ -9812,6 +9812,39 @@ body.dark-mode,
                                         </div>
                                     </div>
 
+                                    <!-- Appwrite -->
+                                    <div class="bkp-provider-card" id="cloudPanelAppwrite">
+                                        <div class="bkp-provider-head">
+                                            <div class="ic" style="background:#fd366e;"><i class="fas fa-shield-halved"></i></div>
+                                            <b>Appwrite</b>
+                                            <span id="appwriteTag" class="bkp-tag bkp-tag-off">Desconectado</span>
+                                        </div>
+                                        <div id="appwriteDisconnected">
+                                            <p style="font-size:.76rem;color:var(--gray);margin:0 0 .8rem;line-height:1.4;">Sync via Appwrite (Database + Realtime). Use o usuário criado no Appwrite Auth.</p>
+                                            <input id="appwriteEmail" type="email" placeholder="usuario@oticamegavision.local" class="form-control"
+                                                style="font-size:.8rem;margin-bottom:.5rem;padding:8px 10px;">
+                                            <input id="appwritePassword" type="password" placeholder="Senha" class="form-control"
+                                                style="font-size:.8rem;margin-bottom:.7rem;padding:8px 10px;">
+                                            <button class="btn btn-sm btn-block" style="background:#ffe4ec;color:#fd366e;font-weight:700;width:100%;padding:9px;"
+                                                onclick="CloudSync.connectAppwrite(document.getElementById('appwriteEmail').value.trim(), document.getElementById('appwritePassword').value)">
+                                                <i class="fas fa-shield-halved"></i> Conectar
+                                            </button>
+                                        </div>
+                                        <div id="appwriteConnected" style="display:none;">
+                                            <div style="display:flex;align-items:center;gap:.5rem;margin-bottom:.7rem;color:#fd366e;font-weight:700;font-size:.8rem;">
+                                                <span style="width:9px;height:9px;border-radius:50%;background:#fd366e;display:inline-block;animation:cs_pulse 1.5s ease-in-out infinite alternate;"></span>
+                                                Appwrite — Realtime ativo
+                                            </div>
+                                            <div style="display:flex;gap:.5rem;">
+                                                <button class="btn btn-sm" style="background:#ffe4ec;color:#fd366e;flex:1;font-weight:700;" onclick="CloudSync.appwritePush()"><i class="fas fa-cloud-arrow-up"></i> Enviar</button>
+                                                <button class="btn btn-sm" style="background:#ffe4ec;color:#fd366e;flex:1;font-weight:700;" onclick="CloudSync.appwritePull()"><i class="fas fa-cloud-arrow-down"></i> Baixar</button>
+                                            </div>
+                                            <button class="btn btn-sm btn-outline-secondary" style="width:100%;font-size:.72rem;margin-top:.6rem;" onclick="CloudSync.appwriteDisconnect()">
+                                                <i class="fas fa-sign-out-alt"></i> Desconectar
+                                            </button>
+                                        </div>
+                                    </div>
+
                                 </div>
                             </div>
                         </div>
@@ -12854,6 +12887,22 @@ body.dark-mode,
             // Se o projeto do schema (Fase 1) for outro, troque as duas linhas.
             const SUPABASE_URL      = 'https://qhscxyistzlmxxnjrqao.supabase.co';
             const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFoc2N4eWlzdHpsbXh4bmpycWFvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzE4NTQzOTMsImV4cCI6MjA4NzQzMDM5M30.xrhD08N1PcOVAMdA0vovxbHOHrcSdqIYkJWw4K6G13w'; // Project Settings → API → anon public
+            // ── Appwrite — quarto provedor de sync (adicionado sem tocar em
+            // Drive/OneDrive/Supabase) ─────────────────────────────────────
+            // ⚠️ CONFIGURE: preencha com os dados do seu projeto Appwrite
+            // (Console → Project Settings). O Database e a Collection precisam
+            // ser criados antes, com os atributos: store_id (string),
+            // collection (string), doc_id (string), data (string, tamanho
+            // grande — ex: 1000000), updated_at (datetime). Crie também um
+            // índice único composto em (store_id, collection, doc_id) para
+            // permitir upsert determinístico via ID de documento.
+            // Permissões da Collection: leitura/escrita para "users" (qualquer
+            // usuário autenticado) — cada loja compartilha o mesmo projeto,
+            // isolada por store_id, igual ao Supabase.
+            const APPWRITE_ENDPOINT      = 'https://tor.cloud.appwrite.io/v1'; // região Toronto
+            const APPWRITE_PROJECT_ID    = '6a7b4d98000ed291fcfb';
+            const APPWRITE_DATABASE_ID   = '6a7b4dc9003b04a4351b';
+            const APPWRITE_COLLECTION_ID = 'claud_sync';
             // ── FIX MULTI-LOJA: arquivo separado por loja ────────────────────
             // Cada loja tem seu próprio arquivo no Drive para evitar sobreposição
             // de dados entre Barueri e Caucaia do Alto.
@@ -12916,6 +12965,11 @@ body.dark-mode,
             let _sbClient       = null;   // cliente supabase-js (carregado sob demanda)
             let _sbUser         = null;   // usuário autenticado no Supabase Auth
             let _sbChannel      = null;   // canal Realtime ativo
+            let _awClient       = null;   // cliente appwrite (Client) — carregado sob demanda
+            let _awAccount      = null;   // instância Account (auth)
+            let _awDatabases    = null;   // instância Databases (documentos)
+            let _awUser         = null;   // usuário autenticado no Appwrite Auth
+            let _awUnsubscribe  = null;   // função de cancelamento do Realtime ativo
             let _pushing        = false;
             let _pulling        = false;
             let _pushTimer      = null;
@@ -14008,11 +14062,13 @@ body.dark-mode,
                             if (_activeProvider === 'gdrive'   && _gdriveToken)   await gdrivePullMedia(true);
                             if (_activeProvider === 'onedrive' && _onedriveToken) await onedrivePullMedia(true);
                             if (_activeProvider === 'supabase' && _sbUser)        await supabasePullMedia(true);
+                            if (_activeProvider === 'appwrite' && _awUser)        await appwritePullMedia(true);
                         } catch(_e) {}
                         window._lsBackupRestored = false;
                         if (_activeProvider === 'gdrive'   && _gdriveToken)   gdrivePushMedia(true).catch(()=>{});
                         if (_activeProvider === 'onedrive' && _onedriveToken) onedrivePushMedia(true).catch(()=>{});
                         if (_activeProvider === 'supabase' && _sbUser)        supabasePushMedia(true).catch(()=>{});
+                        if (_activeProvider === 'appwrite' && _awUser)        appwritePushMedia(true).catch(()=>{});
                     })();
                     return;
                 }
@@ -14030,6 +14086,8 @@ body.dark-mode,
                 // por isso que logo/fotos nunca saíam do aparelho quando o Supabase
                 // era a conexão ativa.
                 if (_activeProvider === 'supabase' && _sbUser)        supabasePushMedia(true).catch(_mediaPushFail);
+                // Quarto provedor (Appwrite) — mesmo padrão do Supabase acima.
+                if (_activeProvider === 'appwrite' && _awUser)        appwritePushMedia(true).catch(_mediaPushFail);
             }
 
             function _pullMediaNow(silent) {
@@ -14042,6 +14100,7 @@ body.dark-mode,
                 // ✅ FIX SYNC-MEDIA-SUPABASE: idem — sem isso o polling nunca baixava
                 // logo/fotos enviados por outro aparelho quando conectado ao Supabase.
                 if (_activeProvider === 'supabase' && _sbUser)        supabasePullMedia(silent).catch((e)=>console.warn('[CloudSync] pull de mídia falhou:', e?.message));
+                if (_activeProvider === 'appwrite' && _awUser)        appwritePullMedia(silent).catch((e)=>console.warn('[CloudSync] pull de mídia falhou:', e?.message));
             }
 
             // ════════════════════════════════════════════════════════════════
@@ -15012,6 +15071,274 @@ body.dark-mode,
             }
 
             // ════════════════════════════════════════════════════════════════
+            //  APPWRITE — quarto provedor de sync
+            //  Reaproveita _collectAllData()/_applyCloudData() (mesmo "formato
+            //  de arquivo" dos outros 3 provedores). A "gaveta" aqui é um
+            //  documento na Collection configurada (ver APPWRITE_DATABASE_ID /
+            //  APPWRITE_COLLECTION_ID no topo do CloudSync), com Realtime
+            //  nativo do Appwrite no lugar do polling de 5s — igual ao Supabase.
+            //  ID do documento é determinístico (storeId + doc_id) para permitir
+            //  upsert sem precisar de índice/consulta extra.
+            // ════════════════════════════════════════════════════════════════
+            function _awDocId(docId) {
+                // IDs de documento no Appwrite aceitam a-z, A-Z, 0-9, hífen e
+                // underscore (até 36 chars) — normaliza storeId+docId nesse formato.
+                const storeId = window._currentStore || 'barueri';
+                return (storeId + '_' + docId).replace(/[^a-zA-Z0-9_-]/g, '_').slice(0, 36);
+            }
+
+            function _awEnsureClient() {
+                return new Promise((resolve, reject) => {
+                    if (_awDatabases) return resolve({ client: _awClient, account: _awAccount, databases: _awDatabases });
+                    if (!APPWRITE_PROJECT_ID || APPWRITE_PROJECT_ID.startsWith('COLE_') ||
+                        !APPWRITE_DATABASE_ID || APPWRITE_DATABASE_ID.startsWith('COLE_') ||
+                        !APPWRITE_COLLECTION_ID || APPWRITE_COLLECTION_ID.startsWith('COLE_')) {
+                        return reject(new Error('Configure APPWRITE_ENDPOINT/PROJECT_ID/DATABASE_ID/COLLECTION_ID no topo do CloudSync.'));
+                    }
+                    window._lazyLoad('https://cdn.jsdelivr.net/npm/appwrite@16/dist/iife/sdk.js', () => {
+                        try {
+                            _awClient = new window.Appwrite.Client()
+                                .setEndpoint(APPWRITE_ENDPOINT)
+                                .setProject(APPWRITE_PROJECT_ID);
+                            _awAccount   = new window.Appwrite.Account(_awClient);
+                            _awDatabases = new window.Appwrite.Databases(_awClient);
+                            resolve({ client: _awClient, account: _awAccount, databases: _awDatabases });
+                        } catch(e) { reject(e); }
+                    }, () => reject(new Error('Falha ao carregar biblioteca do Appwrite (sem internet?)')));
+                });
+            }
+
+            async function connectAppwrite(email, password) {
+                try {
+                    const { account } = await _awEnsureClient();
+                    // Encerra uma sessão anônima/anterior travada, se houver, antes de logar.
+                    try { await account.deleteSession('current'); } catch(_e) {}
+                    await account.createEmailPasswordSession(email, password);
+                    _awUser = await account.get();
+                    _activeProvider = 'appwrite';
+                    localStorage.setItem('cs_active_provider', 'appwrite');
+                    localStorage.setItem('cs_appwrite_email', email);
+                    Toast.show('✅ Conectado ao Appwrite', 'success');
+                    _updateUI();
+                    await appwritePull(true);
+                    appwritePullMedia(true).catch(()=>{});
+                    _awSubscribeRealtime();
+                    _startPolling(); // fallback caso o Realtime caia
+                    return true;
+                } catch(e) {
+                    Toast.show('❌ Appwrite: ' + e.message, 'error');
+                    return false;
+                }
+            }
+
+            async function _awResumeSession() {
+                // Restaura sessão salva pelo próprio Appwrite (cookie/localStorage interno do SDK)
+                try {
+                    const { account } = await _awEnsureClient();
+                    const user = await account.get();
+                    if (user) {
+                        _awUser = user;
+                        _activeProvider = 'appwrite';
+                        _updateUI();
+                        await appwritePull(true);
+                        appwritePullMedia(true).catch(()=>{});
+                        _awSubscribeRealtime();
+                        _startPolling();
+                        return true;
+                    }
+                } catch(e) {}
+                return false;
+            }
+
+            async function appwritePush(silent) {
+                if (!_awDatabases || !_awUser) return;
+                if (_pushing) return;
+                _pushing = true;
+                try {
+                    const storeId = window._currentStore || 'barueri';
+                    const payload = _collectAllData();
+                    const body = {
+                        store_id:   storeId,
+                        collection: '_cloudsync',
+                        doc_id:     'snapshot',
+                        data:       JSON.stringify(payload),
+                        updated_at: new Date().toISOString()
+                    };
+                    try {
+                        await _awDatabases.updateDocument(APPWRITE_DATABASE_ID, APPWRITE_COLLECTION_ID, _awDocId('snapshot'), body);
+                    } catch(e) {
+                        // Documento ainda não existe (primeiro push desta loja) → cria.
+                        await _awDatabases.createDocument(APPWRITE_DATABASE_ID, APPWRITE_COLLECTION_ID, _awDocId('snapshot'), body);
+                    }
+                    _lastPushTime = Date.now();
+                    if (!silent) Toast.show('☁️ Enviado ao Appwrite', 'success', 2000);
+                } catch(e) {
+                    console.warn('[CloudSync] appwritePush falhou:', e.message);
+                    if (!silent) Toast.show('⚠️ Falha ao enviar ao Appwrite: ' + e.message, 'warning');
+                } finally {
+                    _pushing = false;
+                }
+            }
+
+            async function appwritePull(silent) {
+                if (!_awDatabases || !_awUser) return;
+                if (_pulling) return;
+                _pulling = true;
+                try {
+                    let doc = null;
+                    try {
+                        doc = await _awDatabases.getDocument(APPWRITE_DATABASE_ID, APPWRITE_COLLECTION_ID, _awDocId('snapshot'));
+                    } catch(e) {
+                        // 404 → nenhum snapshot enviado ainda por nenhum dispositivo desta loja
+                        doc = null;
+                    }
+                    if (doc && doc.data) {
+                        const parsed = JSON.parse(doc.data);
+                        await _withSyncLock('cloud:appwritePull', () => _applyCloudData(parsed, silent));
+                    }
+                    _lastPullTime = Date.now();
+                } catch(e) {
+                    console.warn('[CloudSync] appwritePull falhou:', e.message);
+                } finally {
+                    _pulling = false;
+                }
+            }
+
+            // ── Appwrite: push/pull do arquivo de mídia (logo + fotos de produtos) ──
+            // Mesmo padrão do Supabase: reaproveita a mesma "gaveta" lógica
+            // (collection '_cloudsync'), só que com doc_id 'media' em vez de
+            // 'snapshot', e o mesmo _applyMediaData() já usado pelos outros provedores.
+            async function appwritePushMedia(silent) {
+                if (!_awDatabases || !_awUser) return;
+                if (_pushingMedia) return;
+                _pushingMedia = true;
+                try {
+                    const storeId = window._currentStore || 'barueri';
+                    const payload = _collectMediaData();
+                    const body = {
+                        store_id:   storeId,
+                        collection: '_cloudsync',
+                        doc_id:     'media',
+                        data:       JSON.stringify(payload),
+                        updated_at: new Date().toISOString()
+                    };
+                    try {
+                        await _awDatabases.updateDocument(APPWRITE_DATABASE_ID, APPWRITE_COLLECTION_ID, _awDocId('media'), body);
+                    } catch(e) {
+                        await _awDatabases.createDocument(APPWRITE_DATABASE_ID, APPWRITE_COLLECTION_ID, _awDocId('media'), body);
+                    }
+                } catch(e) {
+                    console.warn('[CloudSync] push de mídia (Appwrite) falhou:', e.message);
+                    if (!silent) throw e;
+                } finally {
+                    _pushingMedia = false;
+                }
+            }
+
+            async function appwritePullMedia(silent) {
+                if (!_awDatabases || !_awUser) return;
+                if (_pullingMedia) return;
+                _pullingMedia = true;
+                try {
+                    let doc = null;
+                    try {
+                        doc = await _awDatabases.getDocument(APPWRITE_DATABASE_ID, APPWRITE_COLLECTION_ID, _awDocId('media'));
+                    } catch(e) {
+                        doc = null; // nenhuma mídia enviada ainda
+                    }
+                    if (!doc) return;
+                    // Checagem leve pelo updated_at — mesma ideia do fingerprint usado
+                    // por Drive/OneDrive/Supabase, evita reaplicar o JSON de imagens
+                    // inteiro quando nada mudou desde o último pull.
+                    const fpKey = _lsMediaFingerprintKey('appwrite');
+                    if (doc.updated_at && doc.updated_at === localStorage.getItem(fpKey)) {
+                        return;
+                    }
+                    if (doc.data) {
+                        const parsed = JSON.parse(doc.data);
+                        await _withSyncLock('cloud:appwritePullMedia', () => _applyMediaData(parsed, silent));
+                        if (doc.updated_at) localStorage.setItem(fpKey, doc.updated_at);
+                    }
+                } catch(e) {
+                    console.warn('[CloudSync] pull de mídia (Appwrite) falhou:', e.message);
+                } finally {
+                    _pullingMedia = false;
+                }
+            }
+
+            function _awSubscribeRealtime() {
+                if (!_awClient || _awUnsubscribe) return;
+                const storeId = window._currentStore || 'barueri';
+                try {
+                    // ✅ FIX REALTIME TABLESDB: o projeto foi criado como "TablesDB"
+                    // (nome novo do Appwrite pra Databases). O SDK v16 usado aqui é
+                    // anterior a essa renomeação e só conhece o canal antigo
+                    // ("databases...collections...documents"), mas o servidor mais
+                    // novo pode emitir eventos no formato novo ("tablesdb...tables...rows").
+                    // Assina os DOIS formatos — o que o servidor entender, dispara.
+                    _awUnsubscribe = _awClient.subscribe(
+                        [
+                            'databases.' + APPWRITE_DATABASE_ID + '.collections.' + APPWRITE_COLLECTION_ID + '.documents',
+                            'tablesdb.' + APPWRITE_DATABASE_ID + '.tables.' + APPWRITE_COLLECTION_ID + '.rows'
+                        ],
+                        (response) => {
+                            // Ignora eco do próprio push (evita reaplicar o que acabamos de enviar)
+                            if (Date.now() - _lastPushTime < 2000) return;
+                            try {
+                                const row = response && response.payload;
+                                // Appwrite Realtime não filtra por atributo no servidor — o
+                                // canal acima entrega TODOS os documentos da collection
+                                // (de todas as lojas), então filtramos aqui pelo store_id.
+                                if (!row || row.store_id !== storeId) return;
+                                if (row.collection === '_cloudsync' && row.doc_id === 'snapshot' && row.data) {
+                                    _withSyncLock('cloud:realtimeSnapshotAW', () => _applyCloudData(JSON.parse(row.data), true));
+                                    _lastPullTime = Date.now();
+                                    return;
+                                }
+                                if (row.collection === '_cloudsync' && row.doc_id === 'media' && row.data) {
+                                    _withSyncLock('cloud:realtimeMediaAW', () => _applyMediaData(JSON.parse(row.data), true));
+                                    if (row.updated_at) localStorage.setItem(_lsMediaFingerprintKey('appwrite'), row.updated_at);
+                                    return;
+                                }
+                            } catch(e) {
+                                console.warn('[CloudSync] falha ao aplicar evento Realtime (Appwrite), caindo para pull tradicional:', e && e.message);
+                                appwritePull(true);
+                                appwritePullMedia(true).catch(()=>{});
+                            }
+                        }
+                    );
+                } catch(e) {
+                    console.warn('[CloudSync] falha ao assinar Realtime do Appwrite:', e && e.message);
+                }
+            }
+
+            function _awUnsubscribeRealtime() {
+                if (_awUnsubscribe) { try { _awUnsubscribe(); } catch(_e) {} _awUnsubscribe = null; }
+            }
+
+            // Mesma proteção do Supabase: ao voltar a ficar visível, reconecta o
+            // Realtime (se caiu) e força um pull imediato — evita depender de F5.
+            document.addEventListener('visibilitychange', () => {
+                if (document.visibilityState === 'visible' && _awUser) {
+                    if (!_awUnsubscribe) _awSubscribeRealtime();
+                    appwritePull(true).catch(()=>{});
+                    appwritePullMedia(true).catch(()=>{});
+                }
+            });
+
+            function appwriteDisconnect() {
+                _awUnsubscribeRealtime();
+                if (_awAccount) { try { _awAccount.deleteSession('current'); } catch(e) {} }
+                _awUser = null;
+                if (_activeProvider === 'appwrite') _activeProvider = null;
+                localStorage.removeItem('cs_active_provider');
+                localStorage.removeItem('cs_appwrite_email');
+                _stopPolling();
+                _updateUI();
+                Toast.show('Appwrite desconectado', 'info');
+            }
+
+            // ════════════════════════════════════════════════════════════════
             //  POLLING ADAPTATIVO — 5s quando a aba está ativa, 15s em background
             //  (valores confirmados em 05/08/2026 — ver POLL_ACTIVE_MS/POLL_BACKGROUND_MS)
             // ════════════════════════════════════════════════════════════════
@@ -15070,6 +15397,7 @@ body.dark-mode,
                     if (_activeProvider === 'gdrive'   && _gdriveToken)                                  gdrivePull(true).catch(()=>{});
                     if (_activeProvider === 'onedrive' && _onedriveToken && !_isExpired(_onedriveToken)) onedrivePull(true).catch(()=>{});
                     if (_activeProvider === 'supabase' && _sbUser)                                        supabasePull(true).catch(()=>{});
+                    if (_activeProvider === 'appwrite' && _awUser)                                        appwritePull(true).catch(()=>{});
                 } catch(e) {}
             }
 
@@ -15093,6 +15421,7 @@ body.dark-mode,
                     if (_activeProvider === 'gdrive'   && _gdriveToken)                                  gdrivePush(true).catch(()=>{});
                     if (_activeProvider === 'onedrive' && _onedriveToken && !_isExpired(_onedriveToken)) onedrivePush(true).catch(()=>{});
                     if (_activeProvider === 'supabase' && _sbUser)                                        supabasePush(true).catch(()=>{});
+                    if (_activeProvider === 'appwrite' && _awUser)                                        appwritePush(true).catch(()=>{});
                 } catch(e) {}
             }
 
@@ -15253,17 +15582,25 @@ body.dark-mode,
                 if (sCon) sCon.style.display = sOk ? 'block' : 'none';
                 const sTag = document.getElementById('supabaseTag');
                 if (sTag) { sTag.textContent = sOk ? 'Conectado' : 'Desconectado'; sTag.className = 'bkp-tag ' + (sOk ? 'bkp-tag-on' : 'bkp-tag-off'); }
+                const awOk  = !!_awUser;
+                const awDis = document.getElementById('appwriteDisconnected');
+                const awCon = document.getElementById('appwriteConnected');
+                if (awDis) awDis.style.display = awOk ? 'none'  : 'block';
+                if (awCon) awCon.style.display = awOk ? 'block' : 'none';
+                const awTag = document.getElementById('appwriteTag');
+                if (awTag) { awTag.textContent = awOk ? 'Conectado' : 'Desconectado'; awTag.className = 'bkp-tag ' + (awOk ? 'bkp-tag-on' : 'bkp-tag-off'); }
                 const status = document.getElementById('cloudSyncStatus');
                 if (status) {
-                    if (gOk)      status.textContent = '🟢 Google Drive — sync em tempo real ativo (' + POLL_ACTIVE_MS/1000 + 's ativo / ' + POLL_BACKGROUND_MS/1000 + 's bg)';
-                    else if (oOk) status.textContent = '🟢 OneDrive — sync em tempo real ativo (' + POLL_ACTIVE_MS/1000 + 's ativo / ' + POLL_BACKGROUND_MS/1000 + 's bg)';
-                    else if (sOk) status.textContent = '🟢 Supabase — sync em tempo real (Realtime + fallback de polling)';
-                    else          status.textContent = '⚫ Nenhum provedor conectado — dados apenas locais';
+                    if (gOk)       status.textContent = '🟢 Google Drive — sync em tempo real ativo (' + POLL_ACTIVE_MS/1000 + 's ativo / ' + POLL_BACKGROUND_MS/1000 + 's bg)';
+                    else if (oOk)  status.textContent = '🟢 OneDrive — sync em tempo real ativo (' + POLL_ACTIVE_MS/1000 + 's ativo / ' + POLL_BACKGROUND_MS/1000 + 's bg)';
+                    else if (sOk)  status.textContent = '🟢 Supabase — sync em tempo real (Realtime + fallback de polling)';
+                    else if (awOk) status.textContent = '🟢 Appwrite — sync em tempo real (Realtime + fallback de polling)';
+                    else           status.textContent = '⚫ Nenhum provedor conectado — dados apenas locais';
                 }
-                // Painéis dos 3 provedores agora ficam sempre visíveis lado a lado
+                // Painéis dos 4 provedores agora ficam sempre visíveis lado a lado
                 // (grade de cards, como na amostra aprovada) — não há mais troca de aba.
                 // Inicializa widget com estado atual — FIX: exibe apenas na primeira ativação
-                if (gOk || oOk || sOk) {
+                if (gOk || oOk || sOk || awOk) {
                     if (!_syncActivoShown) {
                         _syncActivoShown = true;
                         _ensureWidget();
@@ -15338,6 +15675,14 @@ body.dark-mode,
             // ✅ NOVO: Sync ao focar na janela do navegador (volta de outro app)
             window.addEventListener('focus', () => {
                 setTimeout(() => _silentPull(), 400);
+            });
+
+            // ✅ NOVO: alguns navegadores mobile (Chrome/Edge Android) restauram a
+            // página do cache de navegação (bfcache) ao voltar de outro app/aba
+            // sem disparar 'visibilitychange' nem 'focus' de forma confiável —
+            // o 'pageshow' com persisted=true cobre exatamente esse caso.
+            window.addEventListener('pageshow', (ev) => {
+                if (ev.persisted) setTimeout(() => _silentPull(), 400);
             });
 
             // ── Verificação e auto-renovação de token ─────────────────────────
@@ -15462,6 +15807,7 @@ body.dark-mode,
                 }
                 if (_activeProvider === 'onedrive' && _onedriveToken && !_isExpired(_onedriveToken)) { _startPolling(); setTimeout(() => onedrivePull(true).catch(()=>{}), 1500); }
                 if (_activeProvider === 'supabase') { _sbResumeSession(); }
+                if (_activeProvider === 'appwrite') { _awResumeSession(); }
                 // FIX: mostra banner se token expirado logo na abertura
                 setTimeout(_checkTokenExpiry, 3000);
             }
@@ -15518,6 +15864,7 @@ body.dark-mode,
                 connectGDrive, gdrivePush, gdrivePull, gdriveDisconnect,
                 connectOneDrive, onedrivePush, onedrivePull, onedriveDisconnect,
                 connectSupabase, supabasePush, supabasePull, supabaseDisconnect,
+                connectAppwrite, appwritePush, appwritePull, appwriteDisconnect,
                 // ✅ FIX PERFORMANCE-SYNC: canal separado de sincronização de
                 // imagens (logo + fotos de produtos) — ver _collectMediaData.
                 pushMediaNow,
@@ -15531,6 +15878,7 @@ body.dark-mode,
                 forcePull() {
                     if (_activeProvider === 'gdrive')   return gdrivePull(false);
                     if (_activeProvider === 'supabase') return supabasePull(false);
+                    if (_activeProvider === 'appwrite') return appwritePull(false);
                     return onedrivePull(false);
                 },
                 // ✅ FIX SYNC-REALTIME-TROCA-LOJA: chamado pelo StoreManager.switchTo()
