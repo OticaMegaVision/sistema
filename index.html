@@ -12903,6 +12903,16 @@ body.dark-mode,
             const APPWRITE_PROJECT_ID    = '6a7b4d98000ed291fcfb';
             const APPWRITE_DATABASE_ID   = '6a7b4dc9003b04a4351b';
             const APPWRITE_COLLECTION_ID = 'claud_sync';
+            // ── STORAGE DE MÍDIA (economia de egress) ─────────────────────────
+            // ⚠️ CONFIGURE antes de usar: crie o bucket no console do Supabase
+            // Storage (nome abaixo, leitura pública, CORS liberando a origem do
+            // app) e o bucket equivalente no Appwrite Storage (mesmo ID abaixo,
+            // permissão de leitura "any"). ENQUANTO o bucket não existir (ou o
+            // upload falhar por qualquer motivo — CORS, bloqueador, offline), o
+            // envio cai automaticamente no formato antigo (base64 embutido no
+            // documento) — nada quebra, só não economiza egress ainda.
+            const SUPABASE_MEDIA_BUCKET  = 'oticamegavision-media';
+            const APPWRITE_MEDIA_BUCKET_ID = 'media';
             // ── FIX MULTI-LOJA: arquivo separado por loja ────────────────────
             // Cada loja tem seu próprio arquivo no Drive para evitar sobreposição
             // de dados entre Barueri e Caucaia do Alto.
@@ -12968,6 +12978,7 @@ body.dark-mode,
             let _awClient       = null;   // cliente appwrite (Client) — carregado sob demanda
             let _awAccount      = null;   // instância Account (auth)
             let _awDatabases    = null;   // instância Databases (documentos)
+            let _awStorage      = null;   // instância Storage (mídia/objetos) — carregada sob demanda
             let _awUser         = null;   // usuário autenticado no Appwrite Auth
             let _awUnsubscribe  = null;   // função de cancelamento do Realtime ativo
             let _pushing        = false;
@@ -13325,6 +13336,65 @@ body.dark-mode,
             // parcial) — assim um dispositivo novo, ao puxar este arquivo pela
             // primeira vez, recebe todas as imagens de uma vez, sem depender de
             // nenhum outro dispositivo estar online.
+            // ── STORAGE DE MÍDIA: helpers de hash/blob/fetch ───────────────────
+            // Hash curto e estável do conteúdo da imagem — usado como nome do
+            // arquivo no bucket (dedup automático: a mesma foto nunca é
+            // reenviada duas vezes) e para o pull decidir se precisa buscar de
+            // novo. Não precisa ser criptograficamente forte, só estável.
+            async function _hashDataUrl(dataUrl) {
+                try {
+                    const sample = dataUrl.length > 20000
+                        ? (dataUrl.slice(0, 10000) + dataUrl.slice(-10000))
+                        : dataUrl;
+                    const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(sample));
+                    return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, '0')).join('').slice(0, 32);
+                } catch(_e) {
+                    // Contexto sem crypto.subtle (raro, ex.: http sem TLS) — hash simples de fallback.
+                    let h = 0;
+                    for (let i = 0; i < dataUrl.length; i += 37) h = (h * 31 + dataUrl.charCodeAt(i)) | 0;
+                    return 'h' + Math.abs(h).toString(16) + dataUrl.length.toString(16);
+                }
+            }
+
+            function _dataUrlToBlob(dataUrl) {
+                const comma = dataUrl.indexOf(',');
+                const meta = dataUrl.slice(0, comma);
+                const b64 = dataUrl.slice(comma + 1);
+                const mimeMatch = meta.match(/data:(.*?);base64/);
+                const mime = mimeMatch ? mimeMatch[1] : 'application/octet-stream';
+                const bin = atob(b64);
+                const arr = new Uint8Array(bin.length);
+                for (let i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i);
+                return new Blob([arr], { type: mime });
+            }
+
+            function _extForMime(mime) {
+                if (mime.includes('png'))  return '.png';
+                if (mime.includes('webp')) return '.webp';
+                if (mime.includes('gif'))  return '.gif';
+                return '.jpg';
+            }
+
+            // Busca uma URL de mídia e devolve como data: URL (base64) — assim o
+            // resto do app continua usando o mesmo formato de sempre, sem saber
+            // que a imagem veio de um bucket. Feito via fetch() (não via <img
+            // src> direto), para não depender do carregador nativo de imagem do
+            // navegador — que é o alvo mais comum de bloqueadores de anúncio e
+            // regras de CSP. Qualquer falha (CORS, bloqueio, offline, 404) só
+            // lança erro — quem chama decide o fallback, nunca perde a imagem
+            // que já estava local.
+            async function _fetchMediaAsDataUrl(url) {
+                const r = await _fetchTimeout(url, {});
+                if (!r.ok) throw new Error('storage fetch falhou: HTTP ' + r.status);
+                const blob = await r.blob();
+                return await new Promise((resolve, reject) => {
+                    const fr = new FileReader();
+                    fr.onload  = () => resolve(fr.result);
+                    fr.onerror = () => reject(fr.error || new Error('FileReader falhou'));
+                    fr.readAsDataURL(blob);
+                });
+            }
+
             function _collectMediaData() {
                 const storeId = window._currentStore || 'barueri';
                 const products = {};
@@ -13710,6 +13780,46 @@ body.dark-mode,
             // Sempre "última gravação vence" no nível do arquivo inteiro — como
             // esse arquivo só existe pra imagens, não há necessidade do merge
             // item-a-item fino usado nas coleções de dados.
+            // ── STORAGE DE MÍDIA: hash já aplicado por slot (logo / produto) ──
+            // Evita rebaixar do bucket uma imagem que este dispositivo já tem —
+            // só busca de novo quando o hash remoto muda.
+            function _storedMediaHash(type, id) {
+                try { return localStorage.getItem('cs_media_hash_' + (window._currentStore || 'barueri') + '_' + type + '_' + id); }
+                catch(_e) { return null; }
+            }
+            function _setStoredMediaHash(type, id, hash) {
+                try { localStorage.setItem('cs_media_hash_' + (window._currentStore || 'barueri') + '_' + type + '_' + id, hash); }
+                catch(_e) {}
+            }
+
+            // Resolve o que veio no campo remoto (logo/foto de produto) para o
+            // data: URL de sempre, ou `undefined` quando não deve mexer no que
+            // já está local (imagem já atualizada, ou download bloqueado/falhou
+            // — nesse caso NUNCA apaga a imagem local, só deixa como está e
+            // tenta de novo no próximo pull).
+            async function _resolveMediaRef(type, id, ref) {
+                if (typeof ref === 'string' && ref.startsWith('data:')) return ref;
+                if (typeof ref === 'string' && ref.startsWith('$brand:')) return _resolveBrandRef(ref);
+                if (ref && typeof ref === 'object' && ref.$ref === 'storage' && ref.url) {
+                    if (ref.hash && _storedMediaHash(type, id) === ref.hash) return undefined; // já temos essa versão
+                    try {
+                        const dataUrl = await _fetchMediaAsDataUrl(ref.url);
+                        if (ref.hash) _setStoredMediaHash(type, id, ref.hash);
+                        return dataUrl;
+                    } catch(e) {
+                        // ✅ Mitigação do bloqueio de URL de storage no navegador
+                        // (CORS, extensão bloqueadora, offline etc.): a busca via
+                        // fetch() aqui (não <img src>) já evita boa parte dos
+                        // bloqueadores de imagem, mas se mesmo assim falhar, o
+                        // fallback é simplesmente NÃO tocar na imagem local —
+                        // nunca apaga por causa de um download que falhou.
+                        console.warn('[CloudSync] mídia via storage bloqueada/indisponível (' + type + '/' + id + '), mantendo versão local:', e.message);
+                        return undefined;
+                    }
+                }
+                return ref === null ? null : undefined;
+            }
+
             async function _applyMediaData(remote, silent) {
                 if (!remote || (remote._rxdb !== 'v17media')) return false;
                 const storeId = window._currentStore || 'barueri';
@@ -13728,14 +13838,15 @@ body.dark-mode,
                     return false;
                 }
 
-                if (typeof remote.logo === 'string' && remote.logo.startsWith('data:')) {
+                const logoResolved = await _resolveMediaRef('company', 'logo', remote.logo);
+                if (typeof logoResolved === 'string' && logoResolved.startsWith('data:')) {
                     state.company = state.company || {};
-                    if (state.company.logo !== remote.logo) {
-                        state.company.logo = remote.logo;
+                    if (state.company.logo !== logoResolved) {
+                        state.company.logo = logoResolved;
                         try { App.updateCompanyDisplay?.(); } catch(e) {}
                     }
-                    try { if (window.MediaCache) MediaCache.set('company', 'logo', remote.logo); } catch(_e) {}
-                } else if (remote.logo === null && state.company && state.company.logo) {
+                    try { if (window.MediaCache) MediaCache.set('company', 'logo', logoResolved); } catch(_e) {}
+                } else if (logoResolved === null && state.company && state.company.logo) {
                     // Logo removido em outro dispositivo — remove aqui também.
                     delete state.company.logo;
                     try { if (window.MediaCache) MediaCache.remove('company', 'logo'); } catch(_e) {}
@@ -13744,13 +13855,15 @@ body.dark-mode,
 
                 if (remote.products && typeof remote.products === 'object') {
                     let mudou = false;
-                    (state.products || []).forEach(p => {
-                        if (!p || !p.id) return;
+                    for (const p of (state.products || [])) {
+                        if (!p || !p.id) continue;
                         // FIX PERFORMANCE-SYNC 2: o remoto pode trazer uma referência
-                        // curta ("$brand:kodak") em vez do base64 completo — resolve
-                        // para a imagem real usando os logos já embutidos no código.
+                        // curta ("$brand:kodak") ou uma referência de storage
+                        // ({$ref:'storage',...}) em vez do base64 completo —
+                        // _resolveMediaRef resolve para a imagem real (ou `undefined`
+                        // se não há nada a mudar agora).
                         const rawRef = remote.products[p.id];
-                        const img = _resolveBrandRef(rawRef);
+                        const img = await _resolveMediaRef('products', p.id, rawRef);
                         if (typeof img === 'string' && img.startsWith('data:') && p.image !== img) {
                             p.image = img;
                             try { if (window.MediaCache) MediaCache.set('products', p.id, img); } catch(_e) {}
@@ -13764,7 +13877,7 @@ body.dark-mode,
                             // pelo menos loga no console pra facilitar o diagnóstico.
                             console.warn('[CloudSync] Referência de marca "' + rawRef + '" não encontrada em Products._LOGOS_MARCA — produto ' + p.id + ' ficará sem imagem. Verifique se o app está atualizado (cache do navegador).');
                         }
-                    });
+                    }
                     if (mudou) { try { Products.renderTable?.(); } catch(e) {} }
                 }
 
@@ -14916,13 +15029,57 @@ body.dark-mode,
             // Reaproveita a mesma linha 'docs' (collection '_cloudsync'), só que com
             // doc_id 'media' em vez de 'snapshot', e o mesmo _applyMediaData() já
             // usado por Drive/OneDrive.
+            // Tenta subir uma imagem (data: URL) pro bucket do Supabase Storage.
+            // Devolve a URL pública em caso de sucesso, ou null se qualquer coisa
+            // falhar (bucket não existe ainda, CORS, offline, etc.) — quem chama
+            // usa esse null como sinal pra manter o formato antigo (base64
+            // embutido) só para ESSA imagem, sem afetar as demais.
+            async function _supabaseUploadMediaObject(hash, dataUrl) {
+                try {
+                    const blob = _dataUrlToBlob(dataUrl);
+                    const path = hash + _extForMime(blob.type);
+                    const { error } = await _sbClient.storage.from(SUPABASE_MEDIA_BUCKET)
+                        .upload(path, blob, { upsert: true, contentType: blob.type, cacheControl: '31536000' });
+                    if (error) throw error;
+                    const { data } = _sbClient.storage.from(SUPABASE_MEDIA_BUCKET).getPublicUrl(path);
+                    return (data && data.publicUrl) || null;
+                } catch(e) {
+                    console.warn('[CloudSync] upload de mídia p/ Supabase Storage falhou (usando base64 embutido como fallback):', e.message);
+                    return null;
+                }
+            }
+
             async function supabasePushMedia(silent) {
                 if (!_sbClient || !_sbUser) return;
                 if (_pushingMedia) return;
                 _pushingMedia = true;
                 try {
                     const storeId = window._currentStore || 'barueri';
-                    const payload = _collectMediaData();
+                    const base = _collectMediaData();
+                    // ✅ FIX EGRESS-STORAGE: para cada imagem, tenta subir pro bucket
+                    // (Supabase Storage) e trocar por uma referência leve {$ref,hash,url}
+                    // no payload — assim o Realtime passa a propagar poucos KB, não o
+                    // pacote inteiro de fotos. Se o bucket ainda não existir ou o upload
+                    // falhar, aquela imagem específica continua indo em base64, igual
+                    // hoje — comportamento 100% compatível, imagem por imagem.
+                    const payload = { _rxdb: base._rxdb, _store: base._store, _ts: base._ts, products: {} };
+                    if (base.logo) {
+                        const hash = await _hashDataUrl(base.logo);
+                        const url = await _supabaseUploadMediaObject(hash, base.logo);
+                        payload.logo = url ? { $ref: 'storage', hash, url } : base.logo;
+                    } else {
+                        payload.logo = base.logo; // null (logo removido) ou undefined
+                    }
+                    for (const pid of Object.keys(base.products)) {
+                        const val = base.products[pid];
+                        if (typeof val === 'string' && val.startsWith('data:')) {
+                            const hash = await _hashDataUrl(val);
+                            const url = await _supabaseUploadMediaObject(hash, val);
+                            payload.products[pid] = url ? { $ref: 'storage', hash, url } : val;
+                        } else {
+                            payload.products[pid] = val; // ex.: "$brand:kodak" — já é uma referência leve
+                        }
+                    }
                     const { error } = await _sbClient.from('docs').upsert({
                         store_id:   storeId,
                         collection: '_cloudsync',
@@ -15102,6 +15259,7 @@ body.dark-mode,
                                 .setProject(APPWRITE_PROJECT_ID);
                             _awAccount   = new window.Appwrite.Account(_awClient);
                             _awDatabases = new window.Appwrite.Databases(_awClient);
+                            _awStorage   = new window.Appwrite.Storage(_awClient);
                             resolve({ client: _awClient, account: _awAccount, databases: _awDatabases });
                         } catch(e) { reject(e); }
                     }, () => reject(new Error('Falha ao carregar biblioteca do Appwrite (sem internet?)')));
@@ -15208,13 +15366,61 @@ body.dark-mode,
             // Mesmo padrão do Supabase: reaproveita a mesma "gaveta" lógica
             // (collection '_cloudsync'), só que com doc_id 'media' em vez de
             // 'snapshot', e o mesmo _applyMediaData() já usado pelos outros provedores.
+            // Tenta subir uma imagem (data: URL) pro bucket do Appwrite Storage.
+            // Devolve a URL de visualização em caso de sucesso, ou null se
+            // qualquer coisa falhar (bucket não existe ainda, CORS, offline,
+            // etc.) — quem chama usa esse null como sinal pra manter o formato
+            // antigo (base64 embutido) só para ESSA imagem.
+            async function _appwriteUploadMediaObject(hash, dataUrl) {
+                try {
+                    if (!_awStorage) _awStorage = new window.Appwrite.Storage(_awClient);
+                    const blob = _dataUrlToBlob(dataUrl);
+                    const fileId = (hash || ('m' + Date.now())).replace(/[^a-zA-Z0-9_]/g, '').slice(0, 36);
+                    const file = new File([blob], fileId + _extForMime(blob.type), { type: blob.type });
+                    try {
+                        await _awStorage.createFile(APPWRITE_MEDIA_BUCKET_ID, fileId, file);
+                    } catch(e) {
+                        // Arquivo com esse hash já existe no bucket — não é erro, é o
+                        // dedup funcionando (mesma imagem, não precisa reenviar).
+                        if (!(e && (e.code === 409 || /already exists/i.test(e.message || '')))) throw e;
+                    }
+                    return APPWRITE_ENDPOINT + '/storage/buckets/' + APPWRITE_MEDIA_BUCKET_ID +
+                        '/files/' + fileId + '/view?project=' + APPWRITE_PROJECT_ID;
+                } catch(e) {
+                    console.warn('[CloudSync] upload de mídia p/ Appwrite Storage falhou (usando base64 embutido como fallback):', e.message);
+                    return null;
+                }
+            }
+
             async function appwritePushMedia(silent) {
                 if (!_awDatabases || !_awUser) return;
                 if (_pushingMedia) return;
                 _pushingMedia = true;
                 try {
                     const storeId = window._currentStore || 'barueri';
-                    const payload = _collectMediaData();
+                    const base = _collectMediaData();
+                    // ✅ FIX EGRESS-STORAGE: mesma lógica do Supabase — tenta subir
+                    // cada imagem pro bucket e trocar por uma referência leve
+                    // {$ref,hash,url}; qualquer falha (imagem por imagem) cai de
+                    // volta pro base64 embutido, sem quebrar nada.
+                    const payload = { _rxdb: base._rxdb, _store: base._store, _ts: base._ts, products: {} };
+                    if (base.logo) {
+                        const hash = await _hashDataUrl(base.logo);
+                        const url = await _appwriteUploadMediaObject(hash, base.logo);
+                        payload.logo = url ? { $ref: 'storage', hash, url } : base.logo;
+                    } else {
+                        payload.logo = base.logo;
+                    }
+                    for (const pid of Object.keys(base.products)) {
+                        const val = base.products[pid];
+                        if (typeof val === 'string' && val.startsWith('data:')) {
+                            const hash = await _hashDataUrl(val);
+                            const url = await _appwriteUploadMediaObject(hash, val);
+                            payload.products[pid] = url ? { $ref: 'storage', hash, url } : val;
+                        } else {
+                            payload.products[pid] = val;
+                        }
+                    }
                     const body = {
                         store_id:   storeId,
                         collection: '_cloudsync',
