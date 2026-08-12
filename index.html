@@ -15029,19 +15029,58 @@ body.dark-mode,
             // Reaproveita a mesma linha 'docs' (collection '_cloudsync'), só que com
             // doc_id 'media' em vez de 'snapshot', e o mesmo _applyMediaData() já
             // usado por Drive/OneDrive.
+            // ✅ FASE 2 (aprovada): comprime/redimensiona a foto antes de subir pro
+            // bucket, só para a cópia que via pro cloud/outros dispositivos — a
+            // versão original em alta qualidade continua intacta no dispositivo
+            // onde a foto foi tirada (não mexe em state.company.logo / p.image).
+            // Se a imagem já for pequena, ou a compressão falhar por qualquer
+            // motivo, devolve a imagem original sem alterar nada.
+            async function _compressDataUrlForSync(dataUrl, maxDim = 1280, quality = 0.85) {
+                try {
+                    if (!dataUrl || !dataUrl.startsWith('data:image/')) return dataUrl;
+                    if (dataUrl.length < 150000) return dataUrl; // já pequena, não compensa
+                    const img = await new Promise((resolve, reject) => {
+                        const im = new Image();
+                        im.onload  = () => resolve(im);
+                        im.onerror = () => reject(new Error('falha ao carregar imagem p/ compressão'));
+                        im.src = dataUrl;
+                    });
+                    const scale = Math.min(1, maxDim / Math.max(img.width, img.height));
+                    if (scale >= 1) return dataUrl; // resolução já é baixa o suficiente
+                    const canvas = document.createElement('canvas');
+                    canvas.width  = Math.max(1, Math.round(img.width * scale));
+                    canvas.height = Math.max(1, Math.round(img.height * scale));
+                    const ctx = canvas.getContext('2d');
+                    ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+                    const compressed = canvas.toDataURL('image/jpeg', quality);
+                    return (compressed.length < dataUrl.length) ? compressed : dataUrl;
+                } catch(e) {
+                    console.warn('[CloudSync] compressão de imagem p/ sync falhou (enviando original):', e.message);
+                    return dataUrl;
+                }
+            }
+
             // Tenta subir uma imagem (data: URL) pro bucket do Supabase Storage.
             // Devolve a URL pública em caso de sucesso, ou null se qualquer coisa
             // falhar (bucket não existe ainda, CORS, offline, etc.) — quem chama
             // usa esse null como sinal pra manter o formato antigo (base64
             // embutido) só para ESSA imagem, sem afetar as demais.
-            async function _supabaseUploadMediaObject(hash, dataUrl) {
+            async function _supabaseUploadMediaObject(hash, dataUrl, type, id) {
                 try {
                     const blob = _dataUrlToBlob(dataUrl);
                     const path = hash + _extForMime(blob.type);
-                    const { error } = await _sbClient.storage.from(SUPABASE_MEDIA_BUCKET)
-                        .upload(path, blob, { upsert: true, contentType: blob.type, cacheControl: '31536000' });
-                    if (error) throw error;
+                    // ✅ FASE 2 (aprovada): se este dispositivo já subiu essa MESMA
+                    // versão (mesmo hash) da imagem antes, não reenvia os bytes de
+                    // novo — só reconstrói a URL (que é determinística a partir do
+                    // hash) e devolve. O bucket já bloqueava duplicata do lado do
+                    // servidor; isso evita gastar banda de UPLOAD no dispositivo.
+                    if (_storedMediaHash(type, id) !== hash) {
+                        const { error } = await _sbClient.storage.from(SUPABASE_MEDIA_BUCKET)
+                            .upload(path, blob, { upsert: true, contentType: blob.type, cacheControl: '31536000' });
+                        if (error) throw error;
+                    }
                     const { data } = _sbClient.storage.from(SUPABASE_MEDIA_BUCKET).getPublicUrl(path);
+                    if (data && data.publicUrl) _setStoredMediaHash(type, id, hash);
                     return (data && data.publicUrl) || null;
                 } catch(e) {
                     console.warn('[CloudSync] upload de mídia p/ Supabase Storage falhou (usando base64 embutido como fallback):', e.message);
@@ -15064,8 +15103,9 @@ body.dark-mode,
                     // hoje — comportamento 100% compatível, imagem por imagem.
                     const payload = { _rxdb: base._rxdb, _store: base._store, _ts: base._ts, products: {} };
                     if (base.logo) {
-                        const hash = await _hashDataUrl(base.logo);
-                        const url = await _supabaseUploadMediaObject(hash, base.logo);
+                        const logoSync = await _compressDataUrlForSync(base.logo);
+                        const hash = await _hashDataUrl(logoSync);
+                        const url = await _supabaseUploadMediaObject(hash, logoSync, 'company', 'logo');
                         payload.logo = url ? { $ref: 'storage', hash, url } : base.logo;
                     } else {
                         payload.logo = base.logo; // null (logo removido) ou undefined
@@ -15073,8 +15113,9 @@ body.dark-mode,
                     for (const pid of Object.keys(base.products)) {
                         const val = base.products[pid];
                         if (typeof val === 'string' && val.startsWith('data:')) {
-                            const hash = await _hashDataUrl(val);
-                            const url = await _supabaseUploadMediaObject(hash, val);
+                            const valSync = await _compressDataUrlForSync(val);
+                            const hash = await _hashDataUrl(valSync);
+                            const url = await _supabaseUploadMediaObject(hash, valSync, 'products', pid);
                             payload.products[pid] = url ? { $ref: 'storage', hash, url } : val;
                         } else {
                             payload.products[pid] = val; // ex.: "$brand:kodak" — já é uma referência leve
@@ -15371,24 +15412,30 @@ body.dark-mode,
             // qualquer coisa falhar (bucket não existe ainda, CORS, offline,
             // etc.) — quem chama usa esse null como sinal pra manter o formato
             // antigo (base64 embutido) só para ESSA imagem.
-            async function _appwriteUploadMediaObject(hash, dataUrl) {
+            async function _appwriteUploadMediaObject(hash, dataUrl, type, id) {
                 try {
                     if (!_awStorage) _awStorage = new window.Appwrite.Storage(_awClient);
                     const blob = _dataUrlToBlob(dataUrl);
                     const fileId = (hash || ('m' + Date.now())).replace(/[^a-zA-Z0-9_]/g, '').slice(0, 36);
-                    const file = new File([blob], fileId + _extForMime(blob.type), { type: blob.type });
-                    try {
-                        // ⚠️ Appwrite Web SDK v14+ (inclui a v16 usada aqui) exige
-                        // parâmetros NOMEADOS em objeto no createFile — a assinatura
-                        // posicional antiga (bucketId, fileId, file) lança erro e
-                        // fazia o upload cair sempre no fallback de base64, mesmo com
-                        // o bucket configurado certinho.
-                        await _awStorage.createFile({ bucketId: APPWRITE_MEDIA_BUCKET_ID, fileId, file });
-                    } catch(e) {
-                        // Arquivo com esse hash já existe no bucket — não é erro, é o
-                        // dedup funcionando (mesma imagem, não precisa reenviar).
-                        if (!(e && (e.code === 409 || /already exists/i.test(e.message || '')))) throw e;
+                    // ✅ FASE 2 (aprovada): pula o upload se este dispositivo já
+                    // enviou essa mesma versão (hash) antes — economiza banda de
+                    // envio, não só espaço no bucket.
+                    if (_storedMediaHash(type, id) !== hash) {
+                        const file = new File([blob], fileId + _extForMime(blob.type), { type: blob.type });
+                        try {
+                            // ⚠️ Appwrite Web SDK v14+ (inclui a v16 usada aqui) exige
+                            // parâmetros NOMEADOS em objeto no createFile — a assinatura
+                            // posicional antiga (bucketId, fileId, file) lança erro e
+                            // fazia o upload cair sempre no fallback de base64, mesmo com
+                            // o bucket configurado certinho.
+                            await _awStorage.createFile({ bucketId: APPWRITE_MEDIA_BUCKET_ID, fileId, file });
+                        } catch(e) {
+                            // Arquivo com esse hash já existe no bucket — não é erro, é o
+                            // dedup funcionando (mesma imagem, não precisa reenviar).
+                            if (!(e && (e.code === 409 || /already exists/i.test(e.message || '')))) throw e;
+                        }
                     }
+                    _setStoredMediaHash(type, id, hash);
                     return APPWRITE_ENDPOINT + '/storage/buckets/' + APPWRITE_MEDIA_BUCKET_ID +
                         '/files/' + fileId + '/view?project=' + APPWRITE_PROJECT_ID;
                 } catch(e) {
@@ -15410,8 +15457,9 @@ body.dark-mode,
                     // volta pro base64 embutido, sem quebrar nada.
                     const payload = { _rxdb: base._rxdb, _store: base._store, _ts: base._ts, products: {} };
                     if (base.logo) {
-                        const hash = await _hashDataUrl(base.logo);
-                        const url = await _appwriteUploadMediaObject(hash, base.logo);
+                        const logoSync = await _compressDataUrlForSync(base.logo);
+                        const hash = await _hashDataUrl(logoSync);
+                        const url = await _appwriteUploadMediaObject(hash, logoSync, 'company', 'logo');
                         payload.logo = url ? { $ref: 'storage', hash, url } : base.logo;
                     } else {
                         payload.logo = base.logo;
@@ -15419,8 +15467,9 @@ body.dark-mode,
                     for (const pid of Object.keys(base.products)) {
                         const val = base.products[pid];
                         if (typeof val === 'string' && val.startsWith('data:')) {
-                            const hash = await _hashDataUrl(val);
-                            const url = await _appwriteUploadMediaObject(hash, val);
+                            const valSync = await _compressDataUrlForSync(val);
+                            const hash = await _hashDataUrl(valSync);
+                            const url = await _appwriteUploadMediaObject(hash, valSync, 'products', pid);
                             payload.products[pid] = url ? { $ref: 'storage', hash, url } : val;
                         } else {
                             payload.products[pid] = val;
