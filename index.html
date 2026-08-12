@@ -15378,7 +15378,12 @@ body.dark-mode,
                     const fileId = (hash || ('m' + Date.now())).replace(/[^a-zA-Z0-9_]/g, '').slice(0, 36);
                     const file = new File([blob], fileId + _extForMime(blob.type), { type: blob.type });
                     try {
-                        await _awStorage.createFile(APPWRITE_MEDIA_BUCKET_ID, fileId, file);
+                        // ⚠️ Appwrite Web SDK v14+ (inclui a v16 usada aqui) exige
+                        // parâmetros NOMEADOS em objeto no createFile — a assinatura
+                        // posicional antiga (bucketId, fileId, file) lança erro e
+                        // fazia o upload cair sempre no fallback de base64, mesmo com
+                        // o bucket configurado certinho.
+                        await _awStorage.createFile({ bucketId: APPWRITE_MEDIA_BUCKET_ID, fileId, file });
                     } catch(e) {
                         // Arquivo com esse hash já existe no bucket — não é erro, é o
                         // dedup funcionando (mesma imagem, não precisa reenviar).
