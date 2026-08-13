@@ -9157,6 +9157,9 @@ body.dark-mode,
             <!-- Seção Configurações -->
             <section id="config" class="section" aria-labelledby="pageTitle">
                 <h2 class="section-title">Configurações do Sistema</h2>
+                <div style="text-align:right;font-size:.72rem;color:#aaa;font-weight:600;margin-top:-0.8rem;margin-bottom:1rem;" title="Data/hora em que esta cópia do sistema foi gerada — compare entre navegadores/dispositivos para saber se estão na mesma versão">
+                    <i class="fas fa-code-branch"></i> Versão instalada: <span id="appBuildVersionTag">13/08/2026 19:58</span>
+                </div>
 
                 <!-- ===== navegação por segmentos (organização visual — mesma linguagem da amostra de Backup) ===== -->
                 <style>
@@ -11082,6 +11085,13 @@ body.dark-mode,
 
     <script>
         // ==================== CONSTANTES E UTILITÁRIOS ====================
+        // ── Marca d'água de versão (ver watermark em Configurações) ───────────
+        // ✅ Atualizar esta string manualmente a cada nova cópia entregue —
+        // é o jeito mais simples de saber, olhando a tela de Configurações
+        // (ou o console), se dois navegadores/dispositivos estão rodando
+        // exatamente o mesmo arquivo ou se um ficou desatualizado.
+        const APP_BUILD_VERSION = '13/08/2026 19:58';
+        console.log('[ÓticaMegaVision Pro] Versão instalada:', APP_BUILD_VERSION);
         window._currentStore = 'barueri';
         const STORAGE_KEY_BASE = 'optic_pro_data';
         function STORAGE_KEY() { return STORAGE_KEY_BASE + '_' + window._currentStore; }
@@ -15376,7 +15386,14 @@ body.dark-mode,
 
                 if (allRows.length) {
                     const partial = _buildPartialRemoteFromRows(allRows);
-                    await _withSyncLock('cloud:supabaseDeltaPull', () => _applyCloudData(partial, true));
+                    // ✅ FIX: antes chamava sempre com silent=true, mesmo quando o
+                    // pull era manual (botão "Baixar", silent=false/undefined) —
+                    // igual ao _supabaseFullPull faz corretamente logo acima. Isso
+                    // não bloqueava a atualização da tela (os renders no fim de
+                    // _applyCloudData rodam sempre), mas escondia qualquer aviso
+                    // relevante (ex: "arquivo inválido") quando o usuário clicava
+                    // manualmente em Baixar com o delta ligado.
+                    await _withSyncLock('cloud:supabaseDeltaPull', () => _applyCloudData(partial, silent));
                     const maxTs = allRows.reduce((m, r) => {
                         const t = new Date(r.updated_at).getTime();
                         return t > m ? t : m;
@@ -30605,6 +30622,9 @@ ${container.innerHTML}
 
         // ==================== INICIALIZAÇÃO ====================
         document.addEventListener('DOMContentLoaded', async () => {
+            // Marca d'água de versão em Configurações — sempre a partir da
+            // constante única (APP_BUILD_VERSION), nunca hardcoded duas vezes.
+            try { const _tag = document.getElementById('appBuildVersionTag'); if (_tag) _tag.textContent = APP_BUILD_VERSION; } catch(e) {}
             // ✅ Corrige a estrutura de rolagem das tabelas (ver TableScrollFix
             // acima) antes de qualquer outra coisa — independe de login/sessão.
             try { if (window.TableScrollFix) TableScrollFix.init(); } catch(e) {}
