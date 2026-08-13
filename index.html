@@ -13250,6 +13250,99 @@ body.dark-mode,
                 } catch(e) {}
             }
 
+            // ════════════════════════════════════════════════════════════════
+            //  COMPRESSÃO GZIP DO PAYLOAD DE SYNC (Fase aprovada)
+            //  Reduz o tráfego de push/pull/Realtime do Supabase e do Appwrite
+            //  comprimindo o JSON do snapshot antes de enviar. 100% aditivo e
+            //  retrocompatível:
+            //   - Se o navegador não suportar CompressionStream, o push cai
+            //     sozinho para o formato antigo (JSON cru) — nada quebra.
+            //   - O pull/Realtime sempre sabem ler os dois formatos (cru ou
+            //     comprimido), então nunca importa quem escreveu o dado.
+            //   - Não mexe em merge, tombstones, cursor, mídia ou em nenhuma
+            //     outra lógica de sync — só no formato de bytes transmitido.
+            // ════════════════════════════════════════════════════════════════
+            function _u8ToBase64(bytes) {
+                let bin = '';
+                const chunk = 0x8000;
+                for (let i = 0; i < bytes.length; i += chunk) {
+                    bin += String.fromCharCode.apply(null, bytes.subarray(i, i + chunk));
+                }
+                return btoa(bin);
+            }
+            function _base64ToU8(b64) {
+                const bin = atob(b64);
+                const bytes = new Uint8Array(bin.length);
+                for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+                return bytes;
+            }
+            // Comprime uma string (JSON) e devolve um base64 gzip, ou null se o
+            // navegador não suportar CompressionStream — quem chama cai para o
+            // formato cru (sem compressão) nesse caso.
+            async function _gzipStringToBase64(str) {
+                try {
+                    if (typeof CompressionStream === 'undefined') return null;
+                    const stream = new CompressionStream('gzip');
+                    const writer = stream.writable.getWriter();
+                    writer.write(new TextEncoder().encode(str));
+                    writer.close();
+                    const chunks = [];
+                    const reader = stream.readable.getReader();
+                    while (true) {
+                        const { done, value } = await reader.read();
+                        if (done) break;
+                        chunks.push(value);
+                    }
+                    const total = chunks.reduce((n, c) => n + c.length, 0);
+                    const out = new Uint8Array(total);
+                    let off = 0;
+                    chunks.forEach(c => { out.set(c, off); off += c.length; });
+                    return _u8ToBase64(out);
+                } catch(_e) {
+                    return null; // quem chama cai pro formato cru (sem compressão)
+                }
+            }
+            // Descomprime um base64 gzip de volta pra string JSON.
+            async function _gunzipBase64ToString(b64) {
+                if (typeof DecompressionStream === 'undefined') throw new Error('DecompressionStream indisponível neste navegador');
+                const stream = new DecompressionStream('gzip');
+                const writer = stream.writable.getWriter();
+                writer.write(_base64ToU8(b64));
+                writer.close();
+                const chunks = [];
+                const reader = stream.readable.getReader();
+                while (true) {
+                    const { done, value } = await reader.read();
+                    if (done) break;
+                    chunks.push(value);
+                }
+                const total = chunks.reduce((n, c) => n + c.length, 0);
+                const out = new Uint8Array(total);
+                let off = 0;
+                chunks.forEach(c => { out.set(c, off); off += c.length; });
+                return new TextDecoder().decode(out);
+            }
+            // ── Supabase: 'data' é uma coluna jsonb — o payload comprimido vira
+            // um objeto pequeno { _gz: 1, b: '<base64>' }; o formato antigo (sem
+            // compressão) continua sendo o objeto cru, então ambos são aceitos.
+            async function _decodeSyncSnapshot(raw) {
+                if (raw && typeof raw === 'object' && raw._gz === 1 && typeof raw.b === 'string') {
+                    const jsonStr = await _gunzipBase64ToString(raw.b);
+                    return JSON.parse(jsonStr);
+                }
+                return raw; // formato antigo: já é o objeto cru
+            }
+            // ── Appwrite: 'data' é uma coluna string (sempre JSON.stringify) —
+            // o payload comprimido ganha o prefixo "GZ1:"; sem o prefixo, é
+            // tratado como o formato antigo (JSON cru).
+            async function _decodeSyncSnapshotStr(raw) {
+                if (typeof raw === 'string' && raw.startsWith('GZ1:')) {
+                    const jsonStr = await _gunzipBase64ToString(raw.slice(4));
+                    return JSON.parse(jsonStr);
+                }
+                return JSON.parse(raw); // formato antigo: JSON cru
+            }
+
             // ── Coleta TODOS os dados (incluindo company, logo e config) ─────
             function _collectAllData() {
                 const storeId = window._currentStore || 'barueri';
@@ -15019,11 +15112,16 @@ body.dark-mode,
                 try {
                     const storeId = window._currentStore || 'barueri';
                     const payload = _collectAllData();
+                    // ── Compressão (aprovada): tenta comprimir o snapshot antes
+                    // de enviar. Se falhar/não suportado, envia cru (formato
+                    // antigo) — supabasePull/_sbSubscribeRealtime leem os dois.
+                    const gz = await _gzipStringToBase64(JSON.stringify(payload));
+                    const dataToSend = gz ? { _gz: 1, b: gz } : payload;
                     const { error } = await _sbClient.from('docs').upsert({
                         store_id:   storeId,
                         collection: '_cloudsync',
                         doc_id:     'snapshot',
-                        data:       payload,
+                        data:       dataToSend,
                         updated_at: new Date().toISOString()
                     }, { onConflict: 'store_id,collection,doc_id' });
                     if (error) throw error;
@@ -15049,7 +15147,8 @@ body.dark-mode,
                         .maybeSingle();
                     if (error) throw error;
                     if (data && data.data) {
-                        await _withSyncLock('cloud:supabasePull', () => _applyCloudData(data.data, silent));
+                        const remote = await _decodeSyncSnapshot(data.data);
+                        await _withSyncLock('cloud:supabasePull', () => _applyCloudData(remote, silent));
                     }
                     _lastPullTime = Date.now();
                 } catch(e) {
@@ -15239,7 +15338,16 @@ body.dark-mode,
                         try {
                             const row = payload && payload.new;
                             if (row && row.collection === '_cloudsync' && row.doc_id === 'snapshot' && row.data) {
-                                _withSyncLock('cloud:realtimeSnapshot', () => _applyCloudData(row.data, true));
+                                // ── Compressão (aprovada): decodifica o payload
+                                // (cru ou comprimido) antes de aplicar; se a
+                                // decodificação falhar por qualquer motivo, cai
+                                // para o pull tradicional em vez de travar.
+                                _decodeSyncSnapshot(row.data)
+                                    .then(remote => _withSyncLock('cloud:realtimeSnapshot', () => _applyCloudData(remote, true)))
+                                    .catch(e => {
+                                        console.warn('[CloudSync] falha ao decodificar snapshot em tempo real, caindo para pull tradicional:', e && e.message);
+                                        supabasePull(true);
+                                    });
                                 _lastPullTime = Date.now();
                                 return;
                             }
@@ -15395,11 +15503,17 @@ body.dark-mode,
                 try {
                     const storeId = window._currentStore || 'barueri';
                     const payload = _collectAllData();
+                    // ── Compressão (aprovada): mesmo padrão do Supabase — prefixo
+                    // "GZ1:" identifica payload comprimido; se a compressão
+                    // falhar/não for suportada, envia o JSON cru (formato antigo).
+                    const jsonStr = JSON.stringify(payload);
+                    const gz = await _gzipStringToBase64(jsonStr);
+                    const dataStr = gz ? ('GZ1:' + gz) : jsonStr;
                     const body = {
                         store_id:   storeId,
                         collection: '_cloudsync',
                         doc_id:     'snapshot',
-                        data:       JSON.stringify(payload),
+                        data:       dataStr,
                         updated_at: new Date().toISOString()
                     };
                     try {
@@ -15431,7 +15545,7 @@ body.dark-mode,
                         doc = null;
                     }
                     if (doc && doc.data) {
-                        const parsed = JSON.parse(doc.data);
+                        const parsed = await _decodeSyncSnapshotStr(doc.data);
                         await _withSyncLock('cloud:appwritePull', () => _applyCloudData(parsed, silent));
                     }
                     _lastPullTime = Date.now();
@@ -15590,7 +15704,15 @@ body.dark-mode,
                                 // (de todas as lojas), então filtramos aqui pelo store_id.
                                 if (!row || row.store_id !== storeId) return;
                                 if (row.collection === '_cloudsync' && row.doc_id === 'snapshot' && row.data) {
-                                    _withSyncLock('cloud:realtimeSnapshotAW', () => _applyCloudData(JSON.parse(row.data), true));
+                                    // ── Compressão (aprovada): decodifica o
+                                    // payload (cru ou comprimido) antes de
+                                    // aplicar; se falhar, cai pro pull tradicional.
+                                    _decodeSyncSnapshotStr(row.data)
+                                        .then(remote => _withSyncLock('cloud:realtimeSnapshotAW', () => _applyCloudData(remote, true)))
+                                        .catch(e => {
+                                            console.warn('[CloudSync] falha ao decodificar snapshot em tempo real (Appwrite), caindo para pull tradicional:', e && e.message);
+                                            appwritePull(true);
+                                        });
                                     _lastPullTime = Date.now();
                                     return;
                                 }
