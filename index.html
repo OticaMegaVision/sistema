@@ -12387,8 +12387,23 @@ body.dark-mode,
                                 // apagar os dados locais. Agora só carimbamos "now" quando
                                 // o item realmente não tem _updatedAt ainda (item legado);
                                 // caso contrário preservamos o timestamp que já existia.
-                                data:       { ...item, _store: storeId, _updatedAt: item._updatedAt || now },
-                                updated_at: item._updatedAt || now
+                                // ✅ FIX DELTA-SYNC (loop de re-push do catálogo inteiro):
+                                // o fallback acima checava só "item._updatedAt" — mas várias
+                                // coleções (ex: clients, products) gravam o carimbo no campo
+                                // "updated_at" (snake_case) ou "updatedAt", não "_updatedAt".
+                                // Como esses itens nunca têm "_updatedAt" de verdade, o
+                                // fallback caía em "now" em TODO ciclo, gravando um
+                                // "_updatedAt" sintético que sempre avançava. Esse valor
+                                // sintético depois voltava para state[] no próximo
+                                // _fetchAllData() (via IndexedDB local) e passava a "vencer"
+                                // a comparação de _itemUpdatedAt() no delta push — fazendo o
+                                // catálogo INTEIRO parecer "alterado agora" a cada ciclo de
+                                // sync, virando delta em push completo (e pesado) toda vez.
+                                // Agora checamos as mesmas 3 variantes que _itemUpdatedAt()
+                                // usa em todo o resto do código, então um item que já tem
+                                // "updated_at"/"updatedAt" nunca ganha um "_updatedAt" novo.
+                                data:       { ...item, _store: storeId, _updatedAt: item._updatedAt || item.updatedAt || item.updated_at || now },
+                                updated_at: item._updatedAt || item.updatedAt || item.updated_at || now
                             }));
                             try { await sbUpsertBatch(rows); total += chunk.length; }
                             catch(e) { erros++; console.error('[RxDB v17] rewriteAll', col, e.message); }
