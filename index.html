@@ -13936,7 +13936,7 @@ body.dark-mode,
             //     tombstones), só alimentando ela com um objeto parcial em
             //     vez do snapshot inteiro.
             // ════════════════════════════════════════════════════════════════
-            const DELTA_SYNC_ENABLED = false; // ⚠️ ligar só após validar em uma loja piloto (ver relatório)
+            const DELTA_SYNC_ENABLED = true; // ✅ ativado — fallback automático para o caminho completo em caso de falha (mesmo padrão do mídia)
             // Coleções elegíveis para delta item-a-item — as mesmas já usadas
             // no merge genérico de _applyCloudData (cada item já carrega seu
             // próprio _updatedAt/updatedAt/updated_at).
