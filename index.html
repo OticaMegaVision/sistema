@@ -13908,6 +13908,135 @@ body.dark-mode,
                 return true;
             }
 
+            // ════════════════════════════════════════════════════════════════
+            //  DELTA SYNC (Fase 2 aprovada) — sincronização incremental
+            //  Em vez de reenviar/rebaixar o snapshot inteiro da loja a cada
+            //  ciclo, push/pull passam a trafegar só os registros alterados
+            //  desde o último sync bem-sucedido. Vale só para Supabase e
+            //  Appwrite (Drive/OneDrive não são tocados).
+            //
+            //  GARANTIAS DE SEGURANÇA (não quebra o que já funciona):
+            //   - Controlado pela flag DELTA_SYNC_ENABLED abaixo. Enquanto for
+            //     false, o comportamento é 100% idêntico ao de antes (snapshot
+            //     completo a cada push/pull/Realtime) — nada muda.
+            //   - Bootstrap: a primeira vez que o delta roda para uma loja/
+            //     provedor (sem cursor salvo) faz um push OU pull COMPLETO
+            //     tradicional para estabelecer a base — nunca começa "no meio".
+            //   - Checkpoint: mesmo com delta ativo, o push continua gravando
+            //     o snapshot completo periodicamente (a cada
+            //     FULL_SNAPSHOT_CHECKPOINT_MS) como rede de segurança, para
+            //     que um dispositivo novo (ou que precise recuperar do zero)
+            //     sempre tenha um snapshot razoavelmente atual pra cair de
+            //     volta caso o delta falhe.
+            //   - Fallback automático: qualquer erro no caminho delta (rede,
+            //     parsing, cursor inválido) cai para o push/pull COMPLETO
+            //     tradicional na hora — nunca trava, nunca some com dado.
+            //   - Reaproveita 100% da lógica de merge já existente em
+            //     _applyCloudData (mesma regra "mais recente vence", mesmos
+            //     tombstones), só alimentando ela com um objeto parcial em
+            //     vez do snapshot inteiro.
+            // ════════════════════════════════════════════════════════════════
+            const DELTA_SYNC_ENABLED = false; // ⚠️ ligar só após validar em uma loja piloto (ver relatório)
+            // Coleções elegíveis para delta item-a-item — as mesmas já usadas
+            // no merge genérico de _applyCloudData (cada item já carrega seu
+            // próprio _updatedAt/updatedAt/updated_at).
+            const DELTA_COLS = ['clients','products','sales','expenses','prescriptions','suppliers','services','crmContatos','crmTarefas','crmNps'];
+            const FULL_SNAPSHOT_CHECKPOINT_MS = 5 * 60 * 1000; // 5 min
+
+            function _lsGet(key) { try { return localStorage.getItem(key); } catch(_e) { return null; } }
+            function _lsSet(key, val) { try { localStorage.setItem(key, val); } catch(_e) {} }
+            function _lsDeltaPushTsKey(provider) { return 'cs_delta_push_ts_' + provider + '_' + (window._currentStore || 'barueri'); }
+            function _lsDeltaPullTsKey(provider) { return 'cs_delta_pull_ts_' + provider + '_' + (window._currentStore || 'barueri'); }
+            function _lsFullSnapshotTsKey(provider) { return 'cs_full_snapshot_push_ts_' + provider + '_' + (window._currentStore || 'barueri'); }
+            function _lsMetaHashKey(provider) { return 'cs_delta_meta_hash_' + provider + '_' + (window._currentStore || 'barueri'); }
+
+            function _itemUpdatedAt(item) {
+                return (item && (item._updatedAt || item.updatedAt || item.updated_at)) || null;
+            }
+
+            // Monta o documento "meta" — os campos que NÃO são arrays merge-áveis
+            // item a item (empresa, config, contadores, mensagens, financeiro
+            // manual, usuários). É pequeno perto de clientes/vendas/produtos, e
+            // é comparado por hash (JSON) antes de gravar — só sobe de novo
+            // quando algo nele realmente mudou.
+            function _buildMetaDoc() {
+                const full = _collectAllData();
+                return {
+                    company: full.company, config: full.config, lastOsCounter: full.lastOsCounter,
+                    wppMensagens: full.wppMensagens, notificacoes: full.notificacoes,
+                    backupConfig: full.backupConfig, contasFinanceiras: full.contasFinanceiras,
+                    users: full.users, userTombstones: full.userTombstones
+                };
+            }
+
+            // Monta a lista de linhas alteradas desde o cursor de push (itens
+            // das coleções elegíveis + tombstones novos). Devolve também o
+            // maior updated_at encontrado, usado como próximo cursor de push.
+            function _buildDeltaPushRows(cursorIso) {
+                const storeId = window._currentStore || 'barueri';
+                const cursorMs = cursorIso ? new Date(cursorIso).getTime() : 0;
+                const rows = [];
+                let maxMs = cursorMs;
+
+                DELTA_COLS.forEach(col => {
+                    (state[col] || []).forEach(item => {
+                        if (!item || item.id === undefined || item.id === null) return;
+                        const ts = _itemUpdatedAt(item);
+                        const tsMs = ts ? new Date(ts).getTime() : 0;
+                        if (tsMs > cursorMs) {
+                            rows.push({ collection: col, doc_id: String(item.id), data: item, updated_at: ts || new Date().toISOString() });
+                            if (tsMs > maxMs) maxMs = tsMs;
+                        }
+                    });
+                });
+
+                // Tombstones novos desde o cursor (chave: 'storeId|col|id')
+                Object.entries(_pendingDeletions).forEach(([key, deletedAt]) => {
+                    if (!key.startsWith(storeId + '|')) return;
+                    const tsMs = new Date(deletedAt).getTime();
+                    if (tsMs > cursorMs) {
+                        const parts = key.split('|');
+                        rows.push({ collection: '_tombstone', doc_id: parts[1] + '|' + parts[2], data: { col: parts[1], id: parts[2], deletedAt }, updated_at: deletedAt });
+                        if (tsMs > maxMs) maxMs = tsMs;
+                    }
+                });
+
+                return { rows, maxTsIso: maxMs > cursorMs ? new Date(maxMs).toISOString() : null };
+            }
+
+            // Recebe linhas já normalizadas ({collection, doc_id, data (objeto
+            // JS), updated_at}) e monta um "remoto parcial" no MESMO formato
+            // que _applyCloudData já entende — reaproveita 100% a lógica de
+            // merge existente, tombstone a tombstone, coleção a coleção.
+            function _buildPartialRemoteFromRows(rows) {
+                const storeId = window._currentStore || 'barueri';
+                const partial = { _rxdb: 'v17', _store: storeId, _ts: new Date().toISOString(), tombstones: [] };
+                (rows || []).forEach(row => {
+                    if (!row || row.data === undefined || row.data === null) return;
+                    if (row.collection === '_tombstone') {
+                        const d = row.data;
+                        if (d && d.col && d.id !== undefined) {
+                            partial.tombstones.push({ storeId, col: d.col, id: d.id, deletedAt: d.deletedAt || row.updated_at });
+                            // Garante que o merge item-a-item da coleção rode
+                            // mesmo sem nenhum item alterado nesse lote — é o
+                            // que faz a exclusão refletir no estado em memória
+                            // (a tela), não só no IndexedDB local.
+                            if (!Array.isArray(partial[d.col])) partial[d.col] = [];
+                        }
+                        return;
+                    }
+                    if (row.collection === '_cloudsync' && row.doc_id === 'meta') {
+                        Object.assign(partial, row.data);
+                        return;
+                    }
+                    if (DELTA_COLS.includes(row.collection)) {
+                        if (!Array.isArray(partial[row.collection])) partial[row.collection] = [];
+                        partial[row.collection].push(row.data);
+                    }
+                });
+                return partial;
+            }
+
             // ── FIX PERFORMANCE-SYNC: aplica o arquivo de mídia (logo + fotos) ──
             // Sempre "última gravação vence" no nível do arquivo inteiro — como
             // esse arquivo só existe pra imagens, não há necessidade do merge
@@ -15105,27 +15234,160 @@ body.dark-mode,
                 return false;
             }
 
+            // ── Supabase: push/pull COMPLETOS (caminho tradicional) ───────────
+            // Usados diretamente quando DELTA_SYNC_ENABLED é false, e também
+            // como bootstrap/fallback do caminho delta abaixo.
+            async function _supabaseFullPush(storeId) {
+                const payload = _collectAllData();
+                // ── Compressão (aprovada): tenta comprimir o snapshot antes
+                // de enviar. Se falhar/não suportado, envia cru (formato
+                // antigo) — _supabaseFullPull/_sbSubscribeRealtime leem os dois.
+                const gz = await _gzipStringToBase64(JSON.stringify(payload));
+                const dataToSend = gz ? { _gz: 1, b: gz } : payload;
+                const { error } = await _sbClient.from('docs').upsert({
+                    store_id:   storeId,
+                    collection: '_cloudsync',
+                    doc_id:     'snapshot',
+                    data:       dataToSend,
+                    updated_at: new Date().toISOString()
+                }, { onConflict: 'store_id,collection,doc_id' });
+                if (error) throw error;
+                _lastPushTime = Date.now();
+            }
+
+            async function _supabaseFullPull(storeId, silent) {
+                const { data, error } = await _sbClient.from('docs')
+                    .select('data')
+                    .eq('store_id', storeId).eq('collection', '_cloudsync').eq('doc_id', 'snapshot')
+                    .maybeSingle();
+                if (error) throw error;
+                if (data && data.data) {
+                    const remote = await _decodeSyncSnapshot(data.data);
+                    await _withSyncLock('cloud:supabasePull', () => _applyCloudData(remote, silent));
+                }
+                _lastPullTime = Date.now();
+            }
+
+            // ── Supabase: push DELTA (Fase 2 aprovada) ─────────────────────────
+            async function _supabaseDeltaPush(storeId) {
+                const pushCursorKey = _lsDeltaPushTsKey('supabase');
+                const cursorIso = _lsGet(pushCursorKey);
+                if (!cursorIso) {
+                    // Bootstrap: primeira vez com delta ligado nesta loja — manda
+                    // o snapshot completo uma vez (igual ao push tradicional) e só
+                    // a partir daí passa a mandar apenas o que mudar. Evita uma
+                    // rajada de upserts individuais na ativação.
+                    await _supabaseFullPush(storeId);
+                    _lsSet(pushCursorKey, new Date().toISOString());
+                    return;
+                }
+
+                const { rows, maxTsIso } = _buildDeltaPushRows(cursorIso);
+
+                // Doc "meta" (empresa/config/usuários/financeiro manual etc.) —
+                // só incluído se algo nele mudou desde o último push (comparação
+                // por hash do JSON, barato e sem falso-negativo).
+                const metaDoc = _buildMetaDoc();
+                const metaJson = JSON.stringify(metaDoc);
+                const metaHashKey = _lsMetaHashKey('supabase');
+                const metaChanged = metaJson !== _lsGet(metaHashKey);
+                const nowIso = new Date().toISOString();
+                if (metaChanged) {
+                    rows.push({ collection: '_cloudsync', doc_id: 'meta', data: metaDoc, updated_at: nowIso });
+                }
+
+                if (rows.length) {
+                    const upsertRows = rows.map(r => ({ store_id: storeId, collection: r.collection, doc_id: r.doc_id, data: r.data, updated_at: r.updated_at }));
+                    const { error } = await _sbClient.from('docs').upsert(upsertRows, { onConflict: 'store_id,collection,doc_id' });
+                    if (error) throw error;
+                    if (metaChanged) _lsSet(metaHashKey, metaJson);
+                }
+
+                const nextCursor = (maxTsIso && maxTsIso > nowIso) ? maxTsIso : (rows.length ? nowIso : cursorIso);
+                _lsSet(pushCursorKey, nextCursor);
+                _lastPushTime = Date.now();
+
+                // Checkpoint periódico do snapshot completo (rede de segurança) —
+                // não sobe a cada push, só a cada FULL_SNAPSHOT_CHECKPOINT_MS.
+                const fsKey = _lsFullSnapshotTsKey('supabase');
+                const lastFs = _lsGet(fsKey);
+                if (!lastFs || (Date.now() - new Date(lastFs).getTime()) > FULL_SNAPSHOT_CHECKPOINT_MS) {
+                    try {
+                        await _supabaseFullPush(storeId);
+                        _lsSet(fsKey, new Date().toISOString());
+                    } catch(_e) { /* checkpoint é best-effort — não derruba o push delta por causa dele */ }
+                }
+            }
+
+            // ── Supabase: pull DELTA (Fase 2 aprovada) ─────────────────────────
+            async function _supabaseDeltaPull(storeId, silent) {
+                const pullCursorKey = _lsDeltaPullTsKey('supabase');
+                const cursorIso = _lsGet(pullCursorKey);
+                if (!cursorIso) {
+                    // Bootstrap: sem baseline ainda — pull COMPLETO tradicional
+                    // pra estabelecer o ponto de partida, e o cursor do delta
+                    // passa a valer a partir de agora.
+                    await _supabaseFullPull(storeId, silent);
+                    _lsSet(pullCursorKey, new Date().toISOString());
+                    return;
+                }
+
+                const DELTA_QUERY_LIMIT = 2000;
+                const { data: itemRows, error: err1 } = await _sbClient.from('docs')
+                    .select('collection,doc_id,data,updated_at')
+                    .eq('store_id', storeId)
+                    .in('collection', DELTA_COLS.concat(['_tombstone']))
+                    .gt('updated_at', cursorIso)
+                    .order('updated_at', { ascending: true })
+                    .limit(DELTA_QUERY_LIMIT);
+                if (err1) throw err1;
+
+                // Se bateu no limite, pode haver mais linhas alteradas do que
+                // trouxemos — mais seguro cair para um pull completo do que
+                // aplicar um lote parcial e avançar o cursor além da conta.
+                if (itemRows && itemRows.length >= DELTA_QUERY_LIMIT) {
+                    throw new Error('backlog de delta grande demais (' + itemRows.length + '+ linhas) — caindo para pull completo');
+                }
+
+                const { data: metaRow, error: err2 } = await _sbClient.from('docs')
+                    .select('collection,doc_id,data,updated_at')
+                    .eq('store_id', storeId).eq('collection', '_cloudsync').eq('doc_id', 'meta')
+                    .gt('updated_at', cursorIso)
+                    .maybeSingle();
+                if (err2) throw err2;
+
+                const allRows = (itemRows || []).slice();
+                if (metaRow) allRows.push(metaRow);
+
+                if (allRows.length) {
+                    const partial = _buildPartialRemoteFromRows(allRows);
+                    await _withSyncLock('cloud:supabaseDeltaPull', () => _applyCloudData(partial, true));
+                    const maxTs = allRows.reduce((m, r) => {
+                        const t = new Date(r.updated_at).getTime();
+                        return t > m ? t : m;
+                    }, new Date(cursorIso).getTime());
+                    _lsSet(pullCursorKey, new Date(maxTs).toISOString());
+                }
+                _lastPullTime = Date.now();
+            }
+
             async function supabasePush(silent) {
                 if (!_sbClient || !_sbUser) return;
                 if (_pushing) return;
                 _pushing = true;
                 try {
                     const storeId = window._currentStore || 'barueri';
-                    const payload = _collectAllData();
-                    // ── Compressão (aprovada): tenta comprimir o snapshot antes
-                    // de enviar. Se falhar/não suportado, envia cru (formato
-                    // antigo) — supabasePull/_sbSubscribeRealtime leem os dois.
-                    const gz = await _gzipStringToBase64(JSON.stringify(payload));
-                    const dataToSend = gz ? { _gz: 1, b: gz } : payload;
-                    const { error } = await _sbClient.from('docs').upsert({
-                        store_id:   storeId,
-                        collection: '_cloudsync',
-                        doc_id:     'snapshot',
-                        data:       dataToSend,
-                        updated_at: new Date().toISOString()
-                    }, { onConflict: 'store_id,collection,doc_id' });
-                    if (error) throw error;
-                    _lastPushTime = Date.now();
+                    if (DELTA_SYNC_ENABLED) {
+                        try {
+                            await _supabaseDeltaPush(storeId);
+                            if (!silent) Toast.show('☁️ Enviado ao Supabase', 'success', 2000);
+                            return;
+                        } catch(e) {
+                            console.warn('[CloudSync] delta push (Supabase) falhou, caindo para push completo:', e && e.message);
+                            // segue para o caminho completo abaixo (fallback)
+                        }
+                    }
+                    await _supabaseFullPush(storeId);
                     if (!silent) Toast.show('☁️ Enviado ao Supabase', 'success', 2000);
                 } catch(e) {
                     console.warn('[CloudSync] supabasePush falhou:', e.message);
@@ -15141,16 +15403,16 @@ body.dark-mode,
                 _pulling = true;
                 try {
                     const storeId = window._currentStore || 'barueri';
-                    const { data, error } = await _sbClient.from('docs')
-                        .select('data')
-                        .eq('store_id', storeId).eq('collection', '_cloudsync').eq('doc_id', 'snapshot')
-                        .maybeSingle();
-                    if (error) throw error;
-                    if (data && data.data) {
-                        const remote = await _decodeSyncSnapshot(data.data);
-                        await _withSyncLock('cloud:supabasePull', () => _applyCloudData(remote, silent));
+                    if (DELTA_SYNC_ENABLED) {
+                        try {
+                            await _supabaseDeltaPull(storeId, silent);
+                            return;
+                        } catch(e) {
+                            console.warn('[CloudSync] delta pull (Supabase) falhou, caindo para pull completo:', e && e.message);
+                            // segue para o caminho completo abaixo (fallback)
+                        }
                     }
-                    _lastPullTime = Date.now();
+                    await _supabaseFullPull(storeId, silent);
                 } catch(e) {
                     console.warn('[CloudSync] supabasePull falhou:', e.message);
                 } finally {
@@ -15356,10 +15618,36 @@ body.dark-mode,
                                 if (row.updated_at) localStorage.setItem(_lsMediaFingerprintKey('supabase'), row.updated_at);
                                 return;
                             }
+                            // ── Delta sync (Fase 2 aprovada): evento de uma linha
+                            // individual (item de coleção, tombstone ou meta) —
+                            // aplica só esse item via o mesmo merge parcial usado
+                            // no delta pull, sem precisar de ida-e-volta ao banco.
+                            if (DELTA_SYNC_ENABLED && row && row.data &&
+                                (DELTA_COLS.includes(row.collection) || row.collection === '_tombstone' ||
+                                 (row.collection === '_cloudsync' && row.doc_id === 'meta'))) {
+                                const partial = _buildPartialRemoteFromRows([row]);
+                                _withSyncLock('cloud:realtimeDelta', () => _applyCloudData(partial, true))
+                                    .then(() => {
+                                        const cursorKey = _lsDeltaPullTsKey('supabase');
+                                        const cur = _lsGet(cursorKey);
+                                        const rowTs = row.updated_at ? new Date(row.updated_at).getTime() : 0;
+                                        if (!cur || rowTs > new Date(cur).getTime()) _lsSet(cursorKey, new Date(rowTs).toISOString());
+                                    })
+                                    .catch(e => {
+                                        console.warn('[CloudSync] falha ao aplicar delta em tempo real, caindo para pull tradicional:', e && e.message);
+                                        supabasePull(true);
+                                    });
+                                _lastPullTime = Date.now();
+                                return;
+                            }
                         } catch(e) {
                             console.warn('[CloudSync] falha ao aplicar payload em tempo real, caindo para pull tradicional:', e && e.message);
                         }
-                        // Fallback (evento sem payload utilizável, DELETE, ou erro acima)
+                        // Fallback (evento sem payload utilizável, DELETE, formato
+                        // desconhecido, ou delta desligado — nesse caso os eventos
+                        // de coleção individual não deveriam ocorrer, mas se
+                        // ocorrerem por qualquer motivo, um pull tradicional
+                        // resolve com segurança)
                         supabasePull(true);
                         supabasePullMedia(true).catch(()=>{});
                     })
@@ -15431,6 +15719,25 @@ body.dark-mode,
                 const storeId = window._currentStore || 'barueri';
                 return (storeId + '_' + docId).replace(/[^a-zA-Z0-9_-]/g, '_').slice(0, 36);
             }
+            // ── Delta sync (Fase 2 aprovada): ID de documento para itens
+            // individuais (coleção + id do registro). Diferente de _awDocId
+            // (usado só para 'snapshot'/'media'), aqui a concatenação direta de
+            // storeId+collection+itemId pode passar de 36 chars e colidir se
+            // truncada — por isso usa um hash SHA-256 (mesmo padrão já usado em
+            // _hashDataUrl para mídia), com fallback simples se crypto.subtle
+            // não estiver disponível.
+            async function _awDeltaDocId(collection, itemId) {
+                const storeId = window._currentStore || 'barueri';
+                const str = storeId + '|' + collection + '|' + String(itemId);
+                try {
+                    const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(str));
+                    return 'd' + Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, '0')).join('').slice(0, 34);
+                } catch(_e) {
+                    let h = 0;
+                    for (let i = 0; i < str.length; i++) h = (h * 31 + str.charCodeAt(i)) | 0;
+                    return 'd' + Math.abs(h).toString(16) + (str.length % 1000).toString(16);
+                }
+            }
 
             function _awEnsureClient() {
                 return new Promise((resolve, reject) => {
@@ -15496,33 +15803,183 @@ body.dark-mode,
                 return false;
             }
 
+            // ── Appwrite: push/pull COMPLETOS (caminho tradicional) ────────────
+            async function _appwriteFullPush(storeId) {
+                const payload = _collectAllData();
+                // ── Compressão (aprovada): mesmo padrão do Supabase — prefixo
+                // "GZ1:" identifica payload comprimido; se a compressão
+                // falhar/não for suportada, envia o JSON cru (formato antigo).
+                const jsonStr = JSON.stringify(payload);
+                const gz = await _gzipStringToBase64(jsonStr);
+                const dataStr = gz ? ('GZ1:' + gz) : jsonStr;
+                const body = {
+                    store_id:   storeId,
+                    collection: '_cloudsync',
+                    doc_id:     'snapshot',
+                    data:       dataStr,
+                    updated_at: new Date().toISOString()
+                };
+                try {
+                    await _awDatabases.updateDocument(APPWRITE_DATABASE_ID, APPWRITE_COLLECTION_ID, _awDocId('snapshot'), body);
+                } catch(e) {
+                    // Documento ainda não existe (primeiro push desta loja) → cria.
+                    await _awDatabases.createDocument(APPWRITE_DATABASE_ID, APPWRITE_COLLECTION_ID, _awDocId('snapshot'), body);
+                }
+                _lastPushTime = Date.now();
+            }
+
+            async function _appwriteFullPull(silent) {
+                let doc = null;
+                try {
+                    doc = await _awDatabases.getDocument(APPWRITE_DATABASE_ID, APPWRITE_COLLECTION_ID, _awDocId('snapshot'));
+                } catch(e) {
+                    // 404 → nenhum snapshot enviado ainda por nenhum dispositivo desta loja
+                    doc = null;
+                }
+                if (doc && doc.data) {
+                    const parsed = await _decodeSyncSnapshotStr(doc.data);
+                    await _withSyncLock('cloud:appwritePull', () => _applyCloudData(parsed, silent));
+                }
+                _lastPullTime = Date.now();
+            }
+
+            // ── Appwrite: upsert de um documento individual (update, e se não
+            // existir ainda, cria) — mesmo padrão try/catch já usado no push
+            // completo, só que reaproveitado para cada linha de delta.
+            async function _awUpsertDoc(docId, body) {
+                try {
+                    await _awDatabases.updateDocument(APPWRITE_DATABASE_ID, APPWRITE_COLLECTION_ID, docId, body);
+                } catch(e) {
+                    await _awDatabases.createDocument(APPWRITE_DATABASE_ID, APPWRITE_COLLECTION_ID, docId, body);
+                }
+            }
+
+            // ── Appwrite: push DELTA (Fase 2 aprovada) ──────────────────────────
+            async function _appwriteDeltaPush(storeId) {
+                const pushCursorKey = _lsDeltaPushTsKey('appwrite');
+                const cursorIso = _lsGet(pushCursorKey);
+                if (!cursorIso) {
+                    // Bootstrap: primeira vez com delta ligado nesta loja — manda
+                    // o snapshot completo uma vez (evita uma rajada de dezenas/
+                    // centenas de createDocument individuais na ativação, já que
+                    // o SDK do Appwrite não tem upsert em lote).
+                    await _appwriteFullPush(storeId);
+                    _lsSet(pushCursorKey, new Date().toISOString());
+                    return;
+                }
+
+                const { rows, maxTsIso } = _buildDeltaPushRows(cursorIso);
+
+                const metaDoc = _buildMetaDoc();
+                const metaJson = JSON.stringify(metaDoc);
+                const metaHashKey = _lsMetaHashKey('appwrite');
+                const metaChanged = metaJson !== _lsGet(metaHashKey);
+                const nowIso = new Date().toISOString();
+                if (metaChanged) {
+                    rows.push({ collection: '_cloudsync', doc_id: 'meta', data: metaDoc, updated_at: nowIso });
+                }
+
+                if (rows.length) {
+                    // Appwrite não tem upsert em lote — cada linha alterada vira
+                    // uma chamada individual (update→create), em paralelo. Em
+                    // operação normal isso é só um punhado de itens por push
+                    // (debounce de 0.8s), então o custo é baixo.
+                    await Promise.all(rows.map(async r => {
+                        const docId = await _awDeltaDocId(r.collection, r.doc_id);
+                        const body = {
+                            store_id: storeId, collection: r.collection, doc_id: String(r.doc_id),
+                            data: JSON.stringify(r.data), updated_at: r.updated_at
+                        };
+                        await _awUpsertDoc(docId, body);
+                    }));
+                    if (metaChanged) _lsSet(metaHashKey, metaJson);
+                }
+
+                const nextCursor = (maxTsIso && maxTsIso > nowIso) ? maxTsIso : (rows.length ? nowIso : cursorIso);
+                _lsSet(pushCursorKey, nextCursor);
+                _lastPushTime = Date.now();
+
+                // Checkpoint periódico do snapshot completo (rede de segurança).
+                const fsKey = _lsFullSnapshotTsKey('appwrite');
+                const lastFs = _lsGet(fsKey);
+                if (!lastFs || (Date.now() - new Date(lastFs).getTime()) > FULL_SNAPSHOT_CHECKPOINT_MS) {
+                    try {
+                        await _appwriteFullPush(storeId);
+                        _lsSet(fsKey, new Date().toISOString());
+                    } catch(_e) { /* checkpoint é best-effort */ }
+                }
+            }
+
+            // ── Appwrite: pull DELTA (Fase 2 aprovada) ──────────────────────────
+            async function _appwriteDeltaPull(storeId, silent) {
+                const pullCursorKey = _lsDeltaPullTsKey('appwrite');
+                const cursorIso = _lsGet(pullCursorKey);
+                if (!cursorIso) {
+                    await _appwriteFullPull(silent);
+                    _lsSet(pullCursorKey, new Date().toISOString());
+                    return;
+                }
+
+                const { Query } = window.Appwrite;
+                const DELTA_QUERY_LIMIT = 1000; // limite de página do Appwrite
+
+                const itemsRes = await _awDatabases.listDocuments(APPWRITE_DATABASE_ID, APPWRITE_COLLECTION_ID, [
+                    Query.equal('store_id', storeId),
+                    Query.equal('collection', DELTA_COLS.concat(['_tombstone'])),
+                    Query.greaterThan('updated_at', cursorIso),
+                    Query.orderAsc('updated_at'),
+                    Query.limit(DELTA_QUERY_LIMIT)
+                ]);
+                const itemDocs = itemsRes.documents || [];
+                if (itemDocs.length >= DELTA_QUERY_LIMIT) {
+                    throw new Error('backlog de delta grande demais (' + itemDocs.length + '+ linhas) — caindo para pull completo');
+                }
+
+                const metaRes = await _awDatabases.listDocuments(APPWRITE_DATABASE_ID, APPWRITE_COLLECTION_ID, [
+                    Query.equal('store_id', storeId),
+                    Query.equal('collection', '_cloudsync'),
+                    Query.equal('doc_id', 'meta'),
+                    Query.greaterThan('updated_at', cursorIso),
+                    Query.limit(1)
+                ]);
+                const metaDoc = (metaRes.documents && metaRes.documents[0]) || null;
+
+                const allDocs = itemDocs.slice();
+                if (metaDoc) allDocs.push(metaDoc);
+
+                if (allDocs.length) {
+                    const normalized = allDocs.map(d => ({
+                        collection: d.collection, doc_id: d.doc_id,
+                        data: (typeof d.data === 'string') ? JSON.parse(d.data) : d.data,
+                        updated_at: d.updated_at
+                    }));
+                    const partial = _buildPartialRemoteFromRows(normalized);
+                    await _withSyncLock('cloud:appwriteDeltaPull', () => _applyCloudData(partial, true));
+                    const maxTs = allDocs.reduce((m, d) => {
+                        const t = new Date(d.updated_at).getTime();
+                        return t > m ? t : m;
+                    }, new Date(cursorIso).getTime());
+                    _lsSet(pullCursorKey, new Date(maxTs).toISOString());
+                }
+                _lastPullTime = Date.now();
+            }
+
             async function appwritePush(silent) {
                 if (!_awDatabases || !_awUser) return;
                 if (_pushing) return;
                 _pushing = true;
                 try {
                     const storeId = window._currentStore || 'barueri';
-                    const payload = _collectAllData();
-                    // ── Compressão (aprovada): mesmo padrão do Supabase — prefixo
-                    // "GZ1:" identifica payload comprimido; se a compressão
-                    // falhar/não for suportada, envia o JSON cru (formato antigo).
-                    const jsonStr = JSON.stringify(payload);
-                    const gz = await _gzipStringToBase64(jsonStr);
-                    const dataStr = gz ? ('GZ1:' + gz) : jsonStr;
-                    const body = {
-                        store_id:   storeId,
-                        collection: '_cloudsync',
-                        doc_id:     'snapshot',
-                        data:       dataStr,
-                        updated_at: new Date().toISOString()
-                    };
-                    try {
-                        await _awDatabases.updateDocument(APPWRITE_DATABASE_ID, APPWRITE_COLLECTION_ID, _awDocId('snapshot'), body);
-                    } catch(e) {
-                        // Documento ainda não existe (primeiro push desta loja) → cria.
-                        await _awDatabases.createDocument(APPWRITE_DATABASE_ID, APPWRITE_COLLECTION_ID, _awDocId('snapshot'), body);
+                    if (DELTA_SYNC_ENABLED) {
+                        try {
+                            await _appwriteDeltaPush(storeId);
+                            if (!silent) Toast.show('☁️ Enviado ao Appwrite', 'success', 2000);
+                            return;
+                        } catch(e) {
+                            console.warn('[CloudSync] delta push (Appwrite) falhou, caindo para push completo:', e && e.message);
+                        }
                     }
-                    _lastPushTime = Date.now();
+                    await _appwriteFullPush(storeId);
                     if (!silent) Toast.show('☁️ Enviado ao Appwrite', 'success', 2000);
                 } catch(e) {
                     console.warn('[CloudSync] appwritePush falhou:', e.message);
@@ -15537,18 +15994,16 @@ body.dark-mode,
                 if (_pulling) return;
                 _pulling = true;
                 try {
-                    let doc = null;
-                    try {
-                        doc = await _awDatabases.getDocument(APPWRITE_DATABASE_ID, APPWRITE_COLLECTION_ID, _awDocId('snapshot'));
-                    } catch(e) {
-                        // 404 → nenhum snapshot enviado ainda por nenhum dispositivo desta loja
-                        doc = null;
+                    const storeId = window._currentStore || 'barueri';
+                    if (DELTA_SYNC_ENABLED) {
+                        try {
+                            await _appwriteDeltaPull(storeId, silent);
+                            return;
+                        } catch(e) {
+                            console.warn('[CloudSync] delta pull (Appwrite) falhou, caindo para pull completo:', e && e.message);
+                        }
                     }
-                    if (doc && doc.data) {
-                        const parsed = await _decodeSyncSnapshotStr(doc.data);
-                        await _withSyncLock('cloud:appwritePull', () => _applyCloudData(parsed, silent));
-                    }
-                    _lastPullTime = Date.now();
+                    await _appwriteFullPull(silent);
                 } catch(e) {
                     console.warn('[CloudSync] appwritePull falhou:', e.message);
                 } finally {
@@ -15719,6 +16174,33 @@ body.dark-mode,
                                 if (row.collection === '_cloudsync' && row.doc_id === 'media' && row.data) {
                                     _withSyncLock('cloud:realtimeMediaAW', () => _applyMediaData(JSON.parse(row.data), true));
                                     if (row.updated_at) localStorage.setItem(_lsMediaFingerprintKey('appwrite'), row.updated_at);
+                                    return;
+                                }
+                                // ── Delta sync (Fase 2 aprovada): evento de um
+                                // documento individual (item de coleção,
+                                // tombstone ou meta) — aplica só esse item via o
+                                // mesmo merge parcial usado no delta pull.
+                                if (DELTA_SYNC_ENABLED && row.data &&
+                                    (DELTA_COLS.includes(row.collection) || row.collection === '_tombstone' ||
+                                     (row.collection === '_cloudsync' && row.doc_id === 'meta'))) {
+                                    const normalized = [{
+                                        collection: row.collection, doc_id: row.doc_id,
+                                        data: (typeof row.data === 'string') ? JSON.parse(row.data) : row.data,
+                                        updated_at: row.updated_at
+                                    }];
+                                    const partial = _buildPartialRemoteFromRows(normalized);
+                                    _withSyncLock('cloud:realtimeDeltaAW', () => _applyCloudData(partial, true))
+                                        .then(() => {
+                                            const cursorKey = _lsDeltaPullTsKey('appwrite');
+                                            const cur = _lsGet(cursorKey);
+                                            const rowTs = row.updated_at ? new Date(row.updated_at).getTime() : 0;
+                                            if (!cur || rowTs > new Date(cur).getTime()) _lsSet(cursorKey, new Date(rowTs).toISOString());
+                                        })
+                                        .catch(e => {
+                                            console.warn('[CloudSync] falha ao aplicar delta em tempo real (Appwrite), caindo para pull tradicional:', e && e.message);
+                                            appwritePull(true);
+                                        });
+                                    _lastPullTime = Date.now();
                                     return;
                                 }
                             } catch(e) {
