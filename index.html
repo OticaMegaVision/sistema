@@ -9163,7 +9163,7 @@ body.dark-mode,
                      na mesma versão do código. Atualizar manualmente a cada deploy. -->
                 <div id="buildWatermark" title="Versão do sistema (DDMMAAAAHHmm)"
                      style="position:fixed; right:8px; bottom:6px; z-index:9999; font-size:.85rem; font-family:monospace; color:rgba(0,0,0,.4); background:rgba(255,255,255,.6); padding:2px 6px; border-radius:6px; pointer-events:none; user-select:none;">
-                    versão 140820261458
+                    versão 140820260949
                 </div>
 
                 <!-- ===== navegação por segmentos (organização visual — mesma linguagem da amostra de Backup) ===== -->
@@ -13963,7 +13963,7 @@ body.dark-mode,
             //     tombstones), só alimentando ela com um objeto parcial em
             //     vez do snapshot inteiro.
             // ════════════════════════════════════════════════════════════════
-            const DELTA_SYNC_ENABLED = true; // ✅ ativado — fallback automático (merge + checkpoint de pull) validado nesta versão
+            const DELTA_SYNC_ENABLED = false; // ⚠️ ligar só após validar em uma loja piloto (ver relatório)
             // Coleções elegíveis para delta item-a-item — as mesmas já usadas
             // no merge genérico de _applyCloudData (cada item já carrega seu
             // próprio _updatedAt/updatedAt/updated_at).
@@ -15292,23 +15292,6 @@ body.dark-mode,
             }
 
             async function _supabaseFullPull(storeId, silent) {
-                // ✅ FIX ESTRUTURAL (full/delta lendo lugares diferentes): com o
-                // delta ativo, o push grava uma linha por item (collection: 'sales'
-                // etc.), mas o snapshot em '_cloudsync/snapshot' só é atualizado a
-                // cada checkpoint (5 min) — nunca na hora. Isso fazia o pull
-                // "completo" (usado no bootstrap, no fallback de erro do delta e
-                // no checkpoint periódico) ler dados potencialmente desatualizados
-                // bem no momento em que deveria estar corrigindo uma divergência.
-                // Com o delta ligado, o pull completo passa a reconstruir o remoto
-                // direto das MESMAS linhas individuais que o delta usa — a mesma
-                // fonte de verdade dos dois caminhos.
-                if (DELTA_SYNC_ENABLED) {
-                    const applied = await _supabaseFullPullFromRows(storeId, silent);
-                    if (applied) return;
-                    // Nenhuma linha individual encontrada (loja nunca sincronizou
-                    // em modo delta — só existe o snapshot legado). Cai para o
-                    // caminho antigo abaixo como bootstrap único.
-                }
                 const { data, error } = await _sbClient.from('docs')
                     .select('data')
                     .eq('store_id', storeId).eq('collection', '_cloudsync').eq('doc_id', 'snapshot')
@@ -15319,38 +15302,6 @@ body.dark-mode,
                     await _withSyncLock('cloud:supabasePull', () => _applyCloudData(remote, silent));
                 }
                 _lastPullTime = Date.now();
-            }
-
-            // ── Supabase: reconstrói o remoto a partir das linhas individuais
-            // (mesma fonte que o delta push escreve e o delta pull lê), em vez
-            // do snapshot consolidado. Pagina em lotes de 1000 linhas para
-            // suportar lojas com muitos registros. Retorna true se aplicou
-            // alguma linha (ou seja, se existe dado em formato delta pra essa
-            // loja); false se não encontrou nada (sinal pra cair no legado).
-            async function _supabaseFullPullFromRows(storeId, silent) {
-                const PAGE = 1000;
-                let from = 0;
-                const allRows = [];
-                while (true) {
-                    const { data, error } = await _sbClient.from('docs')
-                        .select('collection,doc_id,data,updated_at')
-                        .eq('store_id', storeId)
-                        .in('collection', DELTA_COLS.concat(['_tombstone', '_cloudsync']))
-                        .range(from, from + PAGE - 1);
-                    if (error) throw error;
-                    if (!data || !data.length) break;
-                    allRows.push.apply(allRows, data);
-                    if (data.length < PAGE) break;
-                    from += PAGE;
-                }
-                // '_cloudsync' só nos interessa pelo doc 'meta' (empresa/config/
-                // usuários); 'snapshot' e 'media' não são dados item-a-item.
-                const rows = allRows.filter(r => r.collection !== '_cloudsync' || r.doc_id === 'meta');
-                if (!rows.length) return false;
-                const partial = _buildPartialRemoteFromRows(rows);
-                await _withSyncLock('cloud:supabasePull', () => _applyCloudData(partial, silent));
-                _lastPullTime = Date.now();
-                return true;
             }
 
             // ── Supabase: push DELTA (Fase 2 aprovada) ─────────────────────────
@@ -15930,16 +15881,6 @@ body.dark-mode,
             }
 
             async function _appwriteFullPull(silent) {
-                // ✅ FIX ESTRUTURAL (mesma lacuna do Supabase): com o delta ativo,
-                // o pull "completo" deixa de depender do doc '_cloudsync/snapshot'
-                // (só atualizado a cada checkpoint) e reconstrói o remoto a partir
-                // das mesmas linhas individuais que o delta grava/lê.
-                if (DELTA_SYNC_ENABLED) {
-                    const applied = await _appwriteFullPullFromRows(silent);
-                    if (applied) return;
-                    // Sem linhas individuais (loja nunca sincronizou em modo
-                    // delta) — cai pro snapshot legado como bootstrap único.
-                }
                 let doc = null;
                 try {
                     doc = await _awDatabases.getDocument(APPWRITE_DATABASE_ID, APPWRITE_COLLECTION_ID, _awDocId('snapshot'));
@@ -15954,45 +15895,6 @@ body.dark-mode,
                 _lastPullTime = Date.now();
             }
 
-            // ── Appwrite: reconstrói o remoto a partir das linhas individuais
-            // (mesma fonte que o delta push/pull usa), paginando com
-            // cursorAfter. Retorna true se aplicou alguma linha; false se não
-            // encontrou nada (sinal pra cair no snapshot legado).
-            async function _appwriteFullPullFromRows(silent) {
-                const storeId = window._currentStore || 'barueri';
-                const { Query } = window.Appwrite;
-                const PAGE = 100; // limite padrão de página do Appwrite
-                const allDocs = [];
-                let cursor = null;
-                while (true) {
-                    const queries = [
-                        Query.equal('store_id', storeId),
-                        Query.equal('collection', DELTA_COLS.concat(['_tombstone', '_cloudsync'])),
-                        Query.limit(PAGE)
-                    ];
-                    if (cursor) queries.push(Query.cursorAfter(cursor));
-                    const res = await _awDatabases.listDocuments(APPWRITE_DATABASE_ID, APPWRITE_COLLECTION_ID, queries);
-                    const page = res.documents || [];
-                    if (!page.length) break;
-                    allDocs.push.apply(allDocs, page);
-                    if (page.length < PAGE) break;
-                    cursor = page[page.length - 1].$id;
-                }
-                // '_cloudsync' só nos interessa pelo doc 'meta'; 'snapshot'/'media'
-                // não são dados item-a-item.
-                const filtered = allDocs.filter(d => d.collection !== '_cloudsync' || d.doc_id === 'meta');
-                if (!filtered.length) return false;
-                const normalized = filtered.map(d => ({
-                    collection: d.collection, doc_id: d.doc_id,
-                    data: (typeof d.data === 'string') ? JSON.parse(d.data) : d.data,
-                    updated_at: d.updated_at
-                }));
-                const partial = _buildPartialRemoteFromRows(normalized);
-                await _withSyncLock('cloud:appwritePull', () => _applyCloudData(partial, silent));
-                _lastPullTime = Date.now();
-                return true;
-            }
-
             // ── Appwrite: upsert de um documento individual (update, e se não
             // existir ainda, cria) — mesmo padrão try/catch já usado no push
             // completo, só que reaproveitado para cada linha de delta.
@@ -16000,16 +15902,7 @@ body.dark-mode,
                 try {
                     await _awDatabases.updateDocument(APPWRITE_DATABASE_ID, APPWRITE_COLLECTION_ID, docId, body);
                 } catch(e) {
-                    // ✅ FIX RATE-LIMIT: só cai para createDocument quando o motivo
-                    // real é "documento não existe ainda" (404). Qualquer outro erro
-                    // (ex.: 429 rate limit) deve propagar — tentar criar em cima de
-                    // um 429 só dispara uma SEGUNDA chamada contra um endpoint que já
-                    // está sendo limitado, piorando o problema.
-                    if (e && e.code === 404) {
-                        await _awDatabases.createDocument(APPWRITE_DATABASE_ID, APPWRITE_COLLECTION_ID, docId, body);
-                    } else {
-                        throw e;
-                    }
+                    await _awDatabases.createDocument(APPWRITE_DATABASE_ID, APPWRITE_COLLECTION_ID, docId, body);
                 }
             }
 
