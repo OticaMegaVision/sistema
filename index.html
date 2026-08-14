@@ -9158,12 +9158,13 @@ body.dark-mode,
             <section id="config" class="section" aria-labelledby="pageTitle">
                 <h2 class="section-title">Configurações do Sistema</h2>
 
-                <!-- Marca d'água de versão/build — só números (dia/mês/ano/hora),
-                     usada para conferir se todos os dispositivos/navegadores estão
-                     na mesma versão do código. Atualizar manualmente a cada deploy. -->
+                <!-- Marca d'água de versão/build (DDMMAAAAHHmm) — usada para conferir
+                     se todos os dispositivos/navegadores estão na mesma versão do
+                     código. Este bloco é atualizado automaticamente pelo assistente
+                     sempre que o arquivo index.html é modificado. -->
                 <div id="buildWatermark" title="Versão do sistema (DDMMAAAAHHmm)"
-                     style="position:fixed; right:8px; bottom:6px; z-index:9999; font-size:.85rem; font-family:monospace; color:rgba(0,0,0,.4); background:rgba(255,255,255,.6); padding:2px 6px; border-radius:6px; pointer-events:none; user-select:none;">
-                    versão 140820260949
+                     style="position:fixed; right:10px; bottom:8px; z-index:9999; display:flex; align-items:center; gap:6px; font-size:1rem; font-weight:700; font-family:'Segoe UI',system-ui,monospace; letter-spacing:.02em; color:#fff; background:linear-gradient(135deg,#1f2937,#374151); padding:6px 12px; border-radius:10px; box-shadow:0 4px 14px rgba(0,0,0,.25); border:1px solid rgba(255,255,255,.08); pointer-events:none; user-select:none;">
+                    <i class="fas fa-code-branch" style="font-size:.85rem; opacity:.75;"></i> v140820261739
                 </div>
 
                 <!-- ===== navegação por segmentos (organização visual — mesma linguagem da amostra de Backup) ===== -->
