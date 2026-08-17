@@ -9589,7 +9589,7 @@ body.dark-mode,
                                 <div class="bkp-status-ic" style="background:#f3f0ff;color:#7c3aed;"><i class="fas fa-code-branch"></i></div>
                                 <div class="txt">
                                     <b>Versão do sistema</b>
-                                    <span>versão <strong>140820261739</strong></span>
+                                    <span>versão <strong>170820262022</strong></span>
                                 </div>
                             </div>
                         </div>
@@ -12982,41 +12982,35 @@ body.dark-mode,
             // FIX PERFORMANCE-SYNC 3: guarda a "impressão digital" (modifiedTime no
             // Drive, eTag no OneDrive) do último pull do arquivo de mídia bem-sucedido.
             function _lsMediaFingerprintKey(provider) { return 'cs_' + provider + '_media_fp_' + (window._currentStore || 'barueri'); }
+            // ✅ FIX EGRESS (relatório aprovado): mesmo padrão do fingerprint de
+            // mídia acima, agora também pro snapshot de DADOS (clientes/vendas/
+            // produtos etc.) — evita rebaixar o JSON completo a cada poll quando
+            // nada mudou desde o último pull bem-sucedido.
+            function _lsFullPullFingerprintKey(provider) { return 'cs_' + provider + '_data_fp_' + (window._currentStore || 'barueri'); }
             function _lsPullTsKey()         { return 'cs_last_pull_ts_' + (window._currentStore || 'barueri'); }
-            // REAL-TIME SYNC: polling adaptativo (5s ativo / 45s background)
-            // ✅ FIX: a UI (aba Backup) anuncia "5s ⚡ REAL-TIME" mas o código
-            // estava configurado para 15s — corrigido para bater com o texto
-            // mostrado ao usuário e reduzir o atraso de propagação entre
-            // dispositivos (ex: dar baixa em Contas a Pagar no celular e ver
-            // atualizar no PC sem precisar dar F5).
-            const POLL_ACTIVE_MS          = 5000;   // ✅ CORRIGIDO: 15s → 5s (bate com o texto "sync a cada 5s" da UI)
-            const POLL_BACKGROUND_MS      = 15000;  // ✅ REDUZIDO: 45s → 15s em background (aba oculta) — ainda evita gasto excessivo de bateria/dados, mas sincroniza bem mais rápido
+            // REAL-TIME SYNC: polling adaptativo — INTERVALO POR PROVEDOR
+            // ✅ FIX EGRESS (relatório aprovado): Supabase/Appwrite já têm Realtime
+            // via websocket cobrindo updates instantâneos, então o polling deles
+            // é só rede de segurança — reduzido para 20s/60s. Google Drive/OneDrive
+            // NÃO têm Realtime — o polling É o mecanismo principal de sync pra eles,
+            // então continuam em 5s/15s (valores originais, sem alteração de egress
+            // aqui pois a API do Drive/OneDrive não é o alvo do relatório).
+            const POLL_ACTIVE_MS_DRIVE     = 5000;   // Google Drive / OneDrive — mantido (sem Realtime)
+            const POLL_BACKGROUND_MS_DRIVE = 15000;  // Google Drive / OneDrive — mantido (sem Realtime)
+            const POLL_ACTIVE_MS_CLOUD     = 20000;  // Supabase / Appwrite — reduzido de 5s (têm Realtime)
+            const POLL_BACKGROUND_MS_CLOUD = 60000;  // Supabase / Appwrite — reduzido de 15s (têm Realtime)
+            // Compatibilidade: mantidos como "genéricos" apontando pro par mais
+            // conservador (Drive/OneDrive) — só usados em textos de UI que não
+            // sabem ainda qual provedor está ativo; o polling de verdade usa
+            // _pollActiveMs()/_pollBackgroundMs() abaixo, que resolvem por provedor.
+            const POLL_ACTIVE_MS          = POLL_ACTIVE_MS_DRIVE;
+            const POLL_BACKGROUND_MS      = POLL_BACKGROUND_MS_DRIVE;
             const POLL_INTERVAL_MS        = POLL_ACTIVE_MS;
             const PUSH_DEBOUNCE_MS        = 800;     // push 0.8s após última mudança
-            // Imagens mudam raramente — não precisam do poll de 5s. Um poll
-            // mais espaçado evita baixar fotos de produtos repetidamente sem
-            // necessidade, mas ainda propaga uma foto nova rapidamente.
-            // FIX PERFORMANCE-SYNC 3: antes 45s. Como o pull de mídia agora checa
-            // só metadados (modifiedTime/eTag) antes de baixar o arquivo inteiro,
-            // um intervalo mais curto passa a ser barato — a maioria dos ciclos
-            // faz apenas uma consulta pequena, sem baixar nada.
-            // FIX SYNC-LOGO-LENTO: reduzido de 15s → 7s (ativo) e de 120s → 45s
-            // (segundo plano). Motivo: o logo/fotos ficavam perceptivelmente
-            // atrasados em relação aos dados "quentes" (empresa/clientes/vendas,
-            // que sincronizam a cada 5s) — o nome da empresa atualizava quase na
-            // hora, mas o logo demorava até 15s (ou 2 minutos com a aba em
-            // segundo plano) para aparecer no outro aparelho. Como o pull de
-            // mídia continua barato (checa só metadados antes de baixar o
-            // arquivo inteiro), esse intervalo menor não pesa no tráfego.
-            // ✅ FASE 3: com o Realtime agora aplicando o payload diretamente (ver
-            // _sbSubscribeRealtime) e reconectando sozinho, esse poll deixou de ser
-            // o caminho principal pro Supabase — virou só uma rede de segurança
-            // pros casos em que o Realtime não está disponível (Drive/OneDrive, ou
-            // alguma falha de rede pontual). Por isso dá pra igualar ao poll dos
-            // dados "quentes" sem custo real: a checagem continua leve (só
-            // updated_at antes de baixar o JSON completo).
-            const MEDIA_POLL_ACTIVE_MS    = POLL_ACTIVE_MS;      // 5s — mesmo ritmo dos dados quentes
-            const MEDIA_POLL_BACKGROUND_MS = POLL_BACKGROUND_MS; // 15s — mesmo ritmo dos dados quentes
+            // Imagens acompanham o mesmo ritmo dos dados "quentes" por provedor —
+            // ambos fazem checagem leve antes de baixar o arquivo/JSON completo.
+            function _pollActiveMs()     { return (_activeProvider === 'supabase' || _activeProvider === 'appwrite') ? POLL_ACTIVE_MS_CLOUD     : POLL_ACTIVE_MS_DRIVE; }
+            function _pollBackgroundMs() { return (_activeProvider === 'supabase' || _activeProvider === 'appwrite') ? POLL_BACKGROUND_MS_CLOUD : POLL_BACKGROUND_MS_DRIVE; }
 
             let _gdriveToken    = null;
             let _onedriveToken  = null;
@@ -14844,7 +14838,7 @@ body.dark-mode,
                     _lastPushTime = Date.now();
                     _syncCount++;
                     localStorage.setItem('cs_gdrive_last_push', new Date().toISOString());
-                    _updateStatus('🟢 Enviado às ' + now + ' — polling a cada ' + (POLL_ACTIVE_MS/1000) + 's');
+                    _updateStatus('🟢 Enviado às ' + now + ' — polling a cada ' + (POLL_ACTIVE_MS_DRIVE/1000) + 's');
                     _showSyncIndicator('↑ Salvo ' + now);
                     if (!silent) Toast.show('✅ Dados enviados ao Google Drive!', 'success', 2000);
                     _clearPendingPush(); // ✅ RETRY: sucesso — cancela qualquer retentativa agendada
@@ -15294,6 +15288,22 @@ body.dark-mode,
             }
 
             async function _supabaseFullPull(storeId, silent) {
+                // ✅ FIX EGRESS (relatório aprovado): checagem leve — só o
+                // updated_at — antes de baixar o snapshot completo (que pode
+                // ser grande). Mesma técnica já usada no pull de mídia. Como
+                // isso roda a cada poll (5s antes, agora bem menos frequente),
+                // pular o download quando nada mudou é o maior ganho de egress.
+                const fpKey = _lsFullPullFingerprintKey('supabase');
+                const { data: meta, error: metaErr } = await _sbClient.from('docs')
+                    .select('updated_at')
+                    .eq('store_id', storeId).eq('collection', '_cloudsync').eq('doc_id', 'snapshot')
+                    .maybeSingle();
+                if (metaErr) throw metaErr;
+                if (!meta) { _lastPullTime = Date.now(); return; } // nenhum snapshot enviado ainda
+                if (meta.updated_at && meta.updated_at === localStorage.getItem(fpKey)) {
+                    _lastPullTime = Date.now();
+                    return; // nada mudou desde o último pull completo
+                }
                 const { data, error } = await _sbClient.from('docs')
                     .select('data')
                     .eq('store_id', storeId).eq('collection', '_cloudsync').eq('doc_id', 'snapshot')
@@ -15303,6 +15313,7 @@ body.dark-mode,
                     const remote = await _decodeSyncSnapshot(data.data);
                     await _withSyncLock('cloud:supabasePull', () => _applyCloudData(remote, silent));
                 }
+                if (meta.updated_at) localStorage.setItem(fpKey, meta.updated_at);
                 _lastPullTime = Date.now();
             }
 
@@ -15883,6 +15894,22 @@ body.dark-mode,
             }
 
             async function _appwriteFullPull(silent) {
+                // ✅ FIX EGRESS (relatório aprovado): mesma ideia do Supabase —
+                // tenta buscar só o campo updated_at primeiro (Query.select) pra
+                // decidir se vale a pena baixar o documento inteiro. Se esta
+                // versão do SDK não suportar Query.select aqui, cai sem erro
+                // pro comportamento anterior (sempre baixa completo).
+                const fpKey = _lsFullPullFingerprintKey('appwrite');
+                try {
+                    const { Query } = window.Appwrite;
+                    const meta = await _awDatabases.getDocument(APPWRITE_DATABASE_ID, APPWRITE_COLLECTION_ID, _awDocId('snapshot'), [Query.select(['updated_at'])]);
+                    if (meta && meta.updated_at && meta.updated_at === localStorage.getItem(fpKey)) {
+                        _lastPullTime = Date.now();
+                        return; // nada mudou desde o último pull completo
+                    }
+                } catch(e) {
+                    // 404, ou select não suportado nesta versão do SDK — segue pro pull completo abaixo
+                }
                 let doc = null;
                 try {
                     doc = await _awDatabases.getDocument(APPWRITE_DATABASE_ID, APPWRITE_COLLECTION_ID, _awDocId('snapshot'));
@@ -15894,6 +15921,7 @@ body.dark-mode,
                     const parsed = await _decodeSyncSnapshotStr(doc.data);
                     await _withSyncLock('cloud:appwritePull', () => _applyCloudData(parsed, silent));
                 }
+                if (doc && doc.updated_at) localStorage.setItem(fpKey, doc.updated_at);
                 _lastPullTime = Date.now();
             }
 
@@ -16309,30 +16337,30 @@ body.dark-mode,
             }
 
             // ════════════════════════════════════════════════════════════════
-            //  POLLING ADAPTATIVO — 5s quando a aba está ativa, 15s em background
-            //  (valores confirmados em 05/08/2026 — ver POLL_ACTIVE_MS/POLL_BACKGROUND_MS)
+            //  POLLING ADAPTATIVO — intervalo por provedor (ver _pollActiveMs/
+            //  _pollBackgroundMs): 5s/15s pra Drive/OneDrive (sem Realtime),
+            //  20s/60s pra Supabase/Appwrite (têm Realtime — polling é só
+            //  rede de segurança). Resolvido a cada tick, então acompanha
+            //  corretamente se o provedor ativo mudar em runtime.
             // ════════════════════════════════════════════════════════════════
             function _startPolling() {
                 _stopPolling();
                 function _tick() {
                     if (document.visibilityState !== 'hidden') _silentPull();
-                    const next = document.visibilityState === 'hidden' ? POLL_BACKGROUND_MS : POLL_ACTIVE_MS;
+                    const next = document.visibilityState === 'hidden' ? _pollBackgroundMs() : _pollActiveMs();
                     _pollTimer = setTimeout(_tick, next);
                 }
-                _pollTimer = setTimeout(_tick, POLL_ACTIVE_MS);
-                console.log('[CloudSync] ✅ Polling adaptativo iniciado (ativo:' + POLL_ACTIVE_MS/1000 + 's / bg:' + POLL_BACKGROUND_MS/1000 + 's)');
+                _pollTimer = setTimeout(_tick, _pollActiveMs());
+                console.log('[CloudSync] ✅ Polling adaptativo iniciado (ativo:' + _pollActiveMs()/1000 + 's / bg:' + _pollBackgroundMs()/1000 + 's)');
 
-                // ⚠️ NOTA 05/08/2026: este comentário dizia que a mídia sincroniza
-                // "mais espaçada" que os dados — não é mais verdade. MEDIA_POLL_ACTIVE_MS
-                // e MEDIA_POLL_BACKGROUND_MS foram igualados a POLL_ACTIVE_MS/POLL_BACKGROUND_MS
-                // (ver declaração das constantes) para o logo/fotos chegarem no mesmo
-                // ritmo dos dados "quentes" — ambos giram a 5s ativo / 15s background.
+                // Mídia (logo/fotos) acompanha o mesmo ritmo por provedor dos
+                // dados "quentes" acima.
                 function _mediaTick() {
                     if (document.visibilityState !== 'hidden') _pullMediaNow(true);
-                    const next = document.visibilityState === 'hidden' ? MEDIA_POLL_BACKGROUND_MS : MEDIA_POLL_ACTIVE_MS;
+                    const next = document.visibilityState === 'hidden' ? _pollBackgroundMs() : _pollActiveMs();
                     _mediaPollTimer = setTimeout(_mediaTick, next);
                 }
-                _mediaPollTimer = setTimeout(_mediaTick, MEDIA_POLL_ACTIVE_MS);
+                _mediaPollTimer = setTimeout(_mediaTick, _pollActiveMs());
                 // Puxa a mídia (logo/fotos) uma vez já no início, sem esperar o
                 // primeiro intervalo — importante para um dispositivo novo, que
                 // ainda não tem nenhuma imagem localmente.
@@ -16561,8 +16589,8 @@ body.dark-mode,
                 if (awTag) { awTag.textContent = awOk ? 'Conectado' : 'Desconectado'; awTag.className = 'bkp-tag ' + (awOk ? 'bkp-tag-on' : 'bkp-tag-off'); }
                 const status = document.getElementById('cloudSyncStatus');
                 if (status) {
-                    if (gOk)       status.textContent = '🟢 Google Drive — sync em tempo real ativo (' + POLL_ACTIVE_MS/1000 + 's ativo / ' + POLL_BACKGROUND_MS/1000 + 's bg)';
-                    else if (oOk)  status.textContent = '🟢 OneDrive — sync em tempo real ativo (' + POLL_ACTIVE_MS/1000 + 's ativo / ' + POLL_BACKGROUND_MS/1000 + 's bg)';
+                    if (gOk)       status.textContent = '🟢 Google Drive — sync em tempo real ativo (' + POLL_ACTIVE_MS_DRIVE/1000 + 's ativo / ' + POLL_BACKGROUND_MS_DRIVE/1000 + 's bg)';
+                    else if (oOk)  status.textContent = '🟢 OneDrive — sync em tempo real ativo (' + POLL_ACTIVE_MS_DRIVE/1000 + 's ativo / ' + POLL_BACKGROUND_MS_DRIVE/1000 + 's bg)';
                     else if (sOk)  status.textContent = '🟢 Supabase — sync em tempo real (Realtime + fallback de polling)';
                     else if (awOk) status.textContent = '🟢 Appwrite — sync em tempo real (Realtime + fallback de polling)';
                     else           status.textContent = '⚫ Nenhum provedor conectado — dados apenas locais';
@@ -16575,7 +16603,7 @@ body.dark-mode,
                         _syncActivoShown = true;
                         _ensureWidget();
                         const w = document.getElementById('cs_rt_widget');
-                        _updateWidget('ok', 'Sync ativo (' + POLL_ACTIVE_MS/1000 + 's)');
+                        _updateWidget('ok', 'Sync ativo (' + _pollActiveMs()/1000 + 's)');
                         if (w) { w.style.transition = 'opacity 0.3s'; w.style.opacity = '1'; }
                         setTimeout(() => {
                             if (w) { w.style.transition = 'opacity 1.5s'; w.style.opacity = '0'; }
@@ -19260,9 +19288,17 @@ body.dark-mode,
         }
 
         // getSquareLogo — converte logo para quadrado via canvas (html2canvas nao suporta object-fit)
+        // ✅ FIX LENTIDÃO-PDF: antes, todo PDF (OS/comprovante/promissória/carnê)
+        // refazia o recorte quadrado da logo do zero — decodifica imagem,
+        // redesenha em canvas, reconverte pra base64 — mesmo sendo a MESMA logo
+        // de sempre. Agora o resultado fica em cache em memória por (logo+tamanho)
+        // e só é recalculado quando a logo realmente muda.
+        const _squareLogoCache = {};
         async function getSquareLogo(logoSrc, sizePx) {
             sizePx = sizePx || 200;
             if (!logoSrc) return null;
+            const cacheKey = sizePx + '_' + logoSrc;
+            if (_squareLogoCache[cacheKey]) return _squareLogoCache[cacheKey];
             return new Promise(function(resolve) {
                 var img = new Image();
                 img.onload = function() {
@@ -19273,11 +19309,31 @@ body.dark-mode,
                     var sx = (img.naturalWidth - side) / 2;
                     var sy = (img.naturalHeight - side) / 2;
                     ctx.drawImage(img, sx, sy, side, side, 0, 0, sizePx, sizePx);
-                    resolve(canvas.toDataURL('image/png'));
+                    const out = canvas.toDataURL('image/png');
+                    _squareLogoCache[cacheKey] = out;
+                    resolve(out);
                 };
                 img.onerror = function() { resolve(logoSrc); };
                 img.src = logoSrc;
             });
+        }
+
+        // ✅ FIX BUG PDF-SEM-DADOS-DA-EMPRESA: LocalFirst.sync() (disparado ao
+        // trocar de seção, focar a aba, polling de 30s etc.) zera state.company
+        // para {} por um instante antes de repreencher de forma assíncrona
+        // (ver comentário em LocalFirst._fetchAllData). Se o usuário clicar em
+        // "Gerar PDF"/"Comprovante" bem nessa janela, o documento saía sem nome/
+        // endereço/logo da empresa — bug intermitente, mais visível quanto mais
+        // sync roda em segundo plano. Esta função guarda a última cópia válida
+        // (com .name preenchido) e a usa como fallback sempre que state.company
+        // estiver vazio no momento exato da geração do PDF.
+        function _getCompanyForDoc() {
+            const c = state.company;
+            if (c && c.name) {
+                window._lastGoodCompany = { ...c };
+                return c;
+            }
+            return window._lastGoodCompany || c || {};
         }
 
         // ═══════════════════════════════════════════════════════════════════
@@ -21159,7 +21215,7 @@ tbody tr td{border:1.5px solid #000;padding:2mm;text-align:center;font-weight:70
 
             enviarMsgAniversario(clientId) {
                 const client  = state.clients.find(c => c.id === clientId);
-                const company = state.company;
+                const company = _getCompanyForDoc();
                 if (!client) return;
 
                 const phone = (client.whatsapp || client.phone || '').replace(/\D/g, '');
@@ -21281,7 +21337,7 @@ tbody tr td{border:1.5px solid #000;padding:2mm;text-align:center;font-weight:70
             enviarMsgOculosVencido(saleId) {
                 const sale    = state.sales.find(s => s.id === saleId);
                 const client  = state.clients.find(c => c.id === sale?.clientId);
-                const company = state.company;
+                const company = _getCompanyForDoc();
                 if (!sale || !client) return;
 
                 const phone = (client.whatsapp || client.phone || '').replace(/\D/g, '');
@@ -26101,7 +26157,7 @@ tbody tr td{border:1.5px solid #000;padding:2mm;text-align:center;font-weight:70
                     Toast.show('Gere um relatório antes de imprimir', 'warning');
                     return;
                 }
-                const company = state.company;
+                const company = _getCompanyForDoc();
                 const titulo  = document.getElementById('reportType')?.options[document.getElementById('reportType')?.selectedIndex]?.text || 'Relatório';
                 const data    = new Date().toLocaleDateString('pt-BR', { day:'2-digit', month:'2-digit', year:'numeric', hour:'2-digit', minute:'2-digit' });
 
@@ -28658,7 +28714,7 @@ ${container.innerHTML}
                 const client  = state.clients.find(c => c.id === sale?.clientId);
                 const presc   = state.prescriptions?.find(p => p.clientId === client?.id);
                 const details = sale?.paymentDetails;
-                const company = state.company;
+                const company = _getCompanyForDoc();
                 const squareLogo = await getSquareLogo(company.logo, 200);
 
                 if (!sale) { Toast.show('Nenhuma OS selecionada.', 'error'); return; }
@@ -28945,7 +29001,7 @@ ${container.innerHTML}
                 const client = state.clients.find(c => c.id === state.currentSale.clientId);
                 const sale = state.currentSale;
                 const details = state.currentSale.paymentDetails;
-                const company = state.company;
+                const company = _getCompanyForDoc();
                 const squareLogo = await getSquareLogo(company.logo, 200);
 
                 if (!details) {
@@ -29167,7 +29223,7 @@ ${container.innerHTML}
                 const sale    = state._pdfSale || state.currentSale;
                 const client  = state.clients.find(c => c.id === sale.clientId);
                 const details = sale.paymentDetails;
-                const company = state.company;
+                const company = _getCompanyForDoc();
                 const squareLogo = await getSquareLogo(company.logo, 200);
                 // Limpa o alvo temporário após uso
                 state._pdfSale = null;
@@ -29347,7 +29403,7 @@ ${container.innerHTML}
                 const client  = state.clients.find(c => c.id === state.currentSale.clientId);
                 const sale    = state.currentSale;
                 const details = state.currentSale.paymentDetails;
-                const company = state.company;
+                const company = _getCompanyForDoc();
                 const squareLogo = await getSquareLogo(company.logo, 200);
 
                 if (!details) {
@@ -29495,7 +29551,7 @@ ${container.innerHTML}
             enviarStatusPedidoWhatsApp(saleId) {
                 const sale    = state.sales.find(s => s.id === saleId);
                 const client  = state.clients.find(c => c.id === sale?.clientId);
-                const company = state.company;
+                const company = _getCompanyForDoc();
 
                 if (!sale)   { Toast.show('Venda não encontrada', 'error');   return; }
                 if (!client) { Toast.show('Cliente não encontrado', 'error'); return; }
@@ -29550,7 +29606,7 @@ ${container.innerHTML}
                 if (!sale?.id) {
                     // Se for a OS atual (não salva ainda), usa clientId do currentSale
                     const client  = state.clients.find(c => c.id === state.currentSale.clientId);
-                    const company = state.company;
+                    const company = _getCompanyForDoc();
                     if (!client) { Toast.show('Selecione um cliente primeiro', 'warning'); return; }
                     const phone = (client.whatsapp || client.phone || '').replace(/\D/g, '');
                     if (!phone) { Toast.show('Cliente sem WhatsApp/telefone', 'warning'); return; }
@@ -29667,7 +29723,7 @@ ${container.innerHTML}
                 if (!phone) { Toast.show('Cliente não possui WhatsApp/telefone cadastrado', 'warning'); return; }
 
                 const presc   = state.prescriptions.find(p => p.clientId === clientTarget.id);
-                const company = state.company;
+                const company = _getCompanyForDoc();
                 const fmt     = v => v || '—';
                 const endereco = [company.address, company.number ? ', ' + company.number : '', company.city ? ' — ' + company.city : '', company.state ? '/' + company.state : ''].filter(Boolean).join('');
 
@@ -29726,7 +29782,7 @@ ${container.innerHTML}
                 const client  = state.clients.find(c => c.id === state.currentSale.clientId);
                 const sale    = state.currentSale;
                 const details = state.currentSale.paymentDetails;
-                const company = state.company;
+                const company = _getCompanyForDoc();
 
                 if (!client) { Toast.show('Selecione um cliente primeiro', 'warning'); return; }
                 if (!details) { Toast.show('Calcule as parcelas primeiro', 'warning'); return; }
