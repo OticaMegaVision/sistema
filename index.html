@@ -9589,7 +9589,7 @@ body.dark-mode,
                                 <div class="bkp-status-ic" style="background:#f3f0ff;color:#7c3aed;"><i class="fas fa-code-branch"></i></div>
                                 <div class="txt">
                                     <b>Versão do sistema</b>
-                                    <span>versão <strong>180820262017</strong></span>
+                                    <span>versão <strong>190820261728</strong></span>
                                 </div>
                             </div>
                         </div>
@@ -18856,6 +18856,15 @@ body.dark-mode,
             if (_pdfTab) {
                 try { _pdfTab.document.write('<title>Gerando PDF…</title><body style="font-family:Arial,sans-serif;display:flex;align-items:center;justify-content:center;height:100vh;margin:0;color:#666">Gerando PDF, aguarde…</body>'); } catch(_e) {}
             }
+            // ✅ FIX BUG PDF-TRAVADO-EM-ABA-SECUNDÁRIA: window.open() costuma
+            // levar o foco pra aba nova — só que quem faz o trabalho pesado
+            // (html2canvas, jsPDF, os awaits abaixo) é a ABA ORIGINAL (esta
+            // aqui), não a aba em branco. Navegador com a aba original em
+            // segundo plano desacelera (throttling) os timers/renderização
+            // dela — por isso "não acontecia nada" na aba nova e só
+            // avançava ao voltar o foco pro sistema. Puxando o foco de volta
+            // pra cá agora, a geração roda em primeiro plano do início ao fim.
+            try { window.focus(); } catch(_e) {}
             if (!window.jspdf || !window.html2canvas) {
                 const ok = await new Promise(resolve => window._ensurePDF(resolve));
                 if (!ok) {
@@ -18956,6 +18965,15 @@ body.dark-mode,
             if (_pdfTab) {
                 try { _pdfTab.document.write('<title>Gerando PDF…</title><body style="font-family:Arial,sans-serif;display:flex;align-items:center;justify-content:center;height:100vh;margin:0;color:#666">Gerando PDF, aguarde…</body>'); } catch(_e) {}
             }
+            // ✅ FIX BUG PDF-TRAVADO-EM-ABA-SECUNDÁRIA: window.open() costuma
+            // levar o foco pra aba nova — só que quem faz o trabalho pesado
+            // (html2canvas, jsPDF, os awaits abaixo) é a ABA ORIGINAL (esta
+            // aqui), não a aba em branco. Navegador com a aba original em
+            // segundo plano desacelera (throttling) os timers/renderização
+            // dela — por isso "não acontecia nada" na aba nova e só
+            // avançava ao voltar o foco pro sistema. Puxando o foco de volta
+            // pra cá agora, a geração roda em primeiro plano do início ao fim.
+            try { window.focus(); } catch(_e) {}
             if (!window.jspdf || !window.html2canvas) {
                 const ok = await new Promise(resolve => window._ensurePDF(resolve));
                 if (!ok) {
@@ -19022,6 +19040,15 @@ body.dark-mode,
             if (_pdfTab) {
                 try { _pdfTab.document.write('<title>Gerando PDF…</title><body style="font-family:Arial,sans-serif;display:flex;align-items:center;justify-content:center;height:100vh;margin:0;color:#666">Gerando PDF, aguarde…</body>'); } catch(_e) {}
             }
+            // ✅ FIX BUG PDF-TRAVADO-EM-ABA-SECUNDÁRIA: window.open() costuma
+            // levar o foco pra aba nova — só que quem faz o trabalho pesado
+            // (html2canvas, jsPDF, os awaits abaixo) é a ABA ORIGINAL (esta
+            // aqui), não a aba em branco. Navegador com a aba original em
+            // segundo plano desacelera (throttling) os timers/renderização
+            // dela — por isso "não acontecia nada" na aba nova e só
+            // avançava ao voltar o foco pro sistema. Puxando o foco de volta
+            // pra cá agora, a geração roda em primeiro plano do início ao fim.
+            try { window.focus(); } catch(_e) {}
             if (!window.jspdf || !window.html2canvas) {
                 const ok = await new Promise(resolve => window._ensurePDF(resolve));
                 if (!ok) {
