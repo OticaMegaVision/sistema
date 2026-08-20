@@ -12934,8 +12934,8 @@ body.dark-mode,
             // ── Supabase — terceiro provedor de sync (Fase 2 da migração) ─────
             // ⚠️ CONFIRME: a URL abaixo é a mesma usada na Edge Function acima.
             // Se o projeto do schema (Fase 1) for outro, troque as duas linhas.
-            const SUPABASE_URL      = 'http://supabasekong-zgoe0jxdlcntxvvkvak8jciy.147.15.39.31.sslip.io';
-            const SUPABASE_ANON_KEY = 'eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJzdXBhYmFzZSIsImlhdCI6MTc4NzE4Nzc4MCwiZXhwIjo0OTQyODYxMzgwLCJyb2xlIjoiYW5vbiJ9.IEbbwy6Q_U6FDkhG2g4TxKe493SF4lsL-UQhw9mSBqQ'; // Project Settings → API → anon public (self-hosted)
+            const SUPABASE_URL      = 'https://qhscxyistzlmxxnjrqao.supabase.co';
+            const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFoc2N4eWlzdHpsbXh4bmpycWFvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzE4NTQzOTMsImV4cCI6MjA4NzQzMDM5M30.xrhD08N1PcOVAMdA0vovxbHOHrcSdqIYkJWw4K6G13w'; // Project Settings → API → anon public
             // ── Appwrite — quarto provedor de sync (adicionado sem tocar em
             // Drive/OneDrive/Supabase) ─────────────────────────────────────
             // ⚠️ CONFIGURE: preencha com os dados do seu projeto Appwrite
@@ -12948,10 +12948,10 @@ body.dark-mode,
             // Permissões da Collection: leitura/escrita para "users" (qualquer
             // usuário autenticado) — cada loja compartilha o mesmo projeto,
             // isolada por store_id, igual ao Supabase.
-            const APPWRITE_ENDPOINT      = 'http://appwrite-p7a7jad8iwyeldz088fogugq.147.15.39.31.sslip.io/v1'; // self-hosted
-            const APPWRITE_PROJECT_ID    = '6a86673f002a0eaa523d';
-            const APPWRITE_DATABASE_ID   = '6a8667ec0019861b1150';
-            const APPWRITE_COLLECTION_ID = '6a8668e5001488e35aa4';
+            const APPWRITE_ENDPOINT      = 'https://tor.cloud.appwrite.io/v1'; // região Toronto
+            const APPWRITE_PROJECT_ID    = '6a7b4d98000ed291fcfb';
+            const APPWRITE_DATABASE_ID   = '6a7b4dc9003b04a4351b';
+            const APPWRITE_COLLECTION_ID = 'claud_sync';
             // ── STORAGE DE MÍDIA (economia de egress) ─────────────────────────
             // ⚠️ CONFIGURE antes de usar: crie o bucket no console do Supabase
             // Storage (nome abaixo, leitura pública, CORS liberando a origem do
@@ -12961,7 +12961,7 @@ body.dark-mode,
             // envio cai automaticamente no formato antigo (base64 embutido no
             // documento) — nada quebra, só não economiza egress ainda.
             const SUPABASE_MEDIA_BUCKET  = 'oticamegavision-media';
-            const APPWRITE_MEDIA_BUCKET_ID = '6a866db800391152ac81';
+            const APPWRITE_MEDIA_BUCKET_ID = 'media';
             // ── FIX MULTI-LOJA: arquivo separado por loja ────────────────────
             // Cada loja tem seu próprio arquivo no Drive para evitar sobreposição
             // de dados entre Barueri e Caucaia do Alto.
