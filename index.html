@@ -9589,7 +9589,7 @@ body.dark-mode,
                                 <div class="bkp-status-ic" style="background:#f3f0ff;color:#7c3aed;"><i class="fas fa-code-branch"></i></div>
                                 <div class="txt">
                                     <b>Versão do sistema</b>
-                                    <span>versão <strong>190820261728</strong></span>
+                                    <span>versão <strong>200820261951</strong></span>
                                 </div>
                             </div>
                         </div>
@@ -18843,6 +18843,27 @@ body.dark-mode,
             return window._lastGoodCompany || c || {};
         }
 
+        // ✅ FIX LENTIDÃO-PDF-OS (relatório aprovado): captura um bloco de HTML
+        // isolado (ex: 1 via da OS, ou a faixa de corte) na sua própria altura
+        // real — muito mais leve que capturar duas vias completas coladas numa
+        // única chamada de html2canvas. Usada para montar "Ambas as vias" a
+        // partir de 3 capturas pequenas em vez de 1 grande.
+        async function _capturarBlocoIsolado(htmlContent, larguraMM, alturaMM) {
+            const wrapper = document.createElement('div');
+            wrapper.style.cssText = `width:${larguraMM}mm;height:${alturaMM}mm;overflow:hidden;background:#fff;`;
+            wrapper.innerHTML = htmlContent;
+            const container = _criarContainerPDF(wrapper, larguraMM);
+            await new Promise(r => setTimeout(r, PDF_CONFIG.RENDER_DELAY));
+            const { PX_PER_MM } = PDF_CONFIG;
+            const pxW = Math.round(larguraMM * PX_PER_MM);
+            const pxH = Math.round(alturaMM * PX_PER_MM);
+            try {
+                return await _capturarCanvas(wrapper, { larguraMM, width: pxW, height: pxH });
+            } finally {
+                if (document.body.contains(container)) document.body.removeChild(container);
+            }
+        }
+
         // ═══════════════════════════════════════════════════════════════════
         // gerarPDF — A4, com paginação automática, máxima qualidade
         // ═══════════════════════════════════════════════════════════════════
@@ -18882,8 +18903,15 @@ body.dark-mode,
             const PAGE_H_PX = Math.round(PAGE_H_MM * PX_PER_MM);
 
             _showPDFLoading('Gerando PDF\u2026 aguarde');
-            const container = _criarContainerPDF(elemento, PAGE_W_MM);
-            await new Promise(r => setTimeout(r, RENDER_DELAY));
+            // ✅ FIX LENTIDÃO-PDF-OS: quando opcoes.preCapturedCanvas vem pronto
+            // (ex: "Ambas as vias" da OS, montado a partir de capturas menores
+            // e mais rápidas — ver _capturarBlocoIsolado), pula a criação do
+            // container e a captura pesada do elemento inteiro.
+            let container = null;
+            if (!opcoes.preCapturedCanvas) {
+                container = _criarContainerPDF(elemento, PAGE_W_MM);
+                await new Promise(r => setTimeout(r, RENDER_DELAY));
+            }
 
             try {
                 // forceHeight: usa PAGE_H_PX exato (OS via individual).
@@ -18907,8 +18935,9 @@ body.dark-mode,
                 pdf.setProperties({ title: nomeArquivo, creator: 'ÓticaVision Pro' });
 
                 // Captura ÚNICA — fatia por página sem re-renderizar o DOM
+                // (ou usa o canvas já pronto, se veio de fora — ver acima).
                 const captureH = opcoes.forceHeight ? PAGE_H_PX : totalH_px;
-                const fullCanvas = await _capturarCanvas(elemento, {
+                const fullCanvas = opcoes.preCapturedCanvas || await _capturarCanvas(elemento, {
                     larguraMM: PAGE_W_MM, width: PAGE_W_PX, height: captureH
                 });
                 if (pagesNeeded === 1) {
@@ -28268,7 +28297,7 @@ ${container.innerHTML}
                 // ── Logo: posicionamento absoluto para html2canvas ──
                 const logoHtml = squareLogo
                     ? `<img src="${squareLogo}" width="100%" height="100%" style="display:block;border-radius:50%;">`
-                    : '<span style="font-size:16px;line-height:1;display:block;text-align:center;">👁️</span>';
+                    : '<span style="font-size:11px;font-weight:900;line-height:1;display:block;text-align:center;color:#999;">LOGO</span>';
 
                 // ── Dados da Armação (referência/grife/cor/tipo + medidas) ──
                 // Reaproveita o mesmo estilo visual do bloco os-receita-extra —
@@ -28290,7 +28319,7 @@ ${container.innerHTML}
                           <span>Vertical: <strong>${mm(m.vertical)}</strong></span>
                         </div>`;
                     }).join('');
-                    return `<div class="os-section-title">🕶️ Dados da Armação</div>${rows}`;
+                    return `<div class="os-section-title">Dados da Armação</div>${rows}`;
                 };
 
                 // ── Receituário ──
@@ -28299,7 +28328,7 @@ ${container.innerHTML}
                     const hasAdd = parseFloat(presc.od?.add) > 0 || parseFloat(presc.oe?.add) > 0;
                     return `
                     <div class="os-receita-section">
-                      <div class="os-section-title">📋 Receituário Óptico</div>
+                      <div class="os-section-title">Receituário Óptico</div>
                       <table class="os-receita-table">
                         <colgroup><col style="width:8%"><col style="width:11%"><col style="width:14%"><col style="width:13%"><col style="width:11%"><col style="width:13%"><col style="width:13%"></colgroup>
                         <thead><tr><th>Olho</th><th>Tipo</th><th>ESF</th><th>CIL</th><th>EIXO</th><th>ADIÇÃO</th><th>DNP</th></tr></thead>
@@ -28337,8 +28366,8 @@ ${container.innerHTML}
                           <div class="os-pagamento-cell"><span>1º Vencimento</span><strong>${details.parcels?.[0] ? fd(details.parcels[0].dueDate) : '—'}</strong></div>
                           <div class="os-pagamento-cell"><span>Multa / Juros</span><strong>${company.lateFee||0}% + ${company.dailyInterest||0}%/dia</strong></div>
                         </div>
-                        ${retirada > 0 ? `<div class="os-pagamento-pix">💰 Valor na Retirada: <strong>${fc(retirada)}</strong></div>` : ''}
-                        ${company.pixKey||company.cnpj ? `<div class="os-pagamento-pix">🔑 PIX — Chave: <strong>${company.pixKey||company.cnpj}</strong></div>` : ''}`;
+                        ${retirada > 0 ? `<div class="os-pagamento-pix">Valor na Retirada: <strong>${fc(retirada)}</strong></div>` : ''}
+                        ${company.pixKey||company.cnpj ? `<div class="os-pagamento-pix">PIX — Chave: <strong>${company.pixKey||company.cnpj}</strong></div>` : ''}`;
                     }
 
                     // ── Pagamento duplo (2 formas)
@@ -28352,7 +28381,7 @@ ${container.innerHTML}
                           ${dualLabels}
                           <div class="os-pagamento-cell"><span>Total</span><strong>${fc(sale.total)}</strong></div>
                         </div>
-                        ${company.pixKey||company.cnpj ? `<div class="os-pagamento-pix">🔑 PIX — Chave: <strong>${company.pixKey||company.cnpj}</strong></div>` : ''}`;
+                        ${company.pixKey||company.cnpj ? `<div class="os-pagamento-pix">PIX — Chave: <strong>${company.pixKey||company.cnpj}</strong></div>` : ''}`;
                     }
 
                     // ── Pagamento misto (múltiplas formas)
@@ -28373,7 +28402,7 @@ ${container.innerHTML}
                           <div class="os-pagamento-cell"><span>Desconto aplicado</span><strong>${discPct}%</strong></div>
                           ${retirada > 0 ? `<div class="os-pagamento-cell"><span>Saldo na Retirada</span><strong>${fc(retirada)}</strong></div>` : `<div class="os-pagamento-cell"><span>Status</span><strong>À Vista</strong></div>`}
                         </div>
-                        ${company.pixKey||company.cnpj ? `<div class="os-pagamento-pix">🔑 PIX — Chave: <strong>${company.pixKey||company.cnpj}</strong></div>` : ''}`;
+                        ${company.pixKey||company.cnpj ? `<div class="os-pagamento-pix">PIX — Chave: <strong>${company.pixKey||company.cnpj}</strong></div>` : ''}`;
                     }
 
                     // ── Dinheiro com desconto aplicado
@@ -28398,12 +28427,12 @@ ${container.innerHTML}
                       ${installments > 1 ? `<div class="os-pagamento-cell"><span>Parcelas Cartão</span><strong>${installments}×</strong></div>` : `<div class="os-pagamento-cell"><span>Status</span><strong>À Vista</strong></div>`}
                       ${retirada > 0 ? `<div class="os-pagamento-cell"><span>Saldo na Retirada</span><strong>${fc(retirada)}</strong></div>` : ''}
                     </div>
-                    ${company.pixKey||company.cnpj ? `<div class="os-pagamento-pix">🔑 PIX — Chave: <strong>${company.pixKey||company.cnpj}</strong></div>` : ''}`;
+                    ${company.pixKey||company.cnpj ? `<div class="os-pagamento-pix">PIX — Chave: <strong>${company.pixKey||company.cnpj}</strong></div>` : ''}`;
                 };
 
                 // ── Endereço empresa ──
                 const empEnd = [company.address, company.number, company.neighborhood, company.city, company.state].filter(Boolean).join(', ') + (company.cep ? ' — CEP: ' + company.cep : '');
-                const empContatos = `${company.phone ? '📞 ' + company.phone + ' &nbsp; ' : ''}${company.whatsapp ? '📱 ' + company.whatsapp + ' &nbsp; ' : ''}${company.email ? '✉️ ' + company.email : ''}`;
+                const empContatos = `${company.phone ? 'Tel: ' + company.phone + ' &nbsp; ' : ''}${company.whatsapp ? 'WhatsApp: ' + company.whatsapp + ' &nbsp; ' : ''}${company.email ? 'E-mail: ' + company.email : ''}`;
 
                 // ═══════════════════════════════════════
                 // buildVia — monta HTML exato do modelo
@@ -28522,12 +28551,42 @@ ${container.innerHTML}
 
                 } else {
                     // Ambas — A4 297mm (144mm+9mm corte+144mm)
-                    const wrapper = document.createElement('div');
-                    wrapper.className = 'os-pdf-wrapper uma-folha';
-                    const corteHtml = `<div class="os-corte"><div class="os-corte-linha"></div>✂️ &nbsp; RECORTE AQUI — 2ª VIA DO CLIENTE &nbsp; ✂️<div class="os-corte-linha"></div></div>`;
-                    wrapper.innerHTML = buildVia('1ª VIA — LOJA', true, true, '144mm') + corteHtml + buildVia('2ª VIA — CLIENTE', false, true, '144mm');
-                    wrapper.style.cssText = 'width:210mm;height:297mm;overflow:hidden;display:flex;flex-direction:column;background:#fff;';
-                    gerarPDF(wrapper, `OS_${sale.number}_ambas`, { pageWidth:210, pageHeight:297, forceHeight:true, preview:true });
+                    // ✅ FIX LENTIDÃO-PDF-OS (relatório aprovado): antes, as duas
+                    // vias completas iam coladas num único elemento pra UMA
+                    // captura de html2canvas — processando o dobro do conteúdo
+                    // de uma vez (cabeçalho, cliente, receituário, itens,
+                    // assinaturas — tudo duplicado). Agora cada via é capturada
+                    // separadamente (mais leve/rápida) e as duas imagens são
+                    // coladas numa única página do PDF — resultado impresso
+                    // idêntico a antes, 1 página, mesma linha de corte no meio.
+                    const corteHtml = `<div class="os-corte"><div class="os-corte-linha"></div>RECORTE AQUI — 2ª VIA DO CLIENTE<div class="os-corte-linha"></div></div>`;
+                    const via1Html = buildVia('1ª VIA — LOJA', true, true, '144mm');
+                    const via2Html = buildVia('2ª VIA — CLIENTE', false, true, '144mm');
+
+                    const { PX_PER_MM, SCALE } = PDF_CONFIG;
+                    const pageWmm = 210, pageHmm = 297, corteMm = 9, viaMm = 144;
+                    const pageWpx = Math.round(pageWmm * PX_PER_MM * SCALE);
+                    const pageHpx = Math.round(pageHmm * PX_PER_MM * SCALE);
+                    const viaHpx  = Math.round(viaMm  * PX_PER_MM * SCALE);
+
+                    const [canvasVia1, canvasCorte, canvasVia2] = await Promise.all([
+                        _capturarBlocoIsolado(via1Html, pageWmm, viaMm),
+                        _capturarBlocoIsolado(corteHtml, pageWmm, corteMm),
+                        _capturarBlocoIsolado(via2Html, pageWmm, viaMm)
+                    ]);
+
+                    const merged = document.createElement('canvas');
+                    merged.width = pageWpx;
+                    merged.height = pageHpx;
+                    const mctx = merged.getContext('2d');
+                    mctx.fillStyle = '#ffffff';
+                    mctx.fillRect(0, 0, pageWpx, pageHpx);
+                    mctx.drawImage(canvasVia1, 0, 0, pageWpx, viaHpx);
+                    mctx.drawImage(canvasCorte, 0, viaHpx, pageWpx, pageHpx - viaHpx * 2);
+                    mctx.drawImage(canvasVia2, 0, pageHpx - viaHpx, pageWpx, viaHpx);
+
+                    const dummyWrapper = document.createElement('div');
+                    gerarPDF(dummyWrapper, `OS_${sale.number}_ambas`, { pageWidth:210, pageHeight:297, forceHeight:true, preview:true, preCapturedCanvas: merged });
                 }
             },
 
