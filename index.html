@@ -4186,13 +4186,13 @@
         }
         .carne-talao-page:last-child { page-break-after: avoid; }
 
-        /* Cada parcela ocupa 55mm de altura */
+        /* Cada parcela ocupa 57mm de altura (aumentada após remover cabeçalho/rodapé) */
         .carne-parcela {
             width: 210mm;
             box-sizing: border-box;
             border-top: 2px solid #000;
             display: flex;
-            height: 48mm;
+            height: 57mm;
             overflow: hidden;
             page-break-inside: avoid;
         }
@@ -9589,7 +9589,7 @@ body.dark-mode,
                                 <div class="bkp-status-ic" style="background:#f3f0ff;color:#7c3aed;"><i class="fas fa-code-branch"></i></div>
                                 <div class="txt">
                                     <b>Versão do sistema</b>
-                                    <span>versão <strong>210820260038</strong></span>
+                                    <span>versão <strong>210820262028</strong></span>
                                 </div>
                             </div>
                         </div>
@@ -29021,12 +29021,14 @@ ${container.innerHTML}
                         </div>
                     </div>`;
 
-                // ── Montar páginas (5 parcelas cada) ─────────────────────────
+                // ── Montar páginas (5 parcelas cada, sem cabeçalho/rodapé) ────
+                // ✅ FIX CARNÊ SEM CABEÇALHO/RODAPÉ (modelo aprovado): removido
+                // o cabeçalho (empresa/logo/número) e o totalizador de cada
+                // folha — agora só as parcelas, ocupando toda a página.
                 const parcelas = details.parcels;
                 let paginasHtml = '';
                 for (let i = 0; i < parcelas.length; i += PARCELAS_POR_PAG) {
                     const grupo = parcelas.slice(i, i + PARCELAS_POR_PAG);
-                    const isUltimaPag = (i + PARCELAS_POR_PAG) >= parcelas.length;
                     const parcelasHtml = grupo.map((p, gi) => {
                         const isLastInGrupo = gi === grupo.length - 1;
                         return buildParcela(p, isLastInGrupo);
@@ -29034,9 +29036,7 @@ ${container.innerHTML}
 
                     paginasHtml += `
                         <div class="carne-talao-page">
-                            ${buildCabecalho()}
                             ${parcelasHtml}
-                            ${isUltimaPag ? buildTotalizador() : ''}
                         </div>`;
                 }
 
