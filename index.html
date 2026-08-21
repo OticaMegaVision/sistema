@@ -18865,20 +18865,23 @@ body.dark-mode,
         }
 
         // ═══════════════════════════════════════════════════════════════════
-        // _imprimirOS — impressão nativa da OS (sem screenshot, sem nova aba)
-        // ✅ FIX LENTIDÃO-PDF-OS (relatório aprovado): a OS usava html2canvas
-        // pra "fotografar" o HTML inteiro e depois montar um PDF com essa
-        // imagem — essa captura era a etapa mais lenta do processo, e ainda
-        // abria uma segunda aba (necessário pra evitar bloqueio de pop-up
-        // enquanto o PDF era gerado). Agora a própria OS (que já tem CSS de
-        // impressão pronto) é entregue direto pro navegador imprimir, dentro
-        // de um iframe oculto na MESMA aba — sem captura de tela nenhuma.
-        // O navegador abre o diálogo nativo de impressão, onde a pessoa
-        // escolhe "Salvar como PDF" (se quiser o arquivo) ou manda direto
-        // pra impressora. Resultado visual idêntico ao de antes (mesmo
-        // HTML/CSS), só que muito mais rápido e sem aba extra.
+        // _imprimirDocumento — impressão nativa genérica (sem screenshot,
+        // sem nova aba) usada pela OS, Promissória, Carnê e Comprovante.
+        // ✅ FIX LENTIDÃO-PDF (relatório aprovado, estendido a todos os
+        // documentos que usavam o mesmo fluxo html2canvas+jsPDF): a captura
+        // de tela era a etapa mais lenta e ainda exigia abrir uma segunda
+        // aba (pra não ser bloqueada pelo navegador enquanto processava).
+        // Agora o próprio HTML/CSS do documento (que já é usado na tela e
+        // já tem estilo de impressão pronto) é entregue direto pro
+        // navegador imprimir, dentro de um iframe oculto na MESMA aba —
+        // sem captura de tela nenhuma. O navegador abre o diálogo nativo
+        // de impressão, onde a pessoa escolhe "Salvar como PDF" ou manda
+        // direto pra impressora. Resultado visual idêntico ao de antes.
+        // pageCss: string com a regra @page (tamanho/margem da página) —
+        // ex.: '@page { size: A4; margin: 0; }' ou '@page { size: 80mm auto; margin: 0; }'
         // ═══════════════════════════════════════════════════════════════════
-        function _imprimirOS(htmlConteudo, tituloDocumento) {
+        function _imprimirDocumento(htmlConteudo, tituloDocumento, pageCss) {
+            pageCss = pageCss || '@page { size: A4; margin: 0; }';
             const antigo = document.getElementById('_osPrintFrame');
             if (antigo) antigo.remove();
 
@@ -18892,7 +18895,7 @@ body.dark-mode,
             const doc = iframe.contentWindow.document;
             doc.open();
             doc.write(`<!DOCTYPE html><html><head><title>${tituloDocumento}</title><style>
-                @page { size: A4; margin: 0; }
+                ${pageCss}
                 html,body { margin:0; padding:0; background:#fff; }
                 ${_cssCache}
                 * { -webkit-print-color-adjust:exact!important; print-color-adjust:exact!important; font-family:Arial,Helvetica,sans-serif!important; }
@@ -18914,7 +18917,7 @@ body.dark-mode,
                         iframe.contentWindow.focus();
                         iframe.contentWindow.print();
                     } catch (e) {
-                        console.error('[Impressão OS] Erro:', e);
+                        console.error('[Impressão] Erro:', e);
                         Toast.show('Erro ao abrir impressão: ' + e.message, 'error');
                         limpar();
                         return;
@@ -18924,6 +18927,11 @@ body.dark-mode,
                     setTimeout(limpar, 60000);
                 }, 150);
             };
+        }
+
+        // Wrapper mantido por compatibilidade com as chamadas da OS (A4 padrão)
+        function _imprimirOS(htmlConteudo, tituloDocumento) {
+            _imprimirDocumento(htmlConteudo, tituloDocumento, '@page { size: A4; margin: 0; }');
         }
 
         // ═══════════════════════════════════════════════════════════════════
@@ -28840,10 +28848,10 @@ ${container.innerHTML}
                     </div>
                 `;
 
-                const elemento = document.createElement('div');
-                elemento.innerHTML = html;
-                elemento.className = 'promissoria-pdf';
-                gerarPDF(elemento, `PROMISSORIA_${sale.number}`);
+                // ✅ FIX LENTIDÃO-PDF (mesma correção aplicada na OS): impressão
+                // nativa em vez de html2canvas+jsPDF — sem captura de tela, sem 2ª aba.
+                const conteudo = `<div class="promissoria-pdf">${html}</div>`;
+                _imprimirDocumento(conteudo, `PROMISSORIA_${sale.number}`, '@page { size: A4; margin: 0; }');
             },
 
             async gerarPDF_Carne() {
@@ -29015,18 +29023,12 @@ ${container.innerHTML}
                         </div>`;
                 }
 
-                const el = document.createElement('div');
-                el.innerHTML = paginasHtml;
-
-                // Injetar CSS do carnê no elemento para renderização correta
-                const style = document.createElement('style');
-                style.textContent = Array.from(document.styleSheets)
-                    .flatMap(s => { try { return Array.from(s.cssRules).map(r => r.cssText); } catch(e){ return []; } })
-                    .filter(r => r.includes('carne-') || r.includes('carne'))
-                    .join('\n');
-                el.prepend(style);
-
-                gerarPDF(el, `CARNE_${sale.number}`, { preview: true });
+                // ✅ FIX LENTIDÃO-PDF (mesma correção aplicada na OS): impressão
+                // nativa em vez de html2canvas+jsPDF — sem captura de tela, sem
+                // 2ª aba. A quebra entre páginas do carnê já é feita pelo CSS
+                // (.carne-talao-page { page-break-after: always }), então o
+                // navegador pagina sozinho — não precisa mais montar canvas.
+                _imprimirDocumento(paginasHtml, `CARNE_${sale.number}`, '@page { size: A4; margin: 0; }');
             },
             async gerarPDF_Comprovante(parcelaIndex) {
                 const client  = state.clients.find(c => c.id === state.currentSale.clientId);
@@ -29160,20 +29162,11 @@ ${container.innerHTML}
                     </div>
                 `;
 
-                // Monta elemento com largura real de 80mm — PDF no tamanho exato do conteúdo
-                const el = document.createElement('div');
-                el.innerHTML = html;
-
-                // Injetar CSS do comprovante
-                const style = document.createElement('style');
-                style.textContent = Array.from(document.styleSheets)
-                    .flatMap(s => { try { return Array.from(s.cssRules).map(r => r.cssText); } catch(e){ return []; } })
-                    .filter(r => r.includes('comp-') || r.includes('comprovante'))
-                    .join('\n');
-                el.prepend(style);
-
-                // PDF no tamanho real: largura 80mm, altura = conteúdo real
-                gerarPDFTamanhoReal(el, `COMPROVANTE_OS${sale.number}_P${parcela.number}`, 80);
+                // ✅ FIX LENTIDÃO-PDF (mesma correção aplicada na OS): impressão
+                // nativa em vez de html2canvas+jsPDF — sem captura de tela, sem
+                // 2ª aba. Página no tamanho real do cupom: 80mm de largura,
+                // altura automática de acordo com o conteúdo.
+                _imprimirDocumento(html, `COMPROVANTE_OS${sale.number}_P${parcela.number}`, '@page { size: 80mm auto; margin: 0; }');
             },
 
             // ── WhatsApp: enviar status do pedido para o cliente ──
