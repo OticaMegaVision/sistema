@@ -18865,6 +18865,68 @@ body.dark-mode,
         }
 
         // ═══════════════════════════════════════════════════════════════════
+        // _imprimirOS — impressão nativa da OS (sem screenshot, sem nova aba)
+        // ✅ FIX LENTIDÃO-PDF-OS (relatório aprovado): a OS usava html2canvas
+        // pra "fotografar" o HTML inteiro e depois montar um PDF com essa
+        // imagem — essa captura era a etapa mais lenta do processo, e ainda
+        // abria uma segunda aba (necessário pra evitar bloqueio de pop-up
+        // enquanto o PDF era gerado). Agora a própria OS (que já tem CSS de
+        // impressão pronto) é entregue direto pro navegador imprimir, dentro
+        // de um iframe oculto na MESMA aba — sem captura de tela nenhuma.
+        // O navegador abre o diálogo nativo de impressão, onde a pessoa
+        // escolhe "Salvar como PDF" (se quiser o arquivo) ou manda direto
+        // pra impressora. Resultado visual idêntico ao de antes (mesmo
+        // HTML/CSS), só que muito mais rápido e sem aba extra.
+        // ═══════════════════════════════════════════════════════════════════
+        function _imprimirOS(htmlConteudo, tituloDocumento) {
+            const antigo = document.getElementById('_osPrintFrame');
+            if (antigo) antigo.remove();
+
+            const iframe = document.createElement('iframe');
+            iframe.id = '_osPrintFrame';
+            iframe.style.cssText = 'position:fixed;right:0;bottom:0;width:0;height:0;border:0;visibility:hidden;';
+            document.body.appendChild(iframe);
+
+            if (!_cssCache) _cssCache = _coletarTodosCSS();
+
+            const doc = iframe.contentWindow.document;
+            doc.open();
+            doc.write(`<!DOCTYPE html><html><head><title>${tituloDocumento}</title><style>
+                @page { size: A4; margin: 0; }
+                html,body { margin:0; padding:0; background:#fff; }
+                ${_cssCache}
+                * { -webkit-print-color-adjust:exact!important; print-color-adjust:exact!important; font-family:Arial,Helvetica,sans-serif!important; }
+                .os-receita-table thead,.os-itens-table thead { background:#d0d0d0 !important; }
+                .os-receita-table th,.os-itens-table th { background:#d0d0d0 !important; color:#000 !important; padding:0.8mm 1mm !important; font-size:7.5px !important; letter-spacing:0 !important; white-space:nowrap !important; border:1.5px solid #000 !important; font-weight:900 !important; }
+                .os-receita-table td,.os-itens-table td { color:#000 !important; padding:0.8mm 1mm !important; font-size:7.5px !important; border:1.5px solid #000 !important; font-weight:900 !important; }
+                .os-itens-table tr:hover td { background:transparent !important; }
+                .os-itens-table tr:last-child td,.os-receita-table tr:last-child td { border-bottom:1.5px solid #000 !important; }
+                .os-olho-label { background:#bbb !important; color:#000 !important; font-weight:900 !important; }
+                .os-section-title { color:#000 !important; background:#d8d8d8 !important; border-bottom:2px solid #000 !important; border-top:1.5px solid #000 !important; font-weight:900 !important; }
+            </style></head><body>${htmlConteudo}</body></html>`);
+            doc.close();
+
+            const limpar = () => { if (document.body.contains(iframe)) document.body.removeChild(iframe); };
+
+            iframe.onload = () => {
+                setTimeout(() => {
+                    try {
+                        iframe.contentWindow.focus();
+                        iframe.contentWindow.print();
+                    } catch (e) {
+                        console.error('[Impressão OS] Erro:', e);
+                        Toast.show('Erro ao abrir impressão: ' + e.message, 'error');
+                        limpar();
+                        return;
+                    }
+                    try { iframe.contentWindow.addEventListener('afterprint', limpar); } catch(e) {}
+                    // Fallback de segurança caso 'afterprint' não dispare em algum navegador
+                    setTimeout(limpar, 60000);
+                }, 150);
+            };
+        }
+
+        // ═══════════════════════════════════════════════════════════════════
         // gerarPDF — A4, com paginação automática, máxima qualidade
         // ═══════════════════════════════════════════════════════════════════
         async function gerarPDF(elemento, nomeArquivo, opcoes = {}) {
@@ -28535,86 +28597,32 @@ ${container.innerHTML}
                     </div>`;
                 };
 
-                // ── Montar wrapper e gerar PDF ──
-                // via1/via2 usam exatamente o mesmo modelo compacto de "ambas"
-                // (mesmo flex, mesma altura inline garantida), só muda pageHeight do PDF
+                // ── Montar e imprimir (nativo, sem screenshot, sem nova aba) ──
+                // ✅ FIX LENTIDÃO-PDF-OS (relatório aprovado): trocado o fluxo
+                // html2canvas+jsPDF pela impressão nativa do navegador — ver
+                // _imprimirOS() acima. Isso elimina a etapa de captura de tela
+                // (a mais lenta do processo) e não abre mais nenhuma aba; o
+                // diálogo de impressão nativo permite "Salvar como PDF" ou
+                // imprimir direto. via1/via2/ambas continuam como opções
+                // separadas, com o resultado visual idêntico ao de antes.
 
                 if (tipo === 'via1') {
-                    const wrapper = document.createElement('div');
-                    wrapper.className = 'os-pdf-wrapper uma-folha';
-                    wrapper.style.cssText = 'width:210mm;height:297mm;overflow:hidden;display:flex;flex-direction:column;background:#fff;';
-                    wrapper.innerHTML = buildVia('1ª VIA — LOJA', true, true, '297mm');
-                    gerarPDF(wrapper, `OS_${sale.number}_via_loja`, { pageWidth:210, pageHeight:297, forceHeight:true, preview:true });
+                    const conteudo = `<div class="os-pdf-wrapper uma-folha" style="width:210mm;height:297mm;overflow:hidden;display:flex;flex-direction:column;background:#fff;">${buildVia('1ª VIA — LOJA', true, true, '297mm')}</div>`;
+                    _imprimirOS(conteudo, `OS_${sale.number}_via_loja`);
 
                 } else if (tipo === 'via2') {
-                    const wrapper = document.createElement('div');
-                    wrapper.className = 'os-pdf-wrapper uma-folha';
-                    wrapper.style.cssText = 'width:210mm;height:297mm;overflow:hidden;display:flex;flex-direction:column;background:#fff;';
-                    wrapper.innerHTML = buildVia('2ª VIA — CLIENTE', false, true, '297mm');
-                    gerarPDF(wrapper, `OS_${sale.number}_via_cliente`, { pageWidth:210, pageHeight:297, forceHeight:true, preview:true });
+                    const conteudo = `<div class="os-pdf-wrapper uma-folha" style="width:210mm;height:297mm;overflow:hidden;display:flex;flex-direction:column;background:#fff;">${buildVia('2ª VIA — CLIENTE', false, true, '297mm')}</div>`;
+                    _imprimirOS(conteudo, `OS_${sale.number}_via_cliente`);
 
                 } else {
-                    // Ambas — A4 297mm (144mm+9mm corte+144mm)
-                    // ✅ FIX LENTIDÃO-PDF-OS (relatório aprovado): antes, as duas
-                    // vias completas iam coladas num único elemento pra UMA
-                    // captura de html2canvas — processando o dobro do conteúdo
-                    // de uma vez (cabeçalho, cliente, receituário, itens,
-                    // assinaturas — tudo duplicado). Agora cada via é capturada
-                    // separadamente (mais leve/rápida) e as duas imagens são
-                    // coladas numa única página do PDF — resultado impresso
-                    // idêntico a antes, 1 página, mesma linha de corte no meio.
-                    //
-                    // ✅ FIX BUG POPUP-BLOQUEADO: como agora fazemos 3 capturas
-                    // sequenciais antes de montar o PDF, esperar até o final pra
-                    // abrir a aba (como gerarPDF() faz sozinho) ficaria longe
-                    // demais do clique original — o navegador bloqueia. Por isso
-                    // abrimos a aba JÁ AQUI (ainda perto do clique) e passamos
-                    // ela pronta pra gerarPDF() via preOpenedTab.
-                    const _osTab = window.open('', '_blank');
-                    if (_osTab) {
-                        try { _osTab.document.write('<title>Gerando PDF…</title><body style="font-family:Arial,sans-serif;display:flex;align-items:center;justify-content:center;height:100vh;margin:0;color:#666">Gerando PDF, aguarde…</body>'); } catch(_e) {}
-                    }
-                    try { window.focus(); } catch(_e) {}
-
+                    // Ambas — A4 297mm (144mm via loja + 9mm corte + 144mm via
+                    // cliente), empilhadas como HTML/CSS real — sem captura
+                    // nem merge de canvas, tudo desenhado nativamente.
                     const corteHtml = `<div class="os-corte"><div class="os-corte-linha"></div>RECORTE AQUI — 2ª VIA DO CLIENTE<div class="os-corte-linha"></div></div>`;
                     const via1Html = buildVia('1ª VIA — LOJA', true, true, '144mm');
                     const via2Html = buildVia('2ª VIA — CLIENTE', false, true, '144mm');
-
-                    const { PX_PER_MM, SCALE } = PDF_CONFIG;
-                    const pageWmm = 210, pageHmm = 297, corteMm = 9, viaMm = 144;
-                    const pageWpx = Math.round(pageWmm * PX_PER_MM * SCALE);
-                    const pageHpx = Math.round(pageHmm * PX_PER_MM * SCALE);
-                    const viaHpx  = Math.round(viaMm  * PX_PER_MM * SCALE);
-
-                    try {
-                        // ✅ FIX BUG "AMBAS NÃO GERA": html2canvas não é seguro pra
-                        // rodar em paralelo (Promise.all) — 3 capturas ao mesmo
-                        // tempo conflitavam e quebravam silenciosamente (a função
-                        // não é aguardada pelo botão, então o erro não aparecia
-                        // em lugar nenhum). Capturando uma de cada vez (sequencial)
-                        // continua bem mais rápido que a captura única de antes,
-                        // e agora funciona de forma confiável.
-                        const canvasVia1  = await _capturarBlocoIsolado(via1Html, pageWmm, viaMm);
-                        const canvasCorte = await _capturarBlocoIsolado(corteHtml, pageWmm, corteMm);
-                        const canvasVia2  = await _capturarBlocoIsolado(via2Html, pageWmm, viaMm);
-
-                        const merged = document.createElement('canvas');
-                        merged.width = pageWpx;
-                        merged.height = pageHpx;
-                        const mctx = merged.getContext('2d');
-                        mctx.fillStyle = '#ffffff';
-                        mctx.fillRect(0, 0, pageWpx, pageHpx);
-                        mctx.drawImage(canvasVia1, 0, 0, pageWpx, viaHpx);
-                        mctx.drawImage(canvasCorte, 0, viaHpx, pageWpx, pageHpx - viaHpx * 2);
-                        mctx.drawImage(canvasVia2, 0, pageHpx - viaHpx, pageWpx, viaHpx);
-
-                        const dummyWrapper = document.createElement('div');
-                        gerarPDF(dummyWrapper, `OS_${sale.number}_ambas`, { pageWidth:210, pageHeight:297, forceHeight:true, preview:true, preCapturedCanvas: merged, preOpenedTab: _osTab });
-                    } catch(e) {
-                        console.error('[PDF] Erro ao gerar "Ambas as vias":', e);
-                        if (_osTab && !_osTab.closed) _osTab.close();
-                        Toast.show('Erro ao gerar PDF: ' + e.message, 'error');
-                    }
+                    const conteudo = `<div class="os-pdf-wrapper uma-folha" style="width:210mm;height:297mm;overflow:hidden;display:flex;flex-direction:column;background:#fff;">${via1Html}${corteHtml}${via2Html}</div>`;
+                    _imprimirOS(conteudo, `OS_${sale.number}_ambas`);
                 }
             },
 
