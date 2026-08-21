@@ -18906,6 +18906,23 @@ body.dark-mode,
                 .os-itens-table tr:last-child td,.os-receita-table tr:last-child td { border-bottom:1.5px solid #000 !important; }
                 .os-olho-label { background:#bbb !important; color:#000 !important; font-weight:900 !important; }
                 .os-section-title { color:#000 !important; background:#d8d8d8 !important; border-bottom:2px solid #000 !important; border-top:1.5px solid #000 !important; font-weight:900 !important; }
+                /* ✅ FIX BUG "ZOOM/SEM BORDA" NA IMPRESSÃO (relatório aprovado):
+                   OS e Carnê desenham a borda bem na beirada física da folha
+                   (0mm). Praticamente nenhuma impressora consegue imprimir até
+                   a borda real — a área mínima não-imprimível do hardware acaba
+                   cortando essa borda (e o navegador ajusta/"zoom" pra
+                   compensar). Recuando o desenho ~5% pra dentro da folha (ainda
+                   a folha inteira, mesmo layout, só um pouco mais afastado da
+                   beirada) a borda sempre cai dentro da área que qualquer
+                   impressora consegue imprimir de verdade. */
+                .os-pdf-wrapper.uma-folha { transform:scale(0.95); transform-origin:center center; }
+                .carne-talao-page { transform:scale(0.95); transform-origin:center center; }
+                /* ✅ Blindagem preventiva: uma regra antiga de impressão (usada só
+                   nas telas comuns do sistema) engloba qualquer <table> e podia
+                   aumentar borda/espaçamento/fonte da tabela da Promissória além
+                   do design original — reforçando os valores certos aqui. */
+                .promissoria-pdf .tabela td { padding:1.5mm 2.5mm !important; border:1.5px solid #000 !important; font-size:8.5px !important; }
+                .promissoria-pdf .tabela th { border:1.5px solid #000 !important; font-size:8.5px !important; }
             </style></head><body>${htmlConteudo}</body></html>`);
             doc.close();
 
