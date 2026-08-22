@@ -1931,6 +1931,27 @@
         .dark-mode .retirada-card .form-control { background:#1e1e1e; border-color:#a5672a; color:#ff8a65; }
         .dark-mode .parcela-valor-box { background:#1e1e1e; }
         .dark-mode .divisor .linha { background:linear-gradient(90deg,transparent,#a5672a,transparent); }
+
+        /* ===== TABELA DE PARCELAS (crediário) — mesmo tratamento do receituário
+           no celular: fonte/preenchimento menores para precisar de bem menos
+           arrastar de lado, com aviso de "deslize" quando ainda sobrar rolagem.
+           Só afeta esta tabela (.parcelas-table), nenhuma outra do sistema. */
+        .parcelas-scroll-hint {
+            display:none; text-align:right; font-size:0.72rem; color:var(--gray);
+            margin-bottom:0.35rem; padding-right:0.25rem;
+        }
+        .parcelas-table { min-width:560px; }
+        @media (max-width:768px){
+            .parcelas-scroll-hint { display:block; }
+            .parcelas-table th, .parcelas-table td { padding:5px 6px !important; font-size:0.68rem !important; }
+            .parcelas-table input.form-control { padding:0.3rem !important; font-size:0.66rem !important; width:84px !important; }
+        }
+        @media (max-width:480px){
+            .parcelas-table { min-width:480px; }
+            .parcelas-table th, .parcelas-table td { padding:4px 4px !important; font-size:0.62rem !important; }
+            .parcelas-table .status-badge { font-size:0.6rem !important; padding:2px 5px !important; }
+            .parcelas-table input.form-control { width:64px !important; font-size:0.6rem !important; }
+        }
         /* dark mode */
         .dark-mode .payment-card { background: #2d2d2d; border-color: #444; color: #e0e0e0; }
         .dark-mode .payment-card:hover { border-color: #888888; background: #2d2d2d; }
@@ -6983,11 +7004,19 @@ body.dark-mode,
                     <!-- DADOS DA OS -->
                     <div class="cliente-card">
                         <h3 class="ic-head"><span class="ic-badge"><i class="fas fa-clipboard-list"></i></span>DADOS DA OS</h3>
+                        <!-- ✅ FIX CORTE DE TEXTO (Nº OS ainda cortando no celular): Nº OS
+                             sempre tem valor longo (ex.: "OS-2026-0180"), então fica sozinho
+                             na linha em vez de dividir espaço com outro campo. Status também
+                             fica sozinho (alguns status, como "Pronto p/ Retirada", são longos
+                             demais para meia largura). Data + Unidade continuam juntos (valores
+                             curtos, cabem bem). -->
                         <div class="form-row">
                             <div class="form-group">
                                 <label for="saleNumber">Nº OS</label>
                                 <input type="text" id="saleNumber" class="form-control" readonly>
                             </div>
+                        </div>
+                        <div class="form-row">
                             <div class="form-group">
                                 <label for="saleDate">Data</label>
                                 <input type="date" id="saleDate" class="form-control">
@@ -7003,12 +7032,14 @@ body.dark-mode,
                         <div class="form-row">
                             <div class="form-group">
                                 <label for="saleSeller">Vendedor</label>
-                                <input type="text" id="saleSeller" class="form-control" placeholder="Nome do vendedor">
+                                <input type="text" id="saleSeller" class="form-control" placeholder="Vendedor">
                             </div>
                             <div class="form-group">
                                 <label for="deliveryForecast">Entrega Prevista</label>
                                 <input type="date" id="deliveryForecast" class="form-control">
                             </div>
+                        </div>
+                        <div class="form-row">
                             <div class="form-group">
                                 <label for="saleStatus">Status</label>
                                 <select id="saleStatus" class="form-control">
@@ -7029,8 +7060,8 @@ body.dark-mode,
                         <div class="form-row">
                             <div class="form-group" style="flex: 2;">
                                 <label for="searchClientSale">Buscar Cliente</label>
-                                <div style="display: flex; gap: 10px;">
-                                    <input type="text" id="searchClientSale" class="form-control" placeholder="Digite nome, CPF ou telefone" onkeyup="Sales.searchClient()">
+                                <div class="search-client-row" style="display: flex; gap: 10px;">
+                                    <input type="text" id="searchClientSale" class="form-control" placeholder="Nome, CPF ou telefone" onkeyup="Sales.searchClient()">
                                     <button type="button" class="btn btn-primary" onclick="Sales.searchClient()"><i class="fas fa-search"></i> Buscar</button>
                                 </div>
                                 <button type="button" onclick="Sales.openQuickClient()"
@@ -7947,18 +7978,19 @@ body.dark-mode,
                                 <div class="resumo-item"><div class="resumo-label">Saldo Parcelado</div><div class="resumo-valor" id="balanceSummary">R$ 0,00</div></div>
                                 <div class="resumo-item"><div class="resumo-label">Parcelas</div><div class="resumo-valor" id="totalParcelsSummary">0x</div></div>
                             </div>
+                            <div class="parcelas-scroll-hint"><i class="fas fa-arrows-left-right"></i> Deslize para ver mais</div>
                             <div style="overflow-x:auto;margin-top:12px;border-radius:8px;border:1px solid #ebebeb;">
-                                <table style="width:100%;border-collapse:collapse;font-size:12px;">
+                                <table class="parcelas-table" style="width:100%;border-collapse:collapse;font-size:12px;">
                                     <thead><tr style="background:linear-gradient(90deg,#e65100,#ff6b00);color:white;">
-                                        <th style="padding:8px 10px;text-align:center;">Parcela</th>
-                                        <th style="padding:8px 10px;text-align:center;">Vencimento</th>
-                                        <th style="padding:8px 10px;text-align:right;">Valor</th>
-                                        <th style="padding:8px 10px;text-align:center;">Status</th>
-                                        <th style="padding:8px 10px;text-align:center;">Data Pag.</th>
-                                        <th style="padding:8px 10px;text-align:right;">Valor Pago</th>
-                                        <th style="padding:8px 10px;text-align:center;">Atraso</th>
-                                        <th style="padding:8px 10px;text-align:right;">Multa+Juros</th>
-                                        <th style="padding:8px 10px;text-align:center;">Ações</th>
+                                        <th style="padding:6px 8px;text-align:center;">Parcela</th>
+                                        <th style="padding:6px 8px;text-align:center;">Vencimento</th>
+                                        <th style="padding:6px 8px;text-align:right;">Valor</th>
+                                        <th style="padding:6px 8px;text-align:center;">Status</th>
+                                        <th style="padding:6px 8px;text-align:center;">Data Pag.</th>
+                                        <th style="padding:6px 8px;text-align:right;">Valor Pago</th>
+                                        <th style="padding:6px 8px;text-align:center;">Atraso</th>
+                                        <th style="padding:6px 8px;text-align:right;">Multa+Juros</th>
+                                        <th style="padding:6px 8px;text-align:center;">Ações</th>
                                     </tr></thead>
                                     <tbody id="installmentsTableBody"></tbody>
                                 </table>
@@ -9638,7 +9670,7 @@ body.dark-mode,
                                 <div class="bkp-status-ic" style="background:#f3f0ff;color:#7c3aed;"><i class="fas fa-code-branch"></i></div>
                                 <div class="txt">
                                     <b>Versão do sistema</b>
-                                    <span>versão <strong>220820260708</strong></span>
+                                    <span>versão <strong>220820261109</strong></span>
                                 </div>
                             </div>
                         </div>
@@ -28024,33 +28056,33 @@ ${container.innerHTML}
                     
                     html += `
                         <tr style="${isLate ? 'background: rgba(220,53,69,0.05);' : ''}">
-                            <td style="padding: 1rem; text-align: center; font-weight: bold;">${p.number}/${details.installments}</td>
-                            <td style="padding: 1rem; text-align: center;">
+                            <td style="padding: 0.6rem; text-align: center; font-weight: bold;">${p.number}/${details.installments}</td>
+                            <td style="padding: 0.6rem; text-align: center;">
                                 <span style="display: flex; align-items: center; justify-content: center; gap: 0.25rem;">
                                     <i class="far fa-calendar-alt" style="color: ${isLate ? '#dc3545' : '#666'};"></i>
                                     ${Utils.formatDate(p.dueDate)}
                                     ${isLate ? `<span style="color: #dc3545; font-size: 0.7rem;">(${daysLate}d)</span>` : ''}
                                 </span>
                             </td>
-                            <td style="padding: 1rem; text-align: right; font-weight: bold;">${Utils.formatCurrency(p.value)}</td>
-                            <td style="padding: 1rem; text-align: center;">
+                            <td style="padding: 0.6rem; text-align: right; font-weight: bold;">${Utils.formatCurrency(p.value)}</td>
+                            <td style="padding: 0.6rem; text-align: center;">
                                 <span class="status-badge ${statusClass}">
                                     ${statusIcon} ${statusText}
                                 </span>
                             </td>
-                            <td style="padding: 1rem; text-align: center;">
-                                <input type="date" id="paidDate_${p.number}" class="form-control" style="width: 140px; padding: 0.5rem; font-size: 0.8rem;" onchange="Sales.updatePaidDate(${p.number})" value="${p.paidDate || ''}">
+                            <td style="padding: 0.6rem; text-align: center;">
+                                <input type="date" id="paidDate_${p.number}" class="form-control" style="width: 100px; padding: 0.4rem; font-size: 0.75rem;" onchange="Sales.updatePaidDate(${p.number})" value="${p.paidDate || ''}">
                             </td>
-                            <td style="padding: 1rem; text-align: right;">
-                                <input type="text" id="paidValue_${p.number}" class="form-control" style="width: 120px; text-align: right; padding: 0.5rem; font-size: 0.8rem;" value="${p.paidValue ? p.paidValue.toFixed(2) : ''}" placeholder="0,00" onblur="Sales.updatePaidValue(${p.number})">
+                            <td style="padding: 0.6rem; text-align: right;">
+                                <input type="text" id="paidValue_${p.number}" class="form-control" style="width: 90px; text-align: right; padding: 0.4rem; font-size: 0.75rem;" value="${p.paidValue ? p.paidValue.toFixed(2) : ''}" placeholder="0,00" onblur="Sales.updatePaidValue(${p.number})">
                             </td>
-                            <td style="padding: 1rem; text-align: center; color: ${isLate ? '#dc3545' : '#28a745'};">
+                            <td style="padding: 0.6rem; text-align: center; color: ${isLate ? '#dc3545' : '#28a745'};">
                                 ${isLate ? daysLate : '0'}
                             </td>
-                            <td style="padding: 1rem; text-align: right; color: #dc3545; font-weight: bold;">
+                            <td style="padding: 0.6rem; text-align: right; color: #dc3545; font-weight: bold;">
                                 ${multaJurosDisplay}
                             </td>
-                            <td style="padding: 1rem; text-align: center;">
+                            <td style="padding: 0.6rem; text-align: center;">
                                 <div style="display: flex; gap: 0.25rem; justify-content: center;">
                                     <button class="btn-icon btn-edit" onclick="Sales.modifyDate(${p.number})" title="Modificar data">
                                         <i class="fas fa-calendar-alt"></i>
@@ -28072,18 +28104,18 @@ ${container.innerHTML}
                 
                 html += `
                     <tr style="background: var(--light); font-weight: bold; border-top: 2px solid var(--primary);">
-                        <td colspan="2" style="padding: 1rem; text-align: right;">TOTAIS:</td>
-                        <td style="padding: 1rem; text-align: right;">${Utils.formatCurrency(totalGeral)}</td>
+                        <td colspan="2" style="padding: 0.6rem; text-align: right;">TOTAIS:</td>
+                        <td style="padding: 0.6rem; text-align: right;">${Utils.formatCurrency(totalGeral)}</td>
                         <td></td>
                         <td></td>
-                        <td style="padding: 1rem; text-align: right;">${Utils.formatCurrency(totalPago)}</td>
+                        <td style="padding: 0.6rem; text-align: right;">${Utils.formatCurrency(totalPago)}</td>
                         <td></td>
-                        <td style="padding: 1rem; text-align: right; color: #dc3545;">${Utils.formatCurrency(totalMulta)}</td>
+                        <td style="padding: 0.6rem; text-align: right; color: #dc3545;">${Utils.formatCurrency(totalMulta)}</td>
                         <td></td>
                     </tr>
                     <tr style="background: var(--light); font-weight: bold;">
-                        <td colspan="8" style="padding: 1rem; text-align: right;">SALDO DEVEDOR:</td>
-                        <td style="padding: 1rem; text-align: center; color: var(--primary); font-size: 1.1rem;">${Utils.formatCurrency(totalGeral - totalPago)}</td>
+                        <td colspan="8" style="padding: 0.6rem; text-align: right;">SALDO DEVEDOR:</td>
+                        <td style="padding: 0.6rem; text-align: center; color: var(--primary); font-size: 1.1rem;">${Utils.formatCurrency(totalGeral - totalPago)}</td>
                     </tr>
                 `;
                 
@@ -31174,12 +31206,30 @@ ${container.innerHTML}
        aqui deixa mais compacto e organizado — só nesta seção (#sales), sem
        afetar .form-row em nenhuma outra tela do sistema. */
     #sales .form-row:has(.form-group ~ .form-group) { grid-template-columns:1fr 1fr !important; gap:.6rem !important; }
+    /* ✅ FIX CORTE DE TEXTO (bug encontrado): em linhas com 3 campos (ex.: Nº OS
+       + Data + Unidade), o 3º campo sobrava espremido em meia coluna em vez de
+       ocupar a linha toda — cortando textos como "OS-2026-0180" e "Orçamento".
+       Fazendo o campo ímpar (3º de 3) ocupar a linha inteira corrige isso. */
+    #sales .form-row > .form-group:nth-child(3):last-child { grid-column:1 / -1 !important; }
 
     /* ✅ REDESIGN TELA DE CLIENTES (mesmo estilo aprovado nas vendas): "Dados
        Pessoais" e "Endereço" tinham o mesmo problema — .form-row genérico
        empilhando tudo em 1 coluna no celular. Mesma correção, só nesta
        seção (#clients). Linhas com 1 campo só (ex.: Foto) não são afetadas. */
     #clients .form-row:has(.form-group ~ .form-group) { grid-template-columns:1fr 1fr !important; gap:.6rem !important; }
+    #clients .form-row > .form-group:nth-child(3):last-child { grid-column:1 / -1 !important; }
+
+    /* ✅ FIX CORTE DE TEXTO (mesmo erro em outros lugares): campo de texto/select
+       mais estreito que o conteúdo agora corta com reticências "…" em vez de
+       cortar o caractere no meio — vale para qualquer tela do sistema. */
+    .form-control { text-overflow:ellipsis; overflow:hidden; }
+    select.form-control { text-overflow:ellipsis; }
+
+    /* ✅ FIX CORTE DE TEXTO — "Buscar Cliente": input dividia a linha com o
+       botão "Buscar", sobrando pouco espaço pro texto. Empilha os dois no
+       celular (input em cima, ocupando a largura toda). */
+    .search-client-row { flex-direction:column !important; }
+    .search-client-row .btn { width:100% !important; justify-content:center; }
 
     /* Botões de ação do form — esconder (barra fixa substitui) */
     .nfe-form-actions     { display:none !important; }
