@@ -1891,6 +1891,46 @@
         }
         .retirada-alert i { color: #e65100; font-size: 1.4rem; }
         .retirada-alert .valor { font-size: 1.4rem; font-weight: 900; color: #c62828; }
+
+        /* ===== REDESIGN CREDIÁRIO — Entrada & Retirada / Parcelamento (aprovado) =====
+           Apenas organização visual. Nenhum id/onclick/oninput mudou — cálculo e
+           máscaras de valor continuam exatamente os mesmos. */
+        .entrada-grid { display:grid; grid-template-columns: 1fr 1.3fr; gap:10px; }
+        .retirada-card {
+            margin-top:12px; background:#fff3e0; border:2px dashed #ffb74d; border-radius:10px;
+            padding:10px 14px;
+        }
+        .retirada-card label {
+            display:flex; align-items:center; gap:6px; font-size:0.78rem; font-weight:700;
+            color:#e65100; text-transform:uppercase; letter-spacing:0.3px; margin-bottom:6px;
+        }
+        .retirada-card .form-control {
+            border-color:#ffcc80; background:#fff; font-weight:800; color:#c62828; font-size:1.05rem;
+        }
+        .divisor { display:flex; align-items:center; gap:8px; margin:14px 0 10px; }
+        .divisor .linha { flex:1; height:1px; background:linear-gradient(90deg,transparent,#ffcc80,transparent); }
+        .divisor span { font-size:0.76rem; font-weight:700; color:#e55a00; text-transform:uppercase; letter-spacing:0.3px; white-space:nowrap; display:flex; align-items:center; gap:4px; }
+        .parcela-grid { display:grid; grid-template-columns: 1fr 1fr; gap:10px; }
+        .parcela-valor-box {
+            background:#fff; border:2px solid var(--primary); border-radius:10px; padding:10px 12px;
+            text-align:right; display:flex; flex-direction:column; justify-content:center;
+        }
+        .parcela-valor-box .lbl { font-size:0.72rem; color:var(--gray); text-transform:uppercase; font-weight:700; margin-bottom:2px; }
+        .parcela-valor-box .val { font-size:1.15rem; font-weight:900; color:var(--primary); }
+        .resumo-final {
+            margin-top:12px; background:linear-gradient(135deg,#ff6b00,#ff9500); color:#fff; border-radius:12px;
+            padding:10px 16px; display:flex; justify-content:space-between; align-items:center;
+            box-shadow:0 6px 16px rgba(255,107,0,0.28);
+        }
+        .resumo-final .txt { font-size:0.78rem; font-weight:700; opacity:0.92; }
+        .resumo-final .num { font-size:1.25rem; font-weight:900; }
+        @media (max-width:480px){
+            .entrada-grid { grid-template-columns: 1fr 1fr; gap:8px; }
+        }
+        .dark-mode .retirada-card { background:#332211; border-color:#a5672a; }
+        .dark-mode .retirada-card .form-control { background:#1e1e1e; border-color:#a5672a; color:#ff8a65; }
+        .dark-mode .parcela-valor-box { background:#1e1e1e; }
+        .dark-mode .divisor .linha { background:linear-gradient(90deg,transparent,#a5672a,transparent); }
         /* dark mode */
         .dark-mode .payment-card { background: #2d2d2d; border-color: #444; color: #e0e0e0; }
         .dark-mode .payment-card:hover { border-color: #888888; background: #2d2d2d; }
@@ -7792,7 +7832,11 @@ body.dark-mode,
                                 </div>
 
                                 <h5 style="display:flex;align-items:center;gap:6px;"><i class="fas fa-hand-holding-usd"></i> Entrada &amp; Retirada</h5>
-                                <div class="form-row" style="margin-bottom:0;">
+
+                                <!-- ✅ REDESIGN CREDIÁRIO (modelo aprovado): Entrada (%) e Valor da
+                                     Entrada lado a lado — mesma informação, ligados visualmente.
+                                     IDs/onclick/oninput mantidos idênticos, só mudou a organização. -->
+                                <div class="entrada-grid">
                                     <div class="form-group">
                                         <label>Entrada (%)</label>
                                         <div class="input-group">
@@ -7801,22 +7845,21 @@ body.dark-mode,
                                         </div>
                                     </div>
                                     <div class="form-group">
-                                        <label>Valor da Entrada (R$)</label>
+                                        <label>Valor da Entrada</label>
                                         <input type="text" inputmode="numeric" class="form-control" id="entryValue" style="font-weight:800;color:#2e7d32;font-size:1.05rem;" placeholder="0,00" oninput="Utils.maskMoney(this); Sales.PAY.instFromValue()" value="0">
-                                    </div>
-                                    <div class="form-group">
-                                        <label>Valor na Retirada (R$)</label>
-                                        <input type="text" inputmode="numeric" class="form-control" id="retiradaEntry" style="font-weight:800;color:#e65100;font-size:1.05rem;" placeholder="0,00" oninput="Utils.maskMoney(this); Sales.PAY.instFromValue()" value="0">
                                     </div>
                                 </div>
 
-                                <!-- Separador visual entre Passo 1 e Passo 2 (só decorativo) -->
-                                <div style="height:1px;background:linear-gradient(90deg,transparent,#ffe0b2,transparent);margin:14px 0;"></div>
-                                <div style="display:flex;align-items:center;gap:6px;margin-bottom:10px;">
-                                    <i class="fas fa-calendar-alt" style="color:#e55a00;font-size:0.8rem;"></i>
-                                    <span style="font-size:0.76rem;font-weight:700;color:#e55a00;">Parcelamento do restante</span>
+                                <!-- Retirada: cartão próprio — é outro conceito (cobrar depois) -->
+                                <div class="retirada-card">
+                                    <label><i class="fas fa-clock"></i> Cobrar na Retirada (R$)</label>
+                                    <input type="text" inputmode="numeric" class="form-control" id="retiradaEntry" placeholder="0,00" oninput="Utils.maskMoney(this); Sales.PAY.instFromValue()" value="0">
                                 </div>
-                                <div class="form-row" style="margin-bottom:0;">
+
+                                <!-- Separador visual entre Passo 1 e Passo 2 (só decorativo) -->
+                                <div class="divisor"><div class="linha"></div><span><i class="fas fa-calendar-alt"></i> Parcelamento do restante</span><div class="linha"></div></div>
+
+                                <div class="parcela-grid">
                                     <div class="form-group">
                                         <label>Nº de Parcelas</label>
                                         <select id="installmentCount" class="form-control" onchange="Sales.PAY.instFromValue()">
@@ -7846,10 +7889,16 @@ body.dark-mode,
                                             <option value="24">24x</option>
                                         </select>
                                     </div>
-                                    <div class="form-group">
-                                        <label>Valor da Parcela</label>
-                                        <div class="form-control" id="installmentValue" style="background:var(--light);font-weight:800;color:var(--primary);font-size:1.05rem;">R$ 0,00</div>
+                                    <div class="parcela-valor-box">
+                                        <span class="lbl">Valor da Parcela</span>
+                                        <span class="val" id="installmentValue">R$ 0,00</span>
                                     </div>
+                                </div>
+
+                                <!-- Resumo: total efetivamente parcelado (entrada e retirada já descontados) -->
+                                <div class="resumo-final">
+                                    <span class="txt" id="resumoFinalTxt">Total parcelado</span>
+                                    <span class="num" id="resumoFinalVal">R$ 0,00</span>
                                 </div>
                             </div>
                             <div class="retirada-alert" id="retiradaAlert" style="display:none;">
@@ -9589,7 +9638,7 @@ body.dark-mode,
                                 <div class="bkp-status-ic" style="background:#f3f0ff;color:#7c3aed;"><i class="fas fa-code-branch"></i></div>
                                 <div class="txt">
                                     <b>Versão do sistema</b>
-                                    <span>versão <strong>210820262028</strong></span>
+                                    <span>versão <strong>220820260708</strong></span>
                                 </div>
                             </div>
                         </div>
@@ -27436,6 +27485,8 @@ ${container.innerHTML}
                     setEl('balanceSummary',     f(remaining));
                     setEl('totalParcelsSummary', nParcelas + 'x');
                     setEl('installmentValue',  f(parcValue));
+                    setEl('resumoFinalTxt', 'Total parcelado (' + nParcelas + 'x)');
+                    setEl('resumoFinalVal', f(remaining));
 
                     // Alerta retirada
                     const alertEl  = document.getElementById('retiradaAlert');
@@ -31116,6 +31167,19 @@ ${container.innerHTML}
 
     /* Topbar NF-e */
     #nfeApiBar            { padding:.5rem .75rem !important; flex-wrap:wrap !important; gap:6px !important; margin-bottom:.75rem !important; }
+
+    /* ✅ REDESIGN CRIAÇÃO DE VENDAS (aprovado): "Dados da OS" e "Selecionar
+       Cliente" usavam o .form-row genérico (colunas de 200px), que no celular
+       não cabe 2 lado a lado e empilha tudo em 1 coluna só. Forçando 2 colunas
+       aqui deixa mais compacto e organizado — só nesta seção (#sales), sem
+       afetar .form-row em nenhuma outra tela do sistema. */
+    #sales .form-row:has(.form-group ~ .form-group) { grid-template-columns:1fr 1fr !important; gap:.6rem !important; }
+
+    /* ✅ REDESIGN TELA DE CLIENTES (mesmo estilo aprovado nas vendas): "Dados
+       Pessoais" e "Endereço" tinham o mesmo problema — .form-row genérico
+       empilhando tudo em 1 coluna no celular. Mesma correção, só nesta
+       seção (#clients). Linhas com 1 campo só (ex.: Foto) não são afetadas. */
+    #clients .form-row:has(.form-group ~ .form-group) { grid-template-columns:1fr 1fr !important; gap:.6rem !important; }
 
     /* Botões de ação do form — esconder (barra fixa substitui) */
     .nfe-form-actions     { display:none !important; }
