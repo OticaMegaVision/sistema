@@ -1940,17 +1940,17 @@
             display:none; text-align:right; font-size:0.72rem; color:var(--gray);
             margin-bottom:0.35rem; padding-right:0.25rem;
         }
-        .parcelas-table { min-width:560px; }
+        .parcelas-table { min-width:440px; }
         @media (max-width:768px){
             .parcelas-scroll-hint { display:block; }
-            .parcelas-table th, .parcelas-table td { padding:5px 6px !important; font-size:0.68rem !important; }
-            .parcelas-table input.form-control { padding:0.3rem !important; font-size:0.66rem !important; width:84px !important; }
+            .parcelas-table th, .parcelas-table td { padding:4px 4px !important; font-size:0.64rem !important; }
+            .parcelas-table input.form-control { padding:0.25rem !important; font-size:0.62rem !important; width:72px !important; }
         }
         @media (max-width:480px){
-            .parcelas-table { min-width:480px; }
-            .parcelas-table th, .parcelas-table td { padding:4px 4px !important; font-size:0.62rem !important; }
-            .parcelas-table .status-badge { font-size:0.6rem !important; padding:2px 5px !important; }
-            .parcelas-table input.form-control { width:64px !important; font-size:0.6rem !important; }
+            .parcelas-table { min-width:400px; }
+            .parcelas-table th, .parcelas-table td { padding:3px 3px !important; font-size:0.58rem !important; }
+            .parcelas-table .status-badge { font-size:0.56rem !important; padding:1px 4px !important; }
+            .parcelas-table input.form-control { width:56px !important; font-size:0.56rem !important; }
         }
         /* dark mode */
         .dark-mode .payment-card { background: #2d2d2d; border-color: #444; color: #e0e0e0; }
@@ -2559,34 +2559,50 @@
 
 
         /* ===== CREDIÁRIO ===== */
+        /* ===== RESUMO CREDIÁRIO — grid 2x2 (aprovado) =====
+           Antes era empilhado (4 linhas). Agora ocupa menos altura na tela,
+           mantendo a mesma ordem de leitura: Total/Entrada na 1ª linha,
+           Saldo Parcelado/Parcelas na 2ª linha. */
         .resumo-crediario {
             background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
             color: white;
-            padding: 1rem;
-            border-radius: 10px;
+            padding: 1rem 1.1rem;
+            border-radius: 14px;
             margin: 1.5rem 0;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            flex-wrap: wrap;
-            gap: 1rem;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 0.9rem 0.6rem;
+            box-shadow: 0 6px 16px rgba(230,90,0,0.25);
         }
 
         .resumo-item {
-            text-align: center;
-            flex: 1;
-            min-width: 120px;
+            text-align: left;
+            position: relative;
+            padding-left: 0.6rem;
+            min-width: 0;
+        }
+
+        .resumo-item::before {
+            content: '';
+            position: absolute;
+            left: 0; top: 2px; bottom: 2px;
+            width: 3px;
+            background: rgba(255,255,255,0.45);
+            border-radius: 2px;
         }
 
         .resumo-label {
-            font-size: 0.8rem;
+            font-size: 0.7rem;
             opacity: 0.9;
-            margin-bottom: 0.25rem;
+            margin-bottom: 0.2rem;
+            text-transform: uppercase;
+            letter-spacing: 0.02em;
         }
 
         .resumo-valor {
-            font-size: 1.2rem;
-            font-weight: bold;
+            font-size: 1.15rem;
+            font-weight: 800;
+            line-height: 1.15;
         }
 
         .tabela-parcelas {
@@ -3733,8 +3749,6 @@
             .btn-group { flex-direction: column; width: 100%; }
             .btn-group .btn { width: 100%; }
             .payment-methods { grid-template-columns: repeat(2, 1fr); }
-            .resumo-crediario { flex-direction: column; }
-            .resumo-item { width: 100%; }
         }
 
         @media (max-width: 576px) {
@@ -9670,7 +9684,7 @@ body.dark-mode,
                                 <div class="bkp-status-ic" style="background:#f3f0ff;color:#7c3aed;"><i class="fas fa-code-branch"></i></div>
                                 <div class="txt">
                                     <b>Versão do sistema</b>
-                                    <span>versão <strong>220820261109</strong></span>
+                                    <span>versão <strong>220820261215</strong></span>
                                 </div>
                             </div>
                         </div>
