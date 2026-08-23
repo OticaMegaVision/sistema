@@ -6613,7 +6613,7 @@ body.dark-mode,
                 </div>
 
                 <!-- Abas do Dashboard — reduz a poluição visual: cada aba mostra só o que importa,
-                     "Últimas Vendas" fica fora das abas (visível sempre, logo abaixo) -->
+                     "Últimas Vendas" acompanha a aba ativa e só aparece em "Visão Geral" -->
                 <div class="dashboard-tabs" id="dashboardTabs">
                     <div class="dashboard-tab active" data-tab="geral" onclick="Dashboard.setDashTab('geral')"><i class="fas fa-gauge"></i><span>Visão Geral</span></div>
                     <div class="dashboard-tab" data-tab="comparativo" onclick="Dashboard.setDashTab('comparativo')"><i class="fas fa-chart-column"></i><span>Comparativo</span></div>
@@ -6947,7 +6947,7 @@ body.dark-mode,
                 </div>
                 </div>
 
-                <!-- Últimas Vendas — sempre visível, independente da aba selecionada -->
+                <!-- Últimas Vendas — visível somente na aba "Visão Geral" (ver Dashboard.setDashTab) -->
                 <div class="table-container tf-ready" id="recentSalesPanel">
                     <div class="table-filtros">
                     <div class="sh-head">
@@ -9684,7 +9684,7 @@ body.dark-mode,
                                 <div class="bkp-status-ic" style="background:#f3f0ff;color:#7c3aed;"><i class="fas fa-code-branch"></i></div>
                                 <div class="txt">
                                     <b>Versão do sistema</b>
-                                    <span>versão <strong>220820261215</strong></span>
+                                    <span>versão <strong>230820261653</strong></span>
                                 </div>
                             </div>
                         </div>
@@ -21370,7 +21370,7 @@ tbody tr td{border:1.5px solid #000;padding:2mm;text-align:center;font-weight:70
             },
 
             // Controla qual aba do Dashboard está visível (Visão Geral / Comparativo / Financeiro / Alertas / Histórico).
-            // "Últimas Vendas" (#recentSalesPanel) fica fora do sistema de abas — sempre visível.
+            // "Últimas Vendas" (#recentSalesPanel) acompanha a aba ativa — só aparece em "Visão Geral".
             _activeDashTab: 'geral',
             setDashTab(tab) {
                 this._activeDashTab = tab;
@@ -21379,6 +21379,11 @@ tbody tr td{border:1.5px solid #000;padding:2mm;text-align:center;font-weight:70
                 // O filtro de período só faz sentido na aba "Visão Geral" — nas demais ele fica oculto
                 const periodBar = document.getElementById('dashPeriodBar');
                 if (periodBar) periodBar.style.display = (tab === 'geral') ? '' : 'none';
+                // ✅ FIX: "Últimas Vendas" (#recentSalesPanel) estava fora do sistema de abas
+                // e por isso aparecia em todas elas (Comparativo, Financeiro, Alertas,
+                // Histórico). Agora só é exibido na aba "Visão Geral", como as demais.
+                const recentSalesPanel = document.getElementById('recentSalesPanel');
+                if (recentSalesPanel) recentSalesPanel.style.display = (tab === 'geral') ? '' : 'none';
                 // O gráfico do comparativo só é desenhado quando a aba fica visível
                 // (Chart.js não mede corretamente um canvas dentro de um elemento display:none)
                 if (tab === 'comparativo') this.renderComparativo();
