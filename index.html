@@ -9684,7 +9684,7 @@ body.dark-mode,
                                 <div class="bkp-status-ic" style="background:#f3f0ff;color:#7c3aed;"><i class="fas fa-code-branch"></i></div>
                                 <div class="txt">
                                     <b>Versão do sistema</b>
-                                    <span>versão <strong>240820261232</strong></span>
+                                    <span>versão <strong>240820261245</strong></span>
                                 </div>
                             </div>
                         </div>
@@ -19360,6 +19360,17 @@ body.dark-mode,
                     el.value = '0.00';
                     this.updateColor(el, id);
                 }
+                // ✅ FIX: duplo clique zera o campo, mas isso não dispara o evento
+                // "onchange" (só dispara em edição manual pelo usuário). Por isso os
+                // campos de perto calculados a partir da Adição não eram atualizados/
+                // limpos quando a Adição era zerada por duplo clique. Chamamos as
+                // mesmas funções de recálculo usadas em stepValue() explicitamente.
+                if (id.startsWith('clientOd')) this.updateClientPertoOD();
+                else if (id.startsWith('clientOe')) this.updateClientPertoOE();
+                else if (id.startsWith('qcOd')) { this.updateQcPertoOD(); this.updateQcDP(); }
+                else if (id.startsWith('qcOe')) { this.updateQcPertoOE(); this.updateQcDP(); }
+                else if (id.startsWith('od')) { this.updateAllPertoOD(); this.updateDP(); }
+                else if (id.startsWith('oe')) { this.updateAllPertoOE(); this.updateDP(); }
             },
 
             updateColor(el, id) {
@@ -19507,15 +19518,21 @@ body.dark-mode,
                 const add = parseFloat(addRaw) || 0;
                 const dnp = parseFloat(document.getElementById('clientOdDnp')?.value) || 0;
 
-                if (!addRaw || addRaw.trim() === '' || addRaw === '0.00' || add === 0) return;
-
-                const nearSph = sph + add;
-                const nearDnp = dnp > 0 ? (dnp - 2.5).toFixed(1) : '';
-
                 const nearSphEl = document.getElementById('clientOdNearSph');
                 const nearCylEl = document.getElementById('clientOdNearCyl');
                 const nearAxisEl = document.getElementById('clientOdNearAxis');
                 const nearDnpEl = document.getElementById('clientOdNearDnp');
+
+                if (!addRaw || addRaw.trim() === '' || addRaw === '0.00' || add === 0) {
+                    if (nearSphEl) { nearSphEl.value = '0.00'; this.updateColor(nearSphEl, 'nearSph'); }
+                    if (nearCylEl) { nearCylEl.value = '0.00'; this.updateColor(nearCylEl, 'nearCyl'); }
+                    if (nearAxisEl) nearAxisEl.value = '0°';
+                    if (nearDnpEl) nearDnpEl.value = '0.0';
+                    return;
+                }
+
+                const nearSph = sph + add;
+                const nearDnp = dnp > 0 ? (dnp - 2.5).toFixed(1) : '';
 
                 if (nearSphEl) { nearSphEl.value = nearSph.toFixed(2); this.updateColor(nearSphEl, 'nearSph'); }
                 if (nearCylEl) { nearCylEl.value = cyl.toFixed(2); this.updateColor(nearCylEl, 'nearCyl'); }
@@ -19531,15 +19548,21 @@ body.dark-mode,
                 const add = parseFloat(addRaw) || 0;
                 const dnp = parseFloat(document.getElementById('clientOeDnp')?.value) || 0;
 
-                if (!addRaw || addRaw.trim() === '' || addRaw === '0.00' || add === 0) return;
-
-                const nearSph = sph + add;
-                const nearDnp = dnp > 0 ? (dnp - 2.5).toFixed(1) : '';
-
                 const nearSphEl = document.getElementById('clientOeNearSph');
                 const nearCylEl = document.getElementById('clientOeNearCyl');
                 const nearAxisEl = document.getElementById('clientOeNearAxis');
                 const nearDnpEl = document.getElementById('clientOeNearDnp');
+
+                if (!addRaw || addRaw.trim() === '' || addRaw === '0.00' || add === 0) {
+                    if (nearSphEl) { nearSphEl.value = '0.00'; this.updateColor(nearSphEl, 'nearSph'); }
+                    if (nearCylEl) { nearCylEl.value = '0.00'; this.updateColor(nearCylEl, 'nearCyl'); }
+                    if (nearAxisEl) nearAxisEl.value = '0°';
+                    if (nearDnpEl) nearDnpEl.value = '0.0';
+                    return;
+                }
+
+                const nearSph = sph + add;
+                const nearDnp = dnp > 0 ? (dnp - 2.5).toFixed(1) : '';
 
                 if (nearSphEl) { nearSphEl.value = nearSph.toFixed(2); this.updateColor(nearSphEl, 'nearSph'); }
                 if (nearCylEl) { nearCylEl.value = cyl.toFixed(2); this.updateColor(nearCylEl, 'nearCyl'); }
@@ -19564,15 +19587,21 @@ body.dark-mode,
                 const add = parseFloat(addRaw) || 0;
                 const dnp = parseFloat(document.getElementById('qcOdDnp')?.value) || 0;
 
-                if (!addRaw || addRaw.trim() === '' || addRaw === '0.00' || add === 0) return;
-
-                const nearSph = sph + add;
-                const nearDnp = dnp > 0 ? (dnp - 2.5).toFixed(1) : '';
-
                 const nearSphEl = document.getElementById('qcOdNearSph');
                 const nearCylEl = document.getElementById('qcOdNearCyl');
                 const nearAxisEl = document.getElementById('qcOdNearAxis');
                 const nearDnpEl = document.getElementById('qcOdNearDnp');
+
+                if (!addRaw || addRaw.trim() === '' || addRaw === '0.00' || add === 0) {
+                    if (nearSphEl) { nearSphEl.value = '0.00'; this.updateColor(nearSphEl, 'nearSph'); }
+                    if (nearCylEl) { nearCylEl.value = '0.00'; this.updateColor(nearCylEl, 'nearCyl'); }
+                    if (nearAxisEl) nearAxisEl.value = '0°';
+                    if (nearDnpEl) nearDnpEl.value = '0.0';
+                    return;
+                }
+
+                const nearSph = sph + add;
+                const nearDnp = dnp > 0 ? (dnp - 2.5).toFixed(1) : '';
 
                 if (nearSphEl) { nearSphEl.value = nearSph.toFixed(2); this.updateColor(nearSphEl, 'nearSph'); }
                 if (nearCylEl) { nearCylEl.value = cyl.toFixed(2); this.updateColor(nearCylEl, 'nearCyl'); }
@@ -19588,15 +19617,21 @@ body.dark-mode,
                 const add = parseFloat(addRaw) || 0;
                 const dnp = parseFloat(document.getElementById('qcOeDnp')?.value) || 0;
 
-                if (!addRaw || addRaw.trim() === '' || addRaw === '0.00' || add === 0) return;
-
-                const nearSph = sph + add;
-                const nearDnp = dnp > 0 ? (dnp - 2.5).toFixed(1) : '';
-
                 const nearSphEl = document.getElementById('qcOeNearSph');
                 const nearCylEl = document.getElementById('qcOeNearCyl');
                 const nearAxisEl = document.getElementById('qcOeNearAxis');
                 const nearDnpEl = document.getElementById('qcOeNearDnp');
+
+                if (!addRaw || addRaw.trim() === '' || addRaw === '0.00' || add === 0) {
+                    if (nearSphEl) { nearSphEl.value = '0.00'; this.updateColor(nearSphEl, 'nearSph'); }
+                    if (nearCylEl) { nearCylEl.value = '0.00'; this.updateColor(nearCylEl, 'nearCyl'); }
+                    if (nearAxisEl) nearAxisEl.value = '0°';
+                    if (nearDnpEl) nearDnpEl.value = '0.0';
+                    return;
+                }
+
+                const nearSph = sph + add;
+                const nearDnp = dnp > 0 ? (dnp - 2.5).toFixed(1) : '';
 
                 if (nearSphEl) { nearSphEl.value = nearSph.toFixed(2); this.updateColor(nearSphEl, 'nearSph'); }
                 if (nearCylEl) { nearCylEl.value = cyl.toFixed(2); this.updateColor(nearCylEl, 'nearCyl'); }
