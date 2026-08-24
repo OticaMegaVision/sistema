@@ -9684,7 +9684,7 @@ body.dark-mode,
                                 <div class="bkp-status-ic" style="background:#f3f0ff;color:#7c3aed;"><i class="fas fa-code-branch"></i></div>
                                 <div class="txt">
                                     <b>Versão do sistema</b>
-                                    <span>versão <strong>230820261653</strong></span>
+                                    <span>versão <strong>240820261232</strong></span>
                                 </div>
                             </div>
                         </div>
@@ -19426,16 +19426,23 @@ body.dark-mode,
                 const add = parseFloat(addRaw) || 0;
                 const dnp = parseFloat(document.getElementById('odDnp')?.value) || 0;
 
-                // Só preenche campos de perto se a adição estiver preenchida e > 0
-                if (!addRaw || addRaw.trim() === '' || addRaw === '0.00' || add === 0) return;
-
-                const nearSph = sph + add;
-                const nearDnp = dnp > 0 ? (dnp - 2.5).toFixed(1) : '';
-
                 const nearSphEl = document.getElementById('odNearSph');
                 const nearCylEl = document.getElementById('odNearCyl');
                 const nearAxisEl = document.getElementById('odNearAxis');
                 const nearDnpEl = document.getElementById('odNearDnp');
+
+                // Adição vazia/zerada: limpa os campos de perto que tinham sido
+                // preenchidos antes, em vez de deixá-los com o valor antigo (bug)
+                if (!addRaw || addRaw.trim() === '' || addRaw === '0.00' || add === 0) {
+                    if (nearSphEl) { nearSphEl.value = '0.00'; this.updateColor(nearSphEl, 'nearSph'); }
+                    if (nearCylEl) { nearCylEl.value = '0.00'; this.updateColor(nearCylEl, 'nearCyl'); }
+                    if (nearAxisEl) nearAxisEl.value = '0°';
+                    if (nearDnpEl) nearDnpEl.value = '0.0';
+                    return;
+                }
+
+                const nearSph = sph + add;
+                const nearDnp = dnp > 0 ? (dnp - 2.5).toFixed(1) : '';
 
                 if (nearSphEl) { nearSphEl.value = nearSph.toFixed(2); this.updateColor(nearSphEl, 'nearSph'); }
                 if (nearCylEl) { nearCylEl.value = cyl.toFixed(2); this.updateColor(nearCylEl, 'nearCyl'); }
@@ -19451,16 +19458,23 @@ body.dark-mode,
                 const add = parseFloat(addRaw) || 0;
                 const dnp = parseFloat(document.getElementById('oeDnp')?.value) || 0;
 
-                // Só preenche campos de perto se a adição estiver preenchida e > 0
-                if (!addRaw || addRaw.trim() === '' || addRaw === '0.00' || add === 0) return;
-
-                const nearSph = sph + add;
-                const nearDnp = dnp > 0 ? (dnp - 2.5).toFixed(1) : '';
-
                 const nearSphEl = document.getElementById('oeNearSph');
                 const nearCylEl = document.getElementById('oeNearCyl');
                 const nearAxisEl = document.getElementById('oeNearAxis');
                 const nearDnpEl = document.getElementById('oeNearDnp');
+
+                // Adição vazia/zerada: limpa os campos de perto que tinham sido
+                // preenchidos antes, em vez de deixá-los com o valor antigo (bug)
+                if (!addRaw || addRaw.trim() === '' || addRaw === '0.00' || add === 0) {
+                    if (nearSphEl) { nearSphEl.value = '0.00'; this.updateColor(nearSphEl, 'nearSph'); }
+                    if (nearCylEl) { nearCylEl.value = '0.00'; this.updateColor(nearCylEl, 'nearCyl'); }
+                    if (nearAxisEl) nearAxisEl.value = '0°';
+                    if (nearDnpEl) nearDnpEl.value = '0.0';
+                    return;
+                }
+
+                const nearSph = sph + add;
+                const nearDnp = dnp > 0 ? (dnp - 2.5).toFixed(1) : '';
 
                 if (nearSphEl) { nearSphEl.value = nearSph.toFixed(2); this.updateColor(nearSphEl, 'nearSph'); }
                 if (nearCylEl) { nearCylEl.value = cyl.toFixed(2); this.updateColor(nearCylEl, 'nearCyl'); }
