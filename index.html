@@ -26310,6 +26310,24 @@ ${container.innerHTML}
                 const select = document.getElementById(selectId);
                 const search = document.getElementById(searchId);
                 const dropdown = document.getElementById(dropdownId);
+
+                // ✅ FIX BUG: ao trocar a seleção por um produto diferente, reseta os
+                // campos digitados manualmente ligados a essa seleção (quantidade e,
+                // no caso de armação, as medidas) para não deixar valores do produto
+                // anterior vazando para o novo produto escolhido.
+                const previousValue = select ? select.value : null;
+                if (select && previousValue !== value) {
+                    const prefix = selectId.replace(/Select$/, '');
+                    const qtyEl = document.getElementById(prefix + 'Qty');
+                    if (qtyEl) qtyEl.value = 1;
+                    if (prefix === 'armacao') {
+                        ['armacaoPonte', 'armacaoAro', 'armacaoDiagMaior', 'armacaoVertical'].forEach(id => {
+                            const el = document.getElementById(id);
+                            if (el) el.value = '';
+                        });
+                    }
+                }
+
                 if (select) {
                     select.value = value;
                     select.dispatchEvent(new Event('change', { bubbles: true }));
@@ -27677,8 +27695,11 @@ ${container.innerHTML}
                     const alertEl  = document.getElementById('retiradaAlert');
                     const valorEl  = document.getElementById('retiradaValor');
                     const infoEl   = document.getElementById('retiradaInfo');
-                    if (alertEl) alertEl.style.display = (retiradaV > 0.01 || remaining > 0.01) ? 'flex' : 'none';
-                    if (valorEl) valorEl.textContent   = f(retiradaV > 0 ? retiradaV : remaining);
+                    // ✅ FIX BUG: o alerta só deve aparecer quando o usuário digitar algo
+                    // em "Cobrar na Retirada" — antes ele também disparava com base no
+                    // saldo a parcelar (remaining), que é um valor diferente.
+                    if (alertEl) alertEl.style.display = (retiradaV > 0.01) ? 'flex' : 'none';
+                    if (valorEl) valorEl.textContent   = f(retiradaV);
                     if (infoEl)  infoEl.textContent    = 'Entrada: ' + f(entryVal) +
                         (retiradaV > 0 ? ' | Retirada: ' + f(retiradaV) : '') +
                         ' | ' + nParcelas + 'x de ' + f(parcValue);
@@ -28091,8 +28112,9 @@ ${container.innerHTML}
                 const valorEl = document.getElementById('retiradaValor');
                 const infoEl  = document.getElementById('retiradaInfo');
                 const totalRetirada = retiradaEntry;
-                if (alertEl) alertEl.style.display = (retiradaEntry > 0.01 || remaining > 0.01) ? 'flex' : 'none';
-                if (valorEl) valorEl.textContent = Utils.formatCurrency(retiradaEntry > 0 ? retiradaEntry : remaining);
+                // ✅ FIX BUG: mesma correção — alerta só quando há valor digitado em retirada.
+                if (alertEl) alertEl.style.display = (retiradaEntry > 0.01) ? 'flex' : 'none';
+                if (valorEl) valorEl.textContent = Utils.formatCurrency(retiradaEntry);
                 if (infoEl)  infoEl.textContent = `Entrada: ${Utils.formatCurrency(entryValue)}${retiradaEntry > 0 ? ' | Retirada: ' + Utils.formatCurrency(retiradaEntry) : ''} | ${installments}x de ${Utils.formatCurrency(installmentValue)}`;
 
                 
