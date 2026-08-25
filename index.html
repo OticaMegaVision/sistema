@@ -7763,19 +7763,25 @@ body.dark-mode,
                                         <span id="cashFinal" style="color:#1b5e20;font-weight:900;font-size:18px;">R$ 0,00</span>
                                     </div>
                                 </div>
-                                <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;">
-                                    <div>
-                                        <label style="font-size:12px;font-weight:600;color:#555;display:block;margin-bottom:4px;">Valor recebido (R$)</label>
-                                        <input type="text" inputmode="numeric" id="cashRecebido" class="form-control" value="0" oninput="Utils.maskMoney(this); Sales.PAY.cashChange()">
+                                <div style="background:#fff;border:1px solid #dcedc8;border-radius:10px;padding:12px 14px;">
+                                    <div style="font-size:11px;font-weight:800;color:#1b5e20;text-transform:uppercase;letter-spacing:0.4px;margin-bottom:8px;display:flex;align-items:center;gap:6px;">
+                                        <i class="fas fa-hand-holding-dollar"></i> Recebimento em dinheiro (pagamento à vista)
                                     </div>
-                                    <div>
-                                        <label style="font-size:12px;font-weight:600;color:#2e7d32;display:block;margin-bottom:4px;">Troco</label>
-                                        <div id="cashTroco" class="form-control" style="font-weight:800;color:#2e7d32;font-size:1rem;">R$ 0,00</div>
+                                    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+                                        <div>
+                                            <label style="font-size:12px;font-weight:600;color:#555;display:block;margin-bottom:4px;">Valor recebido (R$)</label>
+                                            <input type="text" inputmode="numeric" id="cashRecebido" class="form-control" value="0" oninput="Utils.maskMoney(this); Sales.PAY.cashChange()">
+                                        </div>
+                                        <div>
+                                            <label style="font-size:12px;font-weight:600;color:#2e7d32;display:block;margin-bottom:4px;">Troco</label>
+                                            <div id="cashTroco" class="form-control" style="font-weight:800;color:#2e7d32;font-size:1rem;">R$ 0,00</div>
+                                        </div>
                                     </div>
-                                    <div>
-                                        <label style="font-size:12px;font-weight:600;color:#555;display:block;margin-bottom:4px;">Entrada paga (R$)</label>
-                                        <input type="text" inputmode="numeric" id="cashEntrada" class="form-control" value="0" oninput="Utils.maskMoney(this); Sales.PAY.retirada('cash')">
-                                    </div>
+                                </div>
+                                <div class="divisor"><div class="linha"></div><span><i class="fas fa-layer-group"></i> Ou pagamento parcial</span><div class="linha"></div></div>
+                                <div>
+                                    <label style="font-size:12px;font-weight:600;color:#555;display:block;margin-bottom:4px;">Entrada recebida agora (R$) — se for deixar valor para a retirada</label>
+                                    <input type="text" inputmode="numeric" id="cashEntrada" class="form-control" value="0" oninput="Utils.maskMoney(this); Sales.PAY.retirada('cash')">
                                 </div>
                                 <div id="cashAlerta" class="retirada-alert" style="display:none;margin-top:8px;">
                                     <i class="fas fa-glasses"></i>
