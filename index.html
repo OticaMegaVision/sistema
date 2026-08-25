@@ -7718,15 +7718,13 @@ body.dark-mode,
                                         <span id="pixFinal" style="color:#00695c;font-weight:900;font-size:18px;">R$ 0,00</span>
                                     </div>
                                 </div>
-                                <div style="margin-top:12px;display:grid;grid-template-columns:1fr 1fr;gap:10px;">
-                                    <div>
-                                        <label style="font-size:12px;font-weight:600;color:#555;display:block;margin-bottom:4px;">Entrada paga (R$)</label>
-                                        <input type="text" inputmode="numeric" id="pixEntrada" class="form-control" value="0" oninput="Utils.maskMoney(this); Sales.PAY.retirada('pix')">
-                                    </div>
-                                    <div>
-                                        <label style="font-size:12px;font-weight:600;color:#555;display:block;margin-bottom:4px;">Restante na retirada</label>
-                                        <div id="pixRetirada" class="form-control" style="font-weight:800;color:#c62828;font-size:1rem;">R$ 0,00</div>
-                                    </div>
+                                <div style="margin-top:12px;">
+                                    <label style="font-size:12px;font-weight:600;color:#555;display:block;margin-bottom:4px;">Entrada paga (R$)</label>
+                                    <input type="text" inputmode="numeric" id="pixEntrada" class="form-control" value="0" oninput="Utils.maskMoney(this); Sales.PAY.retirada('pix')">
+                                </div>
+                                <div class="retirada-card" style="margin-top:10px;">
+                                    <label><i class="fas fa-glasses"></i> Restante na retirada</label>
+                                    <div id="pixRetirada" class="form-control">R$ 0,00</div>
                                 </div>
                                 <div id="pixAlerta" class="retirada-alert" style="display:none;margin-top:8px;">
                                     <i class="fas fa-glasses"></i>
@@ -7804,7 +7802,7 @@ body.dark-mode,
                                         <span id="debitTotal" style="font-weight:900;font-size:18px;color:#0d47a1;">R$ 0,00</span>
                                     </div>
                                 </div>
-                                <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;align-items:end;">
+                                <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
                                     <div>
                                         <label style="font-size:12px;font-weight:600;color:#555;display:block;margin-bottom:4px;">Bandeira</label>
                                         <select id="debitBandeira" class="form-control">
@@ -7819,10 +7817,10 @@ body.dark-mode,
                                         <label style="font-size:12px;font-weight:600;color:#555;display:block;margin-bottom:4px;">Entrada paga (R$)</label>
                                         <input type="text" inputmode="numeric" id="debitEntrada" class="form-control" value="0" oninput="Utils.maskMoney(this); Sales.PAY.retirada('debit')">
                                     </div>
-                                    <div>
-                                        <label style="font-size:12px;font-weight:600;color:#555;display:block;margin-bottom:4px;">Restante na retirada</label>
-                                        <div id="debitRetirada" class="form-control" style="font-weight:800;color:#c62828;font-size:1rem;">R$ 0,00</div>
-                                    </div>
+                                </div>
+                                <div class="retirada-card" style="margin-top:10px;">
+                                    <label><i class="fas fa-glasses"></i> Restante na retirada</label>
+                                    <div id="debitRetirada" class="form-control">R$ 0,00</div>
                                 </div>
                                 <div id="debitAlerta" class="retirada-alert" style="display:none;margin-top:8px;">
                                     <i class="fas fa-glasses"></i>
@@ -7886,15 +7884,13 @@ body.dark-mode,
                                     </div>
                                 </div>
                                 <div id="creditResumoBox" style="background:#fff;border-radius:8px;border:1px solid #e1bee7;padding:10px 14px;font-size:12px;color:#555;margin-bottom:12px;"></div>
-                                <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
-                                    <div>
-                                        <label style="font-size:12px;font-weight:600;color:#555;display:block;margin-bottom:4px;">Entrada paga (R$) — opcional</label>
-                                        <input type="text" inputmode="numeric" id="creditEntrada" class="form-control" value="0" oninput="Utils.maskMoney(this); Sales.PAY.retirada('credit')">
-                                    </div>
-                                    <div>
-                                        <label style="font-size:12px;font-weight:600;color:#555;display:block;margin-bottom:4px;">Restante na retirada</label>
-                                        <div id="creditRetirada" class="form-control" style="font-weight:800;color:#c62828;font-size:1rem;">R$ 0,00</div>
-                                    </div>
+                                <div>
+                                    <label style="font-size:12px;font-weight:600;color:#555;display:block;margin-bottom:4px;">Entrada paga (R$) — opcional</label>
+                                    <input type="text" inputmode="numeric" id="creditEntrada" class="form-control" value="0" oninput="Utils.maskMoney(this); Sales.PAY.retirada('credit')">
+                                </div>
+                                <div class="retirada-card" style="margin-top:10px;">
+                                    <label><i class="fas fa-glasses"></i> Restante na retirada</label>
+                                    <div id="creditRetirada" class="form-control">R$ 0,00</div>
                                 </div>
                                 <div id="creditAlerta" class="retirada-alert" style="display:none;margin-top:8px;">
                                     <i class="fas fa-glasses"></i>
@@ -9724,7 +9720,7 @@ body.dark-mode,
                                 <div class="bkp-status-ic" style="background:#f3f0ff;color:#7c3aed;"><i class="fas fa-code-branch"></i></div>
                                 <div class="txt">
                                     <b>Versão do sistema</b>
-                                    <span>versão <strong>240820261245</strong></span>
+                                    <span>versão <strong>250820261124</strong></span>
                                 </div>
                             </div>
                         </div>
@@ -27586,13 +27582,15 @@ ${container.innerHTML}
 
                     let valorParc, totalFinal, jurosStr;
                     if (n <= 5) {
-                        valorParc = total / n;
-                        totalFinal = total;
+                        valorParc = Math.round((total / n) * 100) / 100;
+                        totalFinal = Math.round((valorParc * n) * 100) / 100;
                         jurosStr = 'Sem juros';
                     } else {
-                        // Tabela Price
-                        valorParc = total * (taxa * Math.pow(1+taxa, n)) / (Math.pow(1+taxa, n) - 1);
-                        totalFinal = valorParc * n;
+                        // Tabela Price — arredonda a parcela em centavos para que a soma
+                        // das parcelas exibidas bata exatamente com o "Total com juros"
+                        const parcRaw = total * (taxa * Math.pow(1+taxa, n)) / (Math.pow(1+taxa, n) - 1);
+                        valorParc = Math.round(parcRaw * 100) / 100;
+                        totalFinal = Math.round((valorParc * n) * 100) / 100;
                         jurosStr = creditTax + '% a.m. (Tabela Price)';
                     }
 
@@ -27602,9 +27600,11 @@ ${container.innerHTML}
                         Array.from(sel.options).forEach(opt => {
                             const ni = parseInt(opt.value);
                             if (ni <= 5) {
-                                opt.text = ni + 'x de ' + this.fmt(total / ni) + ' — sem juros';
+                                const pv = Math.round((total / ni) * 100) / 100;
+                                opt.text = ni + 'x de ' + this.fmt(pv) + ' — sem juros';
                             } else {
-                                const pmt = total * (taxa * Math.pow(1+taxa, ni)) / (Math.pow(1+taxa, ni) - 1);
+                                const pmtRaw = total * (taxa * Math.pow(1+taxa, ni)) / (Math.pow(1+taxa, ni) - 1);
+                                const pmt = Math.round(pmtRaw * 100) / 100;
                                 opt.text = ni + 'x de ' + this.fmt(pmt) + ' — ' + creditTax + '% a.m.';
                             }
                         });
