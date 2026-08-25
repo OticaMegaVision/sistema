@@ -7729,16 +7729,9 @@ body.dark-mode,
                                         <span id="cashFinal" style="color:#1b5e20;font-weight:900;font-size:18px;">R$ 0,00</span>
                                     </div>
                                 </div>
-                                <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
-                                    <div>
-                                        <label style="font-size:12px;font-weight:600;color:#555;display:block;margin-bottom:4px;">Valor recebido (R$)</label>
-                                        <input type="text" inputmode="numeric" id="cashRecebido" class="form-control" value="0" oninput="Utils.maskMoney(this); Sales.PAY.cashChange()">
-                                    </div>
-                                    <div>
-                                        <label style="font-size:12px;font-weight:600;color:#2e7d32;display:block;margin-bottom:4px;">Troco</label>
-                                        <div id="cashTroco" class="form-control" style="font-weight:800;color:#2e7d32;font-size:1rem;">R$ 0,00</div>
-                                    </div>
-                                </div>
+                                <!-- ✅ Removido "Valor recebido"/"Troco" a pedido do usuário: fazia o
+                                     mesmo sentido de "Entrada paga"/"Restante na retirada", que ficou
+                                     como único par de campos do pagamento em dinheiro. -->
                                 <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:10px;">
                                     <div>
                                         <label style="font-size:12px;font-weight:600;color:#555;display:block;margin-bottom:4px;">Entrada paga (R$)</label>
@@ -27584,16 +27577,7 @@ ${container.innerHTML}
                     const b = document.getElementById('cashBruto'); if (b) b.innerText = this.fmt(bruto);
                     const d = document.getElementById('cashDesconto'); if (d) d.innerText = ativo ? '- ' + this.fmt(desc) : '— (não aplicado)';
                     const f = document.getElementById('cashFinal'); if (f) f.innerText = this.fmt(final);
-                    this.cashChange();
                     this.retirada('cash');
-                },
-
-                // Troco do dinheiro
-                cashChange() {
-                    const total    = state.currentSale.total || 0;
-                    const recebido = Utils.parseMoney(document.getElementById('cashRecebido')?.value) || 0;
-                    const troco    = Math.max(0, recebido - total);
-                    const el = document.getElementById('cashTroco'); if (el) el.textContent = this.fmt(troco);
                 },
 
                 // Débito
@@ -27871,7 +27855,6 @@ ${container.innerHTML}
             calculateCreditInterest()       { this.PAY.creditCalc.call(this.PAY); },
             calculatePixDiscount()          { this.PAY.pixCalc.call(this.PAY); },
             calculateCashDiscount()         { this.PAY.cashCalc.call(this.PAY); },
-            calcCashChange()                { this.PAY.cashChange.call(this.PAY); },
             calcCreditRetirada()            { this.PAY.retirada.call(this.PAY, 'credit'); },
             calcDebitRetirada()             { this.PAY.retirada.call(this.PAY, 'debit'); },
             calcPixRetirada()               { this.PAY.retirada.call(this.PAY, 'pix'); },
@@ -30016,7 +29999,7 @@ ${container.innerHTML}
                 ['pixEntrada','cashEntrada','debitEntrada','creditEntrada'].forEach(id => {
                     const el = document.getElementById(id); if (el) el.value = '';
                 });
-                ['cashRecebido','installmentCount','lateFee','dailyInterest'].forEach(id => {
+                ['installmentCount','lateFee','dailyInterest'].forEach(id => {
                     const el = document.getElementById(id);
                     if (!el) return;
                     if (id === 'installmentCount') el.value = '2';
