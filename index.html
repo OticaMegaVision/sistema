@@ -7687,11 +7687,11 @@ body.dark-mode,
                                 <div style="margin-top:12px;display:grid;grid-template-columns:1fr 1fr;gap:10px;">
                                     <div>
                                         <label style="font-size:12px;font-weight:600;color:#555;display:block;margin-bottom:4px;">Entrada paga (R$)</label>
-                                        <input type="text" inputmode="numeric" id="pixEntrada" class="form-control" value="0" oninput="Utils.maskMoney(this); Sales.PAY.retirada('pix')">
+                                        <input type="text" inputmode="numeric" id="pixEntrada" class="form-control" value="" placeholder="0,00" oninput="Utils.maskMoney(this); Sales.PAY.retirada('pix')">
                                     </div>
                                     <div>
                                         <label style="font-size:12px;font-weight:600;color:#555;display:block;margin-bottom:4px;">Restante na retirada</label>
-                                        <input type="text" inputmode="numeric" id="pixRetirada" class="form-control" value="0" style="font-weight:800;color:#c62828;font-size:1rem;" oninput="Utils.maskMoney(this); Sales.PAY.retiradaReversa('pix')">
+                                        <input type="text" inputmode="numeric" id="pixRetirada" class="form-control" value="" placeholder="0,00" style="font-weight:800;color:#c62828;font-size:1rem;" oninput="Utils.maskMoney(this); Sales.PAY.retiradaReversa('pix')">
                                     </div>
                                 </div>
                                 <div id="pixAlerta" class="retirada-alert" style="display:none;margin-top:8px;">
@@ -7742,11 +7742,11 @@ body.dark-mode,
                                 <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:10px;">
                                     <div>
                                         <label style="font-size:12px;font-weight:600;color:#555;display:block;margin-bottom:4px;">Entrada paga (R$)</label>
-                                        <input type="text" inputmode="numeric" id="cashEntrada" class="form-control" value="0" oninput="Utils.maskMoney(this); Sales.PAY.retirada('cash')">
+                                        <input type="text" inputmode="numeric" id="cashEntrada" class="form-control" value="" placeholder="0,00" oninput="Utils.maskMoney(this); Sales.PAY.retirada('cash')">
                                     </div>
                                     <div>
                                         <label style="font-size:12px;font-weight:600;color:#555;display:block;margin-bottom:4px;">Restante na retirada</label>
-                                        <input type="text" inputmode="numeric" id="cashRetirada" class="form-control" value="0" style="font-weight:800;color:#c62828;font-size:1rem;" oninput="Utils.maskMoney(this); Sales.PAY.retiradaReversa('cash')">
+                                        <input type="text" inputmode="numeric" id="cashRetirada" class="form-control" value="" placeholder="0,00" style="font-weight:800;color:#c62828;font-size:1rem;" oninput="Utils.maskMoney(this); Sales.PAY.retiradaReversa('cash')">
                                     </div>
                                 </div>
                                 <div id="cashAlerta" class="retirada-alert" style="display:none;margin-top:8px;">
@@ -7783,11 +7783,11 @@ body.dark-mode,
                                     </div>
                                     <div>
                                         <label style="font-size:12px;font-weight:600;color:#555;display:block;margin-bottom:4px;">Entrada paga (R$)</label>
-                                        <input type="text" inputmode="numeric" id="debitEntrada" class="form-control" value="0" oninput="Utils.maskMoney(this); Sales.PAY.retirada('debit')">
+                                        <input type="text" inputmode="numeric" id="debitEntrada" class="form-control" value="" placeholder="0,00" oninput="Utils.maskMoney(this); Sales.PAY.retirada('debit')">
                                     </div>
                                     <div>
                                         <label style="font-size:12px;font-weight:600;color:#555;display:block;margin-bottom:4px;">Restante na retirada</label>
-                                        <input type="text" inputmode="numeric" id="debitRetirada" class="form-control" value="0" style="font-weight:800;color:#c62828;font-size:1rem;" oninput="Utils.maskMoney(this); Sales.PAY.retiradaReversa('debit')">
+                                        <input type="text" inputmode="numeric" id="debitRetirada" class="form-control" value="" placeholder="0,00" style="font-weight:800;color:#c62828;font-size:1rem;" oninput="Utils.maskMoney(this); Sales.PAY.retiradaReversa('debit')">
                                     </div>
                                 </div>
                                 <div id="debitAlerta" class="retirada-alert" style="display:none;margin-top:8px;">
@@ -7855,11 +7855,11 @@ body.dark-mode,
                                 <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
                                     <div>
                                         <label style="font-size:12px;font-weight:600;color:#555;display:block;margin-bottom:4px;">Entrada paga (R$) — opcional</label>
-                                        <input type="text" inputmode="numeric" id="creditEntrada" class="form-control" value="0" oninput="Utils.maskMoney(this); Sales.PAY.creditCalc()">
+                                        <input type="text" inputmode="numeric" id="creditEntrada" class="form-control" value="" placeholder="0,00" oninput="Utils.maskMoney(this); Sales.PAY.creditCalc()">
                                     </div>
                                     <div>
                                         <label style="font-size:12px;font-weight:600;color:#555;display:block;margin-bottom:4px;">Restante na retirada</label>
-                                        <input type="text" inputmode="numeric" id="creditRetirada" class="form-control" value="0" style="font-weight:800;color:#c62828;font-size:1rem;" oninput="Utils.maskMoney(this); Sales.PAY.retiradaReversa('credit')">
+                                        <input type="text" inputmode="numeric" id="creditRetirada" class="form-control" value="" placeholder="0,00" style="font-weight:800;color:#c62828;font-size:1rem;" oninput="Utils.maskMoney(this); Sales.PAY.retiradaReversa('credit')">
                                     </div>
                                 </div>
                                 <div id="creditAlerta" class="retirada-alert" style="display:none;margin-top:8px;">
@@ -9690,7 +9690,7 @@ body.dark-mode,
                                 <div class="bkp-status-ic" style="background:#f3f0ff;color:#7c3aed;"><i class="fas fa-code-branch"></i></div>
                                 <div class="txt">
                                     <b>Versão do sistema</b>
-                                    <span>versão <strong>240820262048</strong></span>
+                                    <span>versão <strong>240820262104</strong></span>
                                 </div>
                             </div>
                         </div>
@@ -27451,11 +27451,34 @@ ${container.innerHTML}
                         credit:{ entrada: 'creditEntrada' },
                     };
                     const cfg = ids[method]; if (!cfg) return;
+                    const entradaRaw = document.getElementById(cfg.entrada)?.value ?? '';
+                    // ✅ Campo em branco = cliente ainda não escolheu quanto vai pagar de
+                    // entrada. Não preenche nada automaticamente até haver digitação.
+                    if (entradaRaw.trim() === '') {
+                        this._clearRetiradaUI(method);
+                        return;
+                    }
                     const total = state.currentSale.total || 0;
-                    let entrada = Utils.parseMoney(document.getElementById(cfg.entrada)?.value) || 0;
+                    let entrada = Utils.parseMoney(entradaRaw) || 0;
                     entrada = Math.max(0, Math.min(total, entrada));
                     const restante = Math.max(0, total - entrada);
                     this._syncRetiradaUI(method, entrada, restante);
+                },
+
+                // Deixa o campo "Restante na retirada" e o alerta em branco/ocultos —
+                // usado enquanto nenhum dos dois campos (entrada/retirada) foi tocado
+                _clearRetiradaUI(method) {
+                    const ids = {
+                        pix:   { display: 'pixRetirada',    alerta: 'pixAlerta' },
+                        cash:  { display: 'cashRetirada',   alerta: 'cashAlerta' },
+                        debit: { display: 'debitRetirada',  alerta: 'debitAlerta' },
+                        credit:{ display: 'creditRetirada', alerta: 'creditAlerta' },
+                    };
+                    const cfg = ids[method]; if (!cfg) return;
+                    const dispEl = document.getElementById(cfg.display);
+                    if (dispEl && document.activeElement !== dispEl) dispEl.value = '';
+                    const alertEl = document.getElementById(cfg.alerta);
+                    if (alertEl) alertEl.style.display = 'none';
                 },
 
                 // ✅ NOVO: disparado ao editar "Restante na retirada" diretamente —
@@ -27470,8 +27493,18 @@ ${container.innerHTML}
                         credit:{ entrada: 'creditEntrada', display: 'creditRetirada' },
                     };
                     const cfg = ids[method]; if (!cfg) return;
+                    const restanteRaw = document.getElementById(cfg.display)?.value ?? '';
+                    // ✅ Campo em branco = cliente ainda não escolheu o valor da retirada.
+                    // Não preenche a entrada automaticamente até haver digitação.
+                    if (restanteRaw.trim() === '') {
+                        const entradaEl = document.getElementById(cfg.entrada);
+                        if (entradaEl && document.activeElement !== entradaEl) entradaEl.value = '';
+                        if (method === 'credit') { this.creditCalc(); return; }
+                        this._clearRetiradaUI(method);
+                        return;
+                    }
                     const total = state.currentSale.total || 0;
-                    let restante = Utils.parseMoney(document.getElementById(cfg.display)?.value) || 0;
+                    let restante = Utils.parseMoney(restanteRaw) || 0;
                     restante = Math.max(0, Math.min(total, restante));
                     const entrada = Math.max(0, total - restante);
                     const entradaEl = document.getElementById(cfg.entrada);
@@ -29956,8 +29989,12 @@ ${container.innerHTML}
                     const el = document.getElementById(id); if (el) el.style.display = 'none';
                 });
                 // Reseta TODOS os campos de cada método de pagamento (novos IDs)
-                ['pixEntrada','cashEntrada','cashRecebido','creditEntrada','debitEntrada',
-                 'installmentCount','lateFee','dailyInterest'].forEach(id => {
+                // ✅ Entrada/Retirada (PIX, Dinheiro, Débito, Crédito) ficam em branco por
+                // padrão — só preenchem quando o usuário digitar (ver retirada/retiradaReversa)
+                ['pixEntrada','cashEntrada','debitEntrada','creditEntrada'].forEach(id => {
+                    const el = document.getElementById(id); if (el) el.value = '';
+                });
+                ['cashRecebido','installmentCount','lateFee','dailyInterest'].forEach(id => {
                     const el = document.getElementById(id);
                     if (!el) return;
                     if (id === 'installmentCount') el.value = '2';
@@ -29985,9 +30022,9 @@ ${container.innerHTML}
                     const el = document.getElementById(id); if (el) el.textContent = 'R$ 0,00';
                 });
                 // ✅ "Restante na retirada" agora são <input> editáveis (eram <div> travados) —
-                // resetar via .value, não .textContent
+                // ficam em branco por padrão até o usuário escolher entrada/retirada
                 ['pixRetirada','cashRetirada','creditRetirada','debitRetirada'].forEach(id => {
-                    const el = document.getElementById(id); if (el) el.value = '0';
+                    const el = document.getElementById(id); if (el) el.value = '';
                 });
                 // Reseta sumário de parcelas
                 const totalParcelsSummary = document.getElementById('totalParcelsSummary');
