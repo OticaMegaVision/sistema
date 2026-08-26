@@ -7728,7 +7728,7 @@ body.dark-mode,
                                 </div>
                                 <div style="margin-top:12px;">
                                     <label style="font-size:12px;font-weight:600;color:#555;display:block;margin-bottom:4px;">Entrada paga (R$)</label>
-                                    <input type="text" inputmode="numeric" id="pixEntrada" class="form-control" value="0" oninput="Utils.maskMoney(this); Sales.PAY.retirada('pix')">
+                                    <input type="text" inputmode="numeric" id="pixEntrada" class="form-control" value="0" oninput="Utils.maskMoney(this); Sales.PAY.pixCalc.call(Sales.PAY)">
                                 </div>
                                 <div class="retirada-card" style="margin-top:10px;">
                                     <label><i class="fas fa-glasses"></i> Restante na retirada</label>
@@ -9710,7 +9710,7 @@ body.dark-mode,
                                 <div class="bkp-status-ic" style="background:#f3f0ff;color:#7c3aed;"><i class="fas fa-code-branch"></i></div>
                                 <div class="txt">
                                     <b>Versão do sistema</b>
-                                    <span>versão <strong>260820261636</strong></span>
+                                    <span>versão <strong>260820261658</strong></span>
                                 </div>
                             </div>
                         </div>
@@ -27534,7 +27534,15 @@ ${container.innerHTML}
                     // exatamente com o que é usado no QR Code.
                     const pix = Utils.normalizePixKey(state.company?.pix || state.company?.cnpj) || '—';
                     const kEl = document.getElementById('companyPix'); if (kEl) kEl.textContent = pix;
-                    this.renderPixQr(pix, final);
+                    // Se o cliente vai pagar só a entrada agora, o QR cobra o valor da
+                    // entrada; sem entrada informada, cobra o valor total (à vista).
+                    const entradaVal = Utils.parseMoney(document.getElementById('pixEntrada')?.value) || 0;
+                    const cobrandoEntrada = entradaVal > 0 && entradaVal < final;
+                    const valorQr = cobrandoEntrada ? entradaVal : final;
+                    const label = cobrandoEntrada
+                        ? 'Escaneie para pagar a entrada de ' + this.fmt(entradaVal)
+                        : 'Escaneie para pagar o valor total';
+                    this.renderPixQr(pix, valorQr, label);
                     this.retirada('pix');
                 },
 
@@ -27582,7 +27590,7 @@ ${container.innerHTML}
                     return crc.toString(16).toUpperCase().padStart(4, '0');
                 },
 
-                renderPixQr(chave, valor) {
+                renderPixQr(chave, valor, label) {
                     const box  = document.getElementById('pixQrCode');
                     const hint = document.getElementById('pixQrHint');
                     if (!box) return;
@@ -27627,7 +27635,7 @@ ${container.innerHTML}
                             svgEl.setAttribute('width', '100%');
                             svgEl.setAttribute('height', '100%');
                         }
-                        if (hint) hint.textContent = 'Escaneie para pagar direto pelo celular';
+                        if (hint) hint.textContent = label || 'Escaneie para pagar direto pelo celular';
                     } catch (e) {
                         box.innerHTML = '<i class="fas fa-qrcode" style="font-size:2.2rem;color:#00a884;"></i>';
                         if (hint) hint.textContent = '';
