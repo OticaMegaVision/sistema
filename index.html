@@ -7704,6 +7704,7 @@ body.dark-mode,
                                         <div style="font-weight:800;color:#00695c;font-size:14px;">Pagamento via PIX</div>
                                         <div style="font-size:12px;color:#555;margin-top:4px;">Chave: <strong id="companyPix">—</strong>
                                             <button type="button" onclick="Sales.copyPixKey()" style="margin-left:6px;padding:2px 8px;background:#00a884;color:white;border:none;border-radius:6px;font-size:11px;cursor:pointer;"><i class="fas fa-copy"></i> Copiar</button>
+                                            <button type="button" onclick="Sales.sendPixWhatsApp()" title="Enviar código Pix por WhatsApp" style="margin-left:4px;padding:2px 8px;background:#25d366;color:white;border:none;border-radius:6px;font-size:11px;cursor:pointer;"><i class="fab fa-whatsapp"></i> WhatsApp</button>
                                         </div>
                                         <div id="pixQrHint" style="font-size:11px;color:#2e7d32;margin-top:4px;"></div>
                                         <label style="display:inline-flex;align-items:center;gap:6px;margin-top:6px;cursor:pointer;font-size:13px;color:#2e7d32;font-weight:600;">
@@ -27599,6 +27600,7 @@ ${container.innerHTML}
                     if (!chave || chave === '—') {
                         box.innerHTML = '<i class="fas fa-qrcode" style="font-size:2.2rem;color:#00a884;"></i>';
                         if (hint) hint.textContent = 'Cadastre a chave PIX nas configurações para gerar o QR Code';
+                        this._lastPixPayload = null;
                         return;
                     }
                     if (typeof window.qrcode !== 'function') {
@@ -27606,12 +27608,17 @@ ${container.innerHTML}
                         // só ocorreria se o script embutido tiver sido removido/corrompido.
                         box.innerHTML = '<i class="fas fa-qrcode" style="font-size:2.2rem;color:#00a884;"></i>';
                         if (hint) hint.textContent = '';
+                        this._lastPixPayload = null;
                         return;
                     }
                     try {
                         const nome    = state.company?.name || 'OTICA';
                         const cidade  = state.company?.city || 'BRASIL';
                         const payload = this.buildPixPayload(chave, valor || 0, nome, cidade);
+                        // Guarda o payload/valor atuais para o botão "Enviar via WhatsApp"
+                        // reaproveitar exatamente o mesmo código copia-e-cola do QR exibido.
+                        this._lastPixPayload = payload;
+                        this._lastPixValor   = valor || 0;
                         // A lib exige um typeNumber válido (1-40) — não faz auto-detecção
                         // sozinha, então tentamos do menor para o maior até caber o payload.
                         let qr = null;
@@ -27641,6 +27648,7 @@ ${container.innerHTML}
                     } catch (e) {
                         box.innerHTML = '<i class="fas fa-qrcode" style="font-size:2.2rem;color:#00a884;"></i>';
                         if (hint) hint.textContent = '';
+                        this._lastPixPayload = null;
                     }
                 },
 
@@ -27991,6 +27999,30 @@ ${container.innerHTML}
                     navigator.clipboard.writeText(pixKey).then(() => Toast.show('Chave PIX copiada!'))
                         .catch(() => Toast.show('Chave PIX: ' + pixKey));
                 }
+            },
+
+            // Monta a mensagem com o código Pix Copia-e-Cola (o mesmo do QR exibido)
+            // e abre o modal de confirmação do WhatsApp — de lá o usuário pode revisar,
+            // editar, apenas copiar a mensagem, ou enviar direto pro WhatsApp do cliente.
+            sendPixWhatsApp() {
+                const payload = this.PAY._lastPixPayload;
+                if (!payload) { Toast.show('Gere o QR Code do Pix antes de enviar','warning'); return; }
+                const valorTxt = document.getElementById('pixFinal')?.textContent?.trim()
+                    || this.PAY.fmt(this.PAY._lastPixValor || 0);
+                const emp = state.company?.name || 'Ótica';
+                const client = state.clients.find(c => c.id === state.currentSale.clientId);
+                const nome1  = client?.name ? client.name.split(' ')[0] : 'Cliente';
+                const phone  = (client?.whatsapp || client?.phone || '').replace(/\D/g, '');
+                const msg = `Olá, *${nome1}*! 👋\n\nSegue o código *Pix Copia e Cola* para pagamento de *${valorTxt}*:\n\n${payload}\n\n_Copie o código acima e cole no app do seu banco, na opção "Pix Copia e Cola"._\n\n_${emp}_`;
+                if (!phone) {
+                    // Sem WhatsApp cadastrado para o cliente: abre a tela de seleção de
+                    // contato do próprio WhatsApp, com a mensagem já pronta.
+                    Toast.show('Cliente sem WhatsApp cadastrado — escolha o contato no WhatsApp','warning');
+                    window.open(`https://wa.me/?text=${encodeURIComponent(msg)}`, '_blank');
+                    return;
+                }
+                WppConfirm.show({ nome: client?.name || nome1, phone, subtitle: 'Enviar Pix via WhatsApp', msg,
+                    url: `https://wa.me/55${phone}?text=${encodeURIComponent(msg)}` });
             },
 
             // ── MODO DE PAGAMENTO (único) ────────────────────────────
