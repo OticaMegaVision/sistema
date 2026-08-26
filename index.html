@@ -9711,7 +9711,7 @@ body.dark-mode,
                                 <div class="bkp-status-ic" style="background:#f3f0ff;color:#7c3aed;"><i class="fas fa-code-branch"></i></div>
                                 <div class="txt">
                                     <b>Versão do sistema</b>
-                                    <span>versão <strong>260820261713</strong></span>
+                                    <span>versão <strong>260820262015</strong></span>
                                 </div>
                             </div>
                         </div>
@@ -28052,7 +28052,7 @@ ${container.innerHTML}
                 const client = state.clients.find(c => c.id === state.currentSale.clientId);
                 const nome1  = client?.name ? client.name.split(' ')[0] : 'Cliente';
                 const phone  = (client?.whatsapp || client?.phone || '').replace(/\D/g, '');
-                const msg = `Olá, *${nome1}*! 👋\n\nSegue o QR Code e o código *Pix Copia e Cola* para pagamento de *${valorTxt}*:\n\n${payload}\n\n_Escaneie a imagem ou copie o código acima e cole no app do seu banco, na opção "Pix Copia e Cola"._\n\n_${emp}_`;
+                const msg = `Olá, *${nome1}*! 👋\n\nSegue o Pix para pagamento de *${valorTxt}*:\n\n${payload}\n\n👆 Toque duas vezes no código acima para selecioná-lo e copiar\n\n_${emp}_`;
                 const pngDataUrl = this.PAY._lastPixQrPng;
 
                 // 1) Tenta o compartilhamento nativo com a imagem + texto juntos.
