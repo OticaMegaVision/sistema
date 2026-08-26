@@ -27593,6 +27593,32 @@ ${container.innerHTML}
                     return crc.toString(16).toUpperCase().padStart(4, '0');
                 },
 
+                // Converte o SVG do QR Code em uma imagem PNG (data URL), usada apenas
+                // para compartilhamento/download — nunca para a exibição principal do
+                // QR (que permanece em SVG puro, ver comentário acima). Best-effort:
+                // se falhar (ex.: alguma WebView Android mais restrita), o botão de
+                // WhatsApp simplesmente cai no modo somente-texto.
+                _svgToPngDataUrl(svgEl, size, callback) {
+                    try {
+                        const xml   = new XMLSerializer().serializeToString(svgEl);
+                        const svg64 = btoa(unescape(encodeURIComponent(xml)));
+                        const img   = new Image();
+                        img.onload = () => {
+                            try {
+                                const canvas = document.createElement('canvas');
+                                canvas.width = size; canvas.height = size;
+                                const ctx = canvas.getContext('2d');
+                                ctx.fillStyle = '#ffffff';
+                                ctx.fillRect(0, 0, size, size);
+                                ctx.drawImage(img, 0, 0, size, size);
+                                callback(canvas.toDataURL('image/png'));
+                            } catch (e) { callback(null); }
+                        };
+                        img.onerror = () => callback(null);
+                        img.src = 'data:image/svg+xml;base64,' + svg64;
+                    } catch (e) { callback(null); }
+                },
+
                 renderPixQr(chave, valor, label) {
                     const box  = document.getElementById('pixQrCode');
                     const hint = document.getElementById('pixQrHint');
@@ -27601,6 +27627,7 @@ ${container.innerHTML}
                         box.innerHTML = '<i class="fas fa-qrcode" style="font-size:2.2rem;color:#00a884;"></i>';
                         if (hint) hint.textContent = 'Cadastre a chave PIX nas configurações para gerar o QR Code';
                         this._lastPixPayload = null;
+                        this._lastPixQrPng = null;
                         return;
                     }
                     if (typeof window.qrcode !== 'function') {
@@ -27609,6 +27636,7 @@ ${container.innerHTML}
                         box.innerHTML = '<i class="fas fa-qrcode" style="font-size:2.2rem;color:#00a884;"></i>';
                         if (hint) hint.textContent = '';
                         this._lastPixPayload = null;
+                        this._lastPixQrPng = null;
                         return;
                     }
                     try {
@@ -27643,12 +27671,20 @@ ${container.innerHTML}
                             svgEl.setAttribute('viewBox', '0 0 ' + parseInt(w) + ' ' + parseInt(h));
                             svgEl.setAttribute('width', '100%');
                             svgEl.setAttribute('height', '100%');
+                            // Gera também uma versão PNG do QR (assíncrona, best-effort) só
+                            // para permitir compartilhar/baixar a imagem junto da mensagem do
+                            // WhatsApp. Isolada em try/catch e sem bloquear o SVG acima —
+                            // que continua sendo a exibição principal, síncrona e confiável
+                            // (ver comentário da lib no topo do arquivo sobre canvas em WebViews Android).
+                            this._lastPixQrPng = null;
+                            this._svgToPngDataUrl(svgEl, 512, (dataUrl) => { this._lastPixQrPng = dataUrl; });
                         }
                         if (hint) hint.textContent = label || 'Escaneie para pagar direto pelo celular';
                     } catch (e) {
                         box.innerHTML = '<i class="fas fa-qrcode" style="font-size:2.2rem;color:#00a884;"></i>';
                         if (hint) hint.textContent = '';
                         this._lastPixPayload = null;
+                        this._lastPixQrPng = null;
                     }
                 },
 
@@ -28002,9 +28038,12 @@ ${container.innerHTML}
             },
 
             // Monta a mensagem com o código Pix Copia-e-Cola (o mesmo do QR exibido)
-            // e abre o modal de confirmação do WhatsApp — de lá o usuário pode revisar,
-            // editar, apenas copiar a mensagem, ou enviar direto pro WhatsApp do cliente.
-            sendPixWhatsApp() {
+            // e tenta enviar junto com a IMAGEM do QR Code. O link wa.me do WhatsApp só
+            // aceita texto, então imagem só é possível via menu nativo de compartilhar
+            // do aparelho (Web Share API). Quando isso não está disponível, baixamos o
+            // QR como imagem e abrimos o modal de texto — o usuário só precisa anexar a
+            // imagem baixada na conversa.
+            async sendPixWhatsApp() {
                 const payload = this.PAY._lastPixPayload;
                 if (!payload) { Toast.show('Gere o QR Code do Pix antes de enviar','warning'); return; }
                 const valorTxt = document.getElementById('pixFinal')?.textContent?.trim()
@@ -28013,11 +28052,37 @@ ${container.innerHTML}
                 const client = state.clients.find(c => c.id === state.currentSale.clientId);
                 const nome1  = client?.name ? client.name.split(' ')[0] : 'Cliente';
                 const phone  = (client?.whatsapp || client?.phone || '').replace(/\D/g, '');
-                const msg = `Olá, *${nome1}*! 👋\n\nSegue o código *Pix Copia e Cola* para pagamento de *${valorTxt}*:\n\n${payload}\n\n_Copie o código acima e cole no app do seu banco, na opção "Pix Copia e Cola"._\n\n_${emp}_`;
+                const msg = `Olá, *${nome1}*! 👋\n\nSegue o QR Code e o código *Pix Copia e Cola* para pagamento de *${valorTxt}*:\n\n${payload}\n\n_Escaneie a imagem ou copie o código acima e cole no app do seu banco, na opção "Pix Copia e Cola"._\n\n_${emp}_`;
+                const pngDataUrl = this.PAY._lastPixQrPng;
+
+                // 1) Tenta o compartilhamento nativo com a imagem + texto juntos.
+                if (pngDataUrl && navigator.share && navigator.canShare) {
+                    try {
+                        const res  = await fetch(pngDataUrl);
+                        const blob = await res.blob();
+                        const file = new File([blob], 'pix-qrcode.png', { type: 'image/png' });
+                        if (navigator.canShare({ files: [file] })) {
+                            await navigator.share({ files: [file], text: msg, title: 'Pix' });
+                            return;
+                        }
+                    } catch (e) {
+                        // Usuário cancelou o compartilhamento ou o navegador recusou —
+                        // cai para o fallback de texto abaixo, sem travar o fluxo.
+                    }
+                }
+
+                // 2) Fallback: baixa a imagem do QR (se disponível) e abre o modal de
+                // texto para copiar/enviar a mensagem — o usuário anexa a imagem à mão.
+                if (pngDataUrl) {
+                    const a = document.createElement('a');
+                    a.href = pngDataUrl;
+                    a.download = 'pix-qrcode.png';
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                    Toast.show('QR Code baixado — anexe a imagem na conversa do WhatsApp','warning');
+                }
                 if (!phone) {
-                    // Sem WhatsApp cadastrado para o cliente: abre a tela de seleção de
-                    // contato do próprio WhatsApp, com a mensagem já pronta.
-                    Toast.show('Cliente sem WhatsApp cadastrado — escolha o contato no WhatsApp','warning');
                     window.open(`https://wa.me/?text=${encodeURIComponent(msg)}`, '_blank');
                     return;
                 }
