@@ -265,6 +265,18 @@
                 var q = _chartQueue.splice(0); q.forEach(function(fn){ try{fn(false);}catch(e){} });
             });
         };
+        // QRCode — usado para o QR Code dinâmico do pagamento via PIX
+        var _qrQueue = [];
+        window._ensureQRCode = function(cb) {
+            if (window.QRCode) { cb(true); return; }
+            _qrQueue.push(cb);
+            if (_qrQueue.length > 1) return;
+            window._lazyLoad('https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js', function() {
+                var q = _qrQueue.splice(0); q.forEach(function(fn){ try{fn(!!window.QRCode);}catch(e){} });
+            }, function(){
+                var q = _qrQueue.splice(0); q.forEach(function(fn){ try{fn(false);}catch(e){} });
+            });
+        };
     })();
     </script>
     <style>
@@ -7546,6 +7558,7 @@ body.dark-mode,
                             <div class="form-group tot-field tot-desconto">
                                 <label for="discountValue">Desconto (R$)</label>
                                 <input type="text" inputmode="numeric" id="discountValue" class="form-control" value="0" placeholder="0,00" oninput="Utils.maskMoney(this); Sales.calculateTotal()">
+                                <div id="discountAlerta" style="display:none;margin-top:4px;font-size:11px;font-weight:700;color:#a12622;">⚠️ Desconto maior que o subtotal</div>
                             </div>
                             <div class="form-group tot-field tot-acrescimo">
                                 <label for="additionValue">Acréscimo (R$)</label>
@@ -7639,7 +7652,7 @@ body.dark-mode,
                                     <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;">
                                         <div><label style="font-size:11px;color:#666;">Entrada (R$)</label><input type="text" inputmode="numeric" id="dual1Entry" class="form-control" value="0" style="font-size:0.83rem;" oninput="Utils.maskMoney(this); Sales.calcDual()"></div>
                                         <div><label style="font-size:11px;color:#666;">Retirada (R$)</label><input type="text" inputmode="numeric" id="dual1Retirada" class="form-control" value="0" style="font-size:0.83rem;" oninput="Utils.maskMoney(this); Sales.calcDual()"></div>
-                                        <div><label style="font-size:11px;color:#666;">Nº Parcelas</label><input type="number" id="dual1Parcelas" class="form-control" value="2" min="1" max="48" style="font-size:0.83rem;" oninput="Sales.calcDual()"></div>
+                                        <div><label style="font-size:11px;color:#666;">Nº Parcelas</label><input type="number" id="dual1Parcelas" class="form-control" value="2" min="1" max="12" style="font-size:0.83rem;" oninput="Sales.calcDual()"></div>
                                     </div>
                                     <div style="margin-top:6px;font-size:0.78rem;color:#e65100;" id="dual1ParcelaInfo">—</div>
                                 </div>
@@ -7664,7 +7677,7 @@ body.dark-mode,
                                     <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;">
                                         <div><label style="font-size:11px;color:#666;">Entrada (R$)</label><input type="text" inputmode="numeric" id="dual2Entry" class="form-control" value="0" style="font-size:0.83rem;" oninput="Utils.maskMoney(this); Sales.calcDual()"></div>
                                         <div><label style="font-size:11px;color:#666;">Retirada (R$)</label><input type="text" inputmode="numeric" id="dual2Retirada" class="form-control" value="0" style="font-size:0.83rem;" oninput="Utils.maskMoney(this); Sales.calcDual()"></div>
-                                        <div><label style="font-size:11px;color:#666;">Nº Parcelas</label><input type="number" id="dual2Parcelas" class="form-control" value="2" min="1" max="48" style="font-size:0.83rem;" oninput="Sales.calcDual()"></div>
+                                        <div><label style="font-size:11px;color:#666;">Nº Parcelas</label><input type="number" id="dual2Parcelas" class="form-control" value="2" min="1" max="12" style="font-size:0.83rem;" oninput="Sales.calcDual()"></div>
                                     </div>
                                     <div style="margin-top:6px;font-size:0.78rem;color:#e65100;" id="dual2ParcelaInfo">—</div>
                                 </div>
@@ -7692,12 +7705,15 @@ body.dark-mode,
                         <div id="pixDetails" class="d-none">
                             <div style="background:#e8f9f3;border:1.5px solid #a5d6a7;border-radius:12px;padding:16px;margin-top:12px;">
                                 <div style="display:flex;align-items:center;gap:12px;margin-bottom:12px;">
-                                    <i class="fas fa-qrcode" style="font-size:2.2rem;color:#00a884;"></i>
+                                    <div id="pixQrCode" style="width:110px;height:110px;flex-shrink:0;display:flex;align-items:center;justify-content:center;background:#fff;border:1px solid #c8e6c9;border-radius:8px;">
+                                        <i class="fas fa-qrcode" style="font-size:2.2rem;color:#00a884;"></i>
+                                    </div>
                                     <div style="flex:1;">
                                         <div style="font-weight:800;color:#00695c;font-size:14px;">Pagamento via PIX</div>
                                         <div style="font-size:12px;color:#555;margin-top:4px;">Chave: <strong id="companyPix">—</strong>
                                             <button type="button" onclick="Sales.copyPixKey()" style="margin-left:6px;padding:2px 8px;background:#00a884;color:white;border:none;border-radius:6px;font-size:11px;cursor:pointer;"><i class="fas fa-copy"></i> Copiar</button>
                                         </div>
+                                        <div id="pixQrHint" style="font-size:11px;color:#2e7d32;margin-top:4px;"></div>
                                         <label style="display:inline-flex;align-items:center;gap:6px;margin-top:6px;cursor:pointer;font-size:13px;color:#2e7d32;font-weight:600;">
                                             <input type="checkbox" id="pixDescontoAtivo" onchange="Sales.PAY.pixCalc.call(Sales.PAY)" style="width:16px;height:16px;cursor:pointer;">
                                             Aplicar desconto PIX (<span id="pixDescontoPct">5</span>%) — opcional
@@ -7870,12 +7886,6 @@ body.dark-mode,
                                             <option value="10">10x — 2,5% a.m.</option>
                                             <option value="11">11x — 2,5% a.m.</option>
                                             <option value="12">12x — 2,5% a.m.</option>
-                                            <option value="13">13x — 2,5% a.m.</option>
-                                            <option value="14">14x — 2,5% a.m.</option>
-                                            <option value="15">15x — 2,5% a.m.</option>
-                                            <option value="16">16x — 2,5% a.m.</option>
-                                            <option value="17">17x — 2,5% a.m.</option>
-                                            <option value="18">18x — 2,5% a.m.</option>
                                         </select>
                                     </div>
                                     <div>
@@ -7956,18 +7966,6 @@ body.dark-mode,
                                             <option value="10">10x</option>
                                             <option value="11">11x</option>
                                             <option value="12">12x</option>
-                                            <option value="13">13x</option>
-                                            <option value="14">14x</option>
-                                            <option value="15">15x</option>
-                                            <option value="16">16x</option>
-                                            <option value="17">17x</option>
-                                            <option value="18">18x</option>
-                                            <option value="19">19x</option>
-                                            <option value="20">20x</option>
-                                            <option value="21">21x</option>
-                                            <option value="22">22x</option>
-                                            <option value="23">23x</option>
-                                            <option value="24">24x</option>
                                         </select>
                                     </div>
                                     <div class="parcela-valor-box">
@@ -27528,7 +27526,64 @@ ${container.innerHTML}
                     // Atualiza chave PIX
                     const pix = state.company?.pix || state.company?.cnpj || '—';
                     const kEl = document.getElementById('companyPix'); if (kEl) kEl.textContent = pix;
+                    this.renderPixQr(pix, final);
                     this.retirada('pix');
+                },
+
+                // Gera o "BR Code" (payload EMV do Pix, com CRC16) e desenha o QR Code
+                // dinâmico a partir da chave já cadastrada, com o valor atual da venda.
+                buildPixPayload(chave, valor, nome, cidade) {
+                    const tlv = (id, v) => id + String(v.length).padStart(2, '0') + v;
+                    const merchantAccount = tlv('00', 'BR.GOV.BCB.PIX') + tlv('01', chave);
+                    const additionalData  = tlv('05', '***');
+                    let payload =
+                        tlv('00', '01') +
+                        tlv('26', merchantAccount) +
+                        tlv('52', '0000') +
+                        tlv('53', '986') +
+                        (valor > 0 ? tlv('54', valor.toFixed(2)) : '') +
+                        tlv('58', 'BR') +
+                        tlv('59', (nome || 'OTICA').substring(0, 25)) +
+                        tlv('60', (cidade || 'BRASIL').substring(0, 15)) +
+                        tlv('62', additionalData);
+                    payload += '6304';
+                    return payload + this._crc16(payload);
+                },
+
+                _crc16(str) {
+                    let crc = 0xFFFF;
+                    for (let i = 0; i < str.length; i++) {
+                        crc ^= str.charCodeAt(i) << 8;
+                        for (let j = 0; j < 8; j++) {
+                            crc = (crc & 0x8000) ? ((crc << 1) ^ 0x1021) : (crc << 1);
+                            crc &= 0xFFFF;
+                        }
+                    }
+                    return crc.toString(16).toUpperCase().padStart(4, '0');
+                },
+
+                renderPixQr(chave, valor) {
+                    const box  = document.getElementById('pixQrCode');
+                    const hint = document.getElementById('pixQrHint');
+                    if (!box) return;
+                    if (!chave || chave === '—') {
+                        box.innerHTML = '<i class="fas fa-qrcode" style="font-size:2.2rem;color:#00a884;"></i>';
+                        if (hint) hint.textContent = 'Cadastre a chave PIX nas configurações para gerar o QR Code';
+                        return;
+                    }
+                    window._ensureQRCode((ok) => {
+                        if (!ok || !window.QRCode) {
+                            box.innerHTML = '<i class="fas fa-qrcode" style="font-size:2.2rem;color:#00a884;"></i>';
+                            if (hint) hint.textContent = '';
+                            return;
+                        }
+                        const nome   = state.company?.name || 'OTICA';
+                        const cidade = state.company?.city || 'BRASIL';
+                        const payload = this.buildPixPayload(chave, valor || 0, nome, cidade);
+                        box.innerHTML = '';
+                        new window.QRCode(box, { text: payload, width: 100, height: 100, correctLevel: window.QRCode.CorrectLevel.M });
+                        if (hint) hint.textContent = 'Escaneie para pagar direto pelo celular';
+                    });
                 },
 
                 // Dinheiro — desconto configurável (padrão 3% se não configurado)
@@ -27667,11 +27722,12 @@ ${container.innerHTML}
                     const labelEl  = document.getElementById('retiradaAlertLabel');
                     if (alertEl) {
                         if (excedente > 0.01) {
+                            const saldoDisponivel = Math.max(0, total - entryVal);
                             alertEl.style.display = 'flex';
                             alertEl.classList.add('excedente');
-                            if (labelEl) labelEl.textContent = '⚠️ Entrada + Retirada excede o total';
+                            if (labelEl) labelEl.textContent = '⚠️ Retirada maior que o saldo disponível';
                             if (valorEl) valorEl.textContent = f(excedente);
-                            if (infoEl)  infoEl.textContent  = 'Reduza a entrada ou a retirada em ' + f(excedente);
+                            if (infoEl)  infoEl.textContent  = 'Saldo disponível para retirada: ' + f(saldoDisponivel) + ' | Reduza em ' + f(excedente);
                         } else if (retiradaV > 0.01 || remaining > 0.01) {
                             alertEl.style.display = 'flex';
                             alertEl.classList.remove('excedente');
@@ -27780,6 +27836,16 @@ ${container.innerHTML}
                 const discount = Utils.parseMoney(document.getElementById('discountValue').value) || 0;
                 const addition = Utils.parseMoney(document.getElementById('additionValue').value) || 0;
                 const bruto = Math.max(0, subtotal - discount + addition);
+
+                // Avisa quando o desconto digitado é maior que o subtotal (não altera o cálculo,
+                // que já protege com Math.max(0, ...), só deixa o vendedor ciente do excesso).
+                const discAlertEl = document.getElementById('discountAlerta');
+                const discInputEl = document.getElementById('discountValue');
+                if (discAlertEl) {
+                    const excede = discount > subtotal + 0.01;
+                    discAlertEl.style.display = excede ? 'block' : 'none';
+                    if (discInputEl) discInputEl.style.borderColor = excede ? '#e57373' : '';
+                }
 
                 state.currentSale.subtotal   = subtotal;
                 state.currentSale.discount   = discount;
