@@ -9710,7 +9710,7 @@ body.dark-mode,
                                 <div class="bkp-status-ic" style="background:#f3f0ff;color:#7c3aed;"><i class="fas fa-code-branch"></i></div>
                                 <div class="txt">
                                     <b>Versão do sistema</b>
-                                    <span>versão <strong>260820261621</strong></span>
+                                    <span>versão <strong>260820261636</strong></span>
                                 </div>
                             </div>
                         </div>
@@ -18438,10 +18438,23 @@ body.dark-mode,
                 return prefix + '-' + Date.now() + '-' + Math.random().toString(36).substr(2, 9);
             },
 
+            // Normaliza a chave Pix: CPF/CNPJ (11 ou 14 dígitos) vira só dígitos,
+            // sem pontuação; e-mail/telefone/chave aleatória ficam como digitados
+            // (apenas sem espaços). Usada tanto para exibir a chave quanto para
+            // montar o QR Code, garantindo que os dois sempre batam.
+            normalizePixKey(v) {
+                v = (v || '').trim();
+                if (!v) return '';
+                const digitsOnly = v.replace(/\D/g, '');
+                if (digitsOnly.length === 11 || digitsOnly.length === 14) return digitsOnly;
+                return v.replace(/\s+/g, '');
+            },
+
             updatePixKey() {
                 const pixElement = document.getElementById('companyPix');
                 if (pixElement) {
-                    pixElement.innerText = state.company.cnpj || '12.345.678/0001-99';
+                    const chave = Utils.normalizePixKey(state.company.pix || state.company.cnpj) || '12345678000199';
+                    pixElement.innerText = chave;
                 }
             },
 
@@ -25314,9 +25327,9 @@ tbody tr td{border:1.5px solid #000;padding:2mm;text-align:center;font-weight:70
                     secondaryColor: document.getElementById('configSecondaryColor').value
                 };
                 
-                // Chave Pix CNPJ deve conter somente dígitos (sem máscara),
-                // conforme o padrão do Bacen; a exibição formatada continua em company.cnpj.
-                state.company.pix = (state.company.cnpj || '').replace(/\D/g, '');
+                // Chave Pix normalizada (CNPJ vira só dígitos); a exibição formatada
+                // continua disponível em company.cnpj.
+                state.company.pix = Utils.normalizePixKey(state.company.cnpj);
                 
                 App.saveData();
                 App.updateCompanyDisplay();
@@ -27517,8 +27530,9 @@ ${container.innerHTML}
                     const b = document.getElementById('pixBruto'); if (b) b.innerText = this.fmt(bruto);
                     const d = document.getElementById('pixDesconto'); if (d) d.innerText = ativo ? '- ' + this.fmt(desc) : '— (não aplicado)';
                     const f = document.getElementById('pixFinal'); if (f) f.innerText = this.fmt(final);
-                    // Atualiza chave PIX
-                    const pix = state.company?.pix || state.company?.cnpj || '—';
+                    // Atualiza chave PIX — sempre normalizada (sem máscara), pra bater
+                    // exatamente com o que é usado no QR Code.
+                    const pix = Utils.normalizePixKey(state.company?.pix || state.company?.cnpj) || '—';
                     const kEl = document.getElementById('companyPix'); if (kEl) kEl.textContent = pix;
                     this.renderPixQr(pix, final);
                     this.retirada('pix');
@@ -27537,7 +27551,7 @@ ${container.innerHTML}
                 },
                 buildPixPayload(chave, valor, nome, cidade) {
                     const tlv = (id, v) => id + String(v.length).padStart(2, '0') + v;
-                    const chaveLimpa = (chave || '').replace(/[^A-Za-z0-9@.+-]/g, '');
+                    const chaveLimpa = Utils.normalizePixKey(chave);
                     const nomeLimpo = this._pixSanitizeText(nome || 'OTICA').substring(0, 25) || 'OTICA';
                     const cidadeLimpa = this._pixSanitizeText(cidade || 'BRASIL').substring(0, 15) || 'BRASIL';
                     const merchantAccount = tlv('00', 'br.gov.bcb.pix') + tlv('01', chaveLimpa);
