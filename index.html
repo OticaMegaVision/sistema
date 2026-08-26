@@ -9711,7 +9711,7 @@ body.dark-mode,
                                 <div class="bkp-status-ic" style="background:#f3f0ff;color:#7c3aed;"><i class="fas fa-code-branch"></i></div>
                                 <div class="txt">
                                     <b>Versão do sistema</b>
-                                    <span>versão <strong>260820262015</strong></span>
+                                    <span>versão <strong>260820262051</strong></span>
                                 </div>
                             </div>
                         </div>
@@ -18012,12 +18012,13 @@ body.dark-mode,
         window.addEventListener('load', () => NotificationEngine.start());
 
         const WppConfirm = {
-            _url: '', _msg: '', _phone: '',
+            _url: '', _msg: '', _phone: '', _onSent: null,
 
-            show({ nome, phone, subtitle, msg, url }) {
-                this._url   = url;
-                this._msg   = msg;
-                this._phone = (phone || '').replace(/\D/g, '');
+            show({ nome, phone, subtitle, msg, url, onSent }) {
+                this._url    = url;
+                this._msg    = msg;
+                this._phone  = (phone || '').replace(/\D/g, '');
+                this._onSent = onSent || null;
                 document.getElementById('wppConfirmName').textContent     = nome    || '—';
                 document.getElementById('wppConfirmPhone').textContent    = this._formatPhone(phone);
                 document.getElementById('wppConfirmSubtitle').textContent = subtitle || 'Edite e confirme antes de enviar';
@@ -18073,7 +18074,11 @@ body.dark-mode,
                 const ta  = document.getElementById('wppConfirmEdit');
                 const msg = (ta ? ta.value.trim() : '') || this._msg;
                 window.open(`https://wa.me/55${this._phone}?text=${encodeURIComponent(msg)}`,'_blank');
+                const onSent = this._onSent;
                 this.close();
+                // Encadeia uma 2ª mensagem (ex.: código Pix isolado) quando configurado
+                // pela tela que abriu o modal — ver Sales.sendPixWhatsApp().
+                if (typeof onSent === 'function') setTimeout(onSent, 400);
             },
 
             copiar() {
@@ -18095,7 +18100,7 @@ body.dark-mode,
 
             close() {
                 document.getElementById('wppConfirmModal').classList.remove('show');
-                this._url=''; this._msg=''; this._phone='';
+                this._url=''; this._msg=''; this._phone=''; this._onSent=null;
             },
 
             _formatPhone(raw='') {
@@ -28037,12 +28042,13 @@ ${container.innerHTML}
                 }
             },
 
-            // Monta a mensagem com o código Pix Copia-e-Cola (o mesmo do QR exibido)
-            // e tenta enviar junto com a IMAGEM do QR Code. O link wa.me do WhatsApp só
-            // aceita texto, então imagem só é possível via menu nativo de compartilhar
-            // do aparelho (Web Share API). Quando isso não está disponível, baixamos o
-            // QR como imagem e abrimos o modal de texto — o usuário só precisa anexar a
-            // imagem baixada na conversa.
+            // Monta DUAS mensagens: a 1ª com saudação/valor e a 2ª contendo *apenas*
+            // o código Pix Copia-e-Cola (sem nenhum outro texto junto) — assim o
+            // cliente consegue copiar o código com um único toque em "Copiar", sem
+            // precisar recortar nada do meio do texto. O link wa.me só aceita uma
+            // mensagem de texto por vez, por isso são dois envios em sequência.
+            // A imagem do QR (quando suportado pelo aparelho) vai junto da 1ª mensagem
+            // via menu nativo de compartilhar do dispositivo.
             async sendPixWhatsApp() {
                 const payload = this.PAY._lastPixPayload;
                 if (!payload) { Toast.show('Gere o QR Code do Pix antes de enviar','warning'); return; }
@@ -28052,17 +28058,30 @@ ${container.innerHTML}
                 const client = state.clients.find(c => c.id === state.currentSale.clientId);
                 const nome1  = client?.name ? client.name.split(' ')[0] : 'Cliente';
                 const phone  = (client?.whatsapp || client?.phone || '').replace(/\D/g, '');
-                const msg = `Olá, *${nome1}*! 👋\n\nSegue o Pix para pagamento de *${valorTxt}*:\n\n${payload}\n\n👆 Toque duas vezes no código acima para selecioná-lo e copiar\n\n_${emp}_`;
+                const msg1 = `Olá, *${nome1}*! 👋\n\nSegue o Pix para pagamento de *${valorTxt}*.\n\nEnvio o código *Pix Copia e Cola* na mensagem seguinte, pra você copiar mais fácil 👇\n\n_${emp}_`;
+                const msg2 = payload; // mensagem só com o código — nada mais junto
                 const pngDataUrl = this.PAY._lastPixQrPng;
 
-                // 1) Tenta o compartilhamento nativo com a imagem + texto juntos.
+                const abrirMsg2 = () => {
+                    Toast.show('Agora envie a 2ª mensagem: o código Pix','warning');
+                    if (!phone) {
+                        window.open(`https://wa.me/?text=${encodeURIComponent(msg2)}`, '_blank');
+                        return;
+                    }
+                    WppConfirm.show({ nome: client?.name || nome1, phone,
+                        subtitle: 'Mensagem 2 de 2 — código Pix (só copiar e enviar)', msg: msg2,
+                        url: `https://wa.me/55${phone}?text=${encodeURIComponent(msg2)}` });
+                };
+
+                // 1) Tenta o compartilhamento nativo da 1ª mensagem já com a imagem do QR.
                 if (pngDataUrl && navigator.share && navigator.canShare) {
                     try {
                         const res  = await fetch(pngDataUrl);
                         const blob = await res.blob();
                         const file = new File([blob], 'pix-qrcode.png', { type: 'image/png' });
                         if (navigator.canShare({ files: [file] })) {
-                            await navigator.share({ files: [file], text: msg, title: 'Pix' });
+                            await navigator.share({ files: [file], text: msg1, title: 'Pix' });
+                            abrirMsg2();
                             return;
                         }
                     } catch (e) {
@@ -28071,8 +28090,8 @@ ${container.innerHTML}
                     }
                 }
 
-                // 2) Fallback: baixa a imagem do QR (se disponível) e abre o modal de
-                // texto para copiar/enviar a mensagem — o usuário anexa a imagem à mão.
+                // 2) Fallback: baixa a imagem do QR (se disponível) e abre o modal da
+                // 1ª mensagem — ao enviá-la, a 2ª (código) abre automaticamente em seguida.
                 if (pngDataUrl) {
                     const a = document.createElement('a');
                     a.href = pngDataUrl;
@@ -28083,11 +28102,14 @@ ${container.innerHTML}
                     Toast.show('QR Code baixado — anexe a imagem na conversa do WhatsApp','warning');
                 }
                 if (!phone) {
-                    window.open(`https://wa.me/?text=${encodeURIComponent(msg)}`, '_blank');
+                    window.open(`https://wa.me/?text=${encodeURIComponent(msg1)}`, '_blank');
+                    abrirMsg2();
                     return;
                 }
-                WppConfirm.show({ nome: client?.name || nome1, phone, subtitle: 'Enviar Pix via WhatsApp', msg,
-                    url: `https://wa.me/55${phone}?text=${encodeURIComponent(msg)}` });
+                WppConfirm.show({ nome: client?.name || nome1, phone,
+                    subtitle: 'Mensagem 1 de 2 — saudação e valor', msg: msg1,
+                    url: `https://wa.me/55${phone}?text=${encodeURIComponent(msg1)}`,
+                    onSent: abrirMsg2 });
             },
 
             // ── MODO DE PAGAMENTO (único) ────────────────────────────
