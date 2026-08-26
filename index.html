@@ -9710,7 +9710,7 @@ body.dark-mode,
                                 <div class="bkp-status-ic" style="background:#f3f0ff;color:#7c3aed;"><i class="fas fa-code-branch"></i></div>
                                 <div class="txt">
                                     <b>Versão do sistema</b>
-                                    <span>versão <strong>260820260722</strong></span>
+                                    <span>versão <strong>260820261621</strong></span>
                                 </div>
                             </div>
                         </div>
@@ -25314,7 +25314,9 @@ tbody tr td{border:1.5px solid #000;padding:2mm;text-align:center;font-weight:70
                     secondaryColor: document.getElementById('configSecondaryColor').value
                 };
                 
-                state.company.pix = state.company.cnpj;
+                // Chave Pix CNPJ deve conter somente dígitos (sem máscara),
+                // conforme o padrão do Bacen; a exibição formatada continua em company.cnpj.
+                state.company.pix = (state.company.cnpj || '').replace(/\D/g, '');
                 
                 App.saveData();
                 App.updateCompanyDisplay();
@@ -27524,9 +27526,21 @@ ${container.innerHTML}
 
                 // Gera o "BR Code" (payload EMV do Pix, com CRC16) e desenha o QR Code
                 // dinâmico a partir da chave já cadastrada, com o valor atual da venda.
+                // Remove acentos e caracteres fora do padrão ASCII exigido pelo BR Code
+                // (campos 59/60), evitando payload com tamanho de bytes divergente do
+                // tamanho declarado no TLV.
+                _pixSanitizeText(v) {
+                    return (v || '')
+                        .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+                        .replace(/[^A-Za-z0-9 ]/g, '')
+                        .toUpperCase();
+                },
                 buildPixPayload(chave, valor, nome, cidade) {
                     const tlv = (id, v) => id + String(v.length).padStart(2, '0') + v;
-                    const merchantAccount = tlv('00', 'BR.GOV.BCB.PIX') + tlv('01', chave);
+                    const chaveLimpa = (chave || '').replace(/[^A-Za-z0-9@.+-]/g, '');
+                    const nomeLimpo = this._pixSanitizeText(nome || 'OTICA').substring(0, 25) || 'OTICA';
+                    const cidadeLimpa = this._pixSanitizeText(cidade || 'BRASIL').substring(0, 15) || 'BRASIL';
+                    const merchantAccount = tlv('00', 'br.gov.bcb.pix') + tlv('01', chaveLimpa);
                     const additionalData  = tlv('05', '***');
                     let payload =
                         tlv('00', '01') +
@@ -27535,8 +27549,8 @@ ${container.innerHTML}
                         tlv('53', '986') +
                         (valor > 0 ? tlv('54', valor.toFixed(2)) : '') +
                         tlv('58', 'BR') +
-                        tlv('59', (nome || 'OTICA').substring(0, 25)) +
-                        tlv('60', (cidade || 'BRASIL').substring(0, 15)) +
+                        tlv('59', nomeLimpo) +
+                        tlv('60', cidadeLimpa) +
                         tlv('62', additionalData);
                     payload += '6304';
                     return payload + this._crc16(payload);
