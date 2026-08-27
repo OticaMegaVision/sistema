@@ -4442,35 +4442,17 @@ var qrcode=function(){function r(t,e){if(void 0===t.length)throw new Error(t.len
             display: flex;
             flex-direction: column;
             gap: 0.5mm;
-            min-width: 0;
         }
         .carne-dados-row {
             display: flex;
             justify-content: space-between;
-            gap: 2mm;
             font-size: 10px;
             color: #000;
             font-weight: 900;
             padding-bottom: 0.5mm;
             border-bottom: 1.5px dotted #888;
         }
-        .carne-dados-row span:first-child { flex-shrink: 0; }
-        .carne-dados-row span:last-child { font-weight: 900; color: #000; font-size: 10.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-
-        /* QR Code Pix da própria parcela — pagamento direto pelo celular */
-        .carne-qr-box {
-            width: 16mm;
-            height: 16mm;
-            flex-shrink: 0;
-            align-self: center;
-            background: #fff;
-            border: 1px solid #ccc;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            overflow: hidden;
-        }
-        .carne-qr-box svg { width: 100%; height: 100%; display: block; }
+        .carne-dados-row span:last-child { font-weight: 900; color: #000; font-size: 10.5px; }
 
         /* Caixa de valor destaque */
         .carne-valor-box {
@@ -9740,7 +9722,7 @@ body.dark-mode,
                                 <div class="bkp-status-ic" style="background:#f3f0ff;color:#7c3aed;"><i class="fas fa-code-branch"></i></div>
                                 <div class="txt">
                                     <b>Versão do sistema</b>
-                                    <span>versão <strong>270820261523</strong></span>
+                                    <span>versão <strong>270820261500</strong></span>
                                 </div>
                             </div>
                         </div>
@@ -27627,39 +27609,6 @@ ${container.innerHTML}
                     return crc.toString(16).toUpperCase().padStart(4, '0');
                 },
 
-                // Gera a tag <svg> (string) de um QR Pix pronta para ser embutida direto
-                // em HTML impresso/PDF (ex.: carnê) — mesma lógica de renderPixQr, mas
-                // sem depender de um elemento na tela. Retorna '' se a chave não estiver
-                // configurada ou a lib de QR não estiver disponível (nunca lança erro,
-                // pra nunca quebrar a geração do carnê).
-                buildPixQrSvg(chave, valor, nome, cidade) {
-                    if (!chave || typeof window.qrcode !== 'function') return '';
-                    try {
-                        const payload = this.buildPixPayload(chave, valor || 0, nome, cidade);
-                        let qr = null;
-                        for (let typeNumber = 4; typeNumber <= 40; typeNumber++) {
-                            try {
-                                qr = window.qrcode(typeNumber, 'M');
-                                qr.addData(payload);
-                                qr.make();
-                                break;
-                            } catch (e) { qr = null; }
-                        }
-                        if (!qr) return '';
-                        const raw = qr.createSvgTag(4);
-                        const tmp = document.createElement('div');
-                        tmp.innerHTML = raw;
-                        const svgEl = tmp.querySelector('svg');
-                        if (!svgEl) return '';
-                        const w = svgEl.getAttribute('width') || '100';
-                        const h = svgEl.getAttribute('height') || '100';
-                        svgEl.setAttribute('viewBox', '0 0 ' + parseInt(w) + ' ' + parseInt(h));
-                        svgEl.removeAttribute('width');
-                        svgEl.removeAttribute('height');
-                        return svgEl.outerHTML;
-                    } catch (e) { return ''; }
-                },
-
                 // Converte o SVG do QR Code em uma imagem PNG (data URL), usada apenas
                 // para compartilhamento/download — nunca para a exibição principal do
                 // QR (que permanece em SVG puro, ver comentário acima). Best-effort:
@@ -29503,18 +29452,7 @@ ${container.innerHTML}
                     ? `<div class="carne-logo-circulo"><img src="${squareLogo}" width="100%" height="100%" style="display:block;border-radius:50%;"></div>`
                     : `<div class="carne-logo-circulo"><span>👁️</span></div>`;
 
-                // Chave PIX da empresa (mesma usada na tela de venda) — se não estiver
-                // cadastrada, o QR simplesmente não é exibido em nenhuma parcela.
-                const carneChavePix = Utils.normalizePixKey(company.pix || company.pixKey || company.cnpj);
-
-                const buildParcela = (p, isLast) => {
-                    // QR Pix individual da parcela, já com o valor exato dela — o
-                    // cliente escaneia e paga só aquela parcela, sem digitar nada.
-                    const qrSvg = carneChavePix
-                        ? this.PAY.buildPixQrSvg(carneChavePix, p.value, company.name, company.city)
-                        : '';
-                    const qrHtml = qrSvg ? `<div class="carne-qr-box">${qrSvg}</div>` : '';
-                    return `
+                const buildParcela = (p, isLast) => `
                     <div class="carne-parcela">
                         <!-- Faixa lateral -->
                         <div class="carne-lateral">
@@ -29550,7 +29488,7 @@ ${container.innerHTML}
                                 </div>
                             </div>
 
-                                <div class="carne-dados-meio">
+                            <div class="carne-dados-meio">
                                 <!-- Infos à esquerda -->
                                 <div class="carne-dados-info">
                                     <div class="carne-dados-row"><span>Parcela</span><span>${p.number} de ${details.installments}</span></div>
@@ -29558,7 +29496,6 @@ ${container.innerHTML}
                                     <div class="carne-dados-row"><span>Telefone</span><span>${client?.phone || '—'}</span></div>
                                     <div class="carne-dados-row"><span>CNPJ Credor</span><span>${company.cnpj || '—'}</span></div>
                                 </div>
-                                ${qrHtml}
                                 <!-- Caixa de valor -->
                                 <div class="carne-valor-box">
                                     <div class="carne-valor-label">Valor da Parcela</div>
@@ -29581,7 +29518,6 @@ ${container.innerHTML}
                     </div>
                     ${!isLast ? '<div class="carne-parcela-sep"><div class="carne-parcela-sep-linha"></div><div class="carne-parcela-sep-txt">✂ recorte</div><div class="carne-parcela-sep-linha"></div></div>' : ''}
                 `;
-                };
 
                 // ── Totalizador (última linha de cada página ou final) ────────
                 const buildTotalizador = () => `
