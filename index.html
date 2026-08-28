@@ -9722,7 +9722,7 @@ body.dark-mode,
                                 <div class="bkp-status-ic" style="background:#f3f0ff;color:#7c3aed;"><i class="fas fa-code-branch"></i></div>
                                 <div class="txt">
                                     <b>Versão do sistema</b>
-                                    <span>versão <strong>280820261240</strong></span>
+                                    <span>versão <strong>280820261335</strong></span>
                                 </div>
                             </div>
                         </div>
@@ -28016,6 +28016,16 @@ ${container.innerHTML}
                     if (tdEl) tdEl.innerText = Utils.formatCurrency(state.currentSale.total);
                 }
 
+                // BUG FIX: por padrão o valor do produto deve aparecer em "Entrada"
+                // (e "Pagamento na retirada" nasce zerado, editável pelo vendedor).
+                // Só é pulado ao reabrir uma venda já salva (preserveDiscount=true),
+                // caso em que os valores salvos de entrada/retirada são respeitados.
+                const _setEntradaCheia = (inputId) => {
+                    if (preserveDiscount) return;
+                    const el = document.getElementById(inputId);
+                    if (el) el.value = (state.currentSale.total || 0).toFixed(2).replace('.', ',');
+                };
+
                 if (method === 'pix') {
                     document.getElementById('pixDetails')?.classList.remove('d-none');
                     // Desconto inicia sempre desmarcado — usuário decide se aplica
@@ -28025,6 +28035,8 @@ ${container.innerHTML}
                         if (pixDescCb) pixDescCb.checked = false;
                     }
                     this.PAY.pixCalc.call(this.PAY);
+                    _setEntradaCheia('pixEntrada');
+                    if (!preserveDiscount) this.PAY.pixCalc.call(this.PAY);
                 } else if (method === 'cash') {
                     document.getElementById('cashDetails')?.classList.remove('d-none');
                     // Desconto inicia sempre desmarcado — usuário decide se aplica
@@ -28034,12 +28046,18 @@ ${container.innerHTML}
                         if (cashDescCb) cashDescCb.checked = false;
                     }
                     this.PAY.cashCalc.call(this.PAY);
+                    _setEntradaCheia('cashEntrada');
+                    if (!preserveDiscount) this.PAY.cashCalc.call(this.PAY);
                 } else if (method === 'debit') {
                     document.getElementById('debitDetails')?.classList.remove('d-none');
                     this.PAY.debitCalc.call(this.PAY);
+                    _setEntradaCheia('debitEntrada');
+                    if (!preserveDiscount) this.PAY.debitCalc.call(this.PAY);
                 } else if (method === 'credit') {
                     document.getElementById('creditDetails')?.classList.remove('d-none');
                     this.PAY.creditCalc.call(this.PAY);
+                    _setEntradaCheia('creditEntrada');
+                    if (!preserveDiscount) this.PAY.creditCalc.call(this.PAY);
                 } else if (method === 'installment') {
                     document.getElementById('installmentDetails')?.classList.remove('d-none');
                     this.PAY.instCalc.call(this.PAY);
