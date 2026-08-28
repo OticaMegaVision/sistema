@@ -7731,9 +7731,9 @@ body.dark-mode,
                                     <label style="font-size:12px;font-weight:600;color:#555;display:block;margin-bottom:4px;">Entrada paga (R$)</label>
                                     <input type="text" inputmode="numeric" id="pixEntrada" class="form-control" value="0" oninput="Utils.maskMoney(this); Sales.PAY.pixCalc.call(Sales.PAY)" onchange="Sales.PAY.pixCalc.call(Sales.PAY)">
                                 </div>
-                                <div class="retirada-card" id="pixRetiradaCard" style="margin-top:10px;">
+                                <div class="retirada-card" id="pixRetiradaCard" style="margin-top:10px;display:none;">
                                     <label><i class="fas fa-glasses"></i> Restante na retirada</label>
-                                    <input type="text" inputmode="numeric" id="pixRetirada" class="form-control" value="0" oninput="Utils.maskMoney(this)">
+                                    <div id="pixRetirada" class="form-control">R$ 0,00</div>
                                 </div>
                                 <div id="pixAlerta" class="retirada-alert" style="display:none;margin-top:8px;">
                                     <i class="fas fa-glasses"></i>
@@ -7798,7 +7798,7 @@ body.dark-mode,
                                 </div>
                                 <div class="divisor"><div class="linha"></div><span><i class="fas fa-layer-group"></i> Ou pagamento parcial</span><div class="linha"></div></div>
                                 <div>
-                                    <label style="font-size:12px;font-weight:600;color:#555;display:block;margin-bottom:4px;">Valor a pagar na retirada</label>
+                                    <label style="font-size:12px;font-weight:600;color:#555;display:block;margin-bottom:4px;">Valor da entrada (R$) — o restante fica para pagar na retirada</label>
                                     <input type="text" inputmode="numeric" id="cashEntrada" class="form-control" value="0" oninput="Utils.maskMoney(this); Sales.PAY.retirada('cash')">
                                 </div>
                                 <div id="cashAlerta" class="retirada-alert" style="display:none;margin-top:8px;">
@@ -7838,9 +7838,9 @@ body.dark-mode,
                                         <input type="text" inputmode="numeric" id="debitEntrada" class="form-control" value="0" oninput="Utils.maskMoney(this); Sales.PAY.retirada('debit')">
                                     </div>
                                 </div>
-                                <div class="retirada-card" id="debitRetiradaCard" style="margin-top:10px;">
+                                <div class="retirada-card" id="debitRetiradaCard" style="margin-top:10px;display:none;">
                                     <label><i class="fas fa-glasses"></i> Restante na retirada</label>
-                                    <input type="text" inputmode="numeric" id="debitRetirada" class="form-control" value="0" oninput="Utils.maskMoney(this)">
+                                    <div id="debitRetirada" class="form-control">R$ 0,00</div>
                                 </div>
                                 <div id="debitAlerta" class="retirada-alert" style="display:none;margin-top:8px;">
                                     <i class="fas fa-glasses"></i>
@@ -7902,9 +7902,9 @@ body.dark-mode,
                                     <label style="font-size:12px;font-weight:600;color:#555;display:block;margin-bottom:4px;">Entrada paga (R$) — opcional</label>
                                     <input type="text" inputmode="numeric" id="creditEntrada" class="form-control" value="0" oninput="Utils.maskMoney(this); Sales.PAY.retirada('credit')">
                                 </div>
-                                <div class="retirada-card" id="creditRetiradaCard" style="margin-top:10px;">
+                                <div class="retirada-card" id="creditRetiradaCard" style="margin-top:10px;display:none;">
                                     <label><i class="fas fa-glasses"></i> Restante na retirada</label>
-                                    <input type="text" inputmode="numeric" id="creditRetirada" class="form-control" value="0" oninput="Utils.maskMoney(this)">
+                                    <div id="creditRetirada" class="form-control">R$ 0,00</div>
                                 </div>
                                 <div id="creditAlerta" class="retirada-alert" style="display:none;margin-top:8px;">
                                     <i class="fas fa-glasses"></i>
@@ -27502,15 +27502,12 @@ ${container.innerHTML}
                     const excedente = Math.max(0, entrada - total);
                     const restante  = Math.max(0, total - entrada);
                     const dispEl    = document.getElementById(cfg.display);
-                    if (dispEl) {
-                        if (dispEl.tagName === 'INPUT') dispEl.value = this.fmt(restante);
-                        else dispEl.textContent = this.fmt(restante);
-                    }
-                    // Campo "Restante na retirada" fica sempre visível (mesmo com
-                    // valor zerado), e é editável manualmente pelo vendedor — é
-                    // recalculado automaticamente sempre que a Entrada paga muda.
+                    if (dispEl) dispEl.textContent = this.fmt(restante);
+                    // O card "Restante na retirada" só aparece depois que o vendedor
+                    // de fato digitou uma entrada — não deve aparecer sozinho com o
+                    // valor total só porque o método foi selecionado.
                     const cardEl    = document.getElementById(cfg.card);
-                    if (cardEl) cardEl.style.display = '';
+                    if (cardEl) cardEl.style.display = (entrada > 0.01) ? '' : 'none';
                     const alertEl   = document.getElementById(cfg.alerta);
                     const alertVal  = document.getElementById(cfg.alertaVal);
                     const alertLbl  = document.getElementById(cfg.alertaLabel);
@@ -30905,7 +30902,7 @@ ${container.innerHTML}
             Usuarios.renderTable().catch(()=>{});
             BackupManager.init();
             KeyboardShortcuts.init();
-            LogSystem.log('info', 'Sistema Iniciado', 'ÓticaVision Pro v2.1');
+            LogSystem.log('info', 'Sistema Iniciado', 'ÓticaVision Pro v2.0');
             setTimeout(() => {
                 adicionarTooltips();
                 melhorarAcessibilidade();
@@ -31088,7 +31085,7 @@ ${container.innerHTML}
                 const backup = {
                     timestamp,
                     tipo: isDiario ? 'diario' : 'automatico',
-                    versao: '2.1',
+                    versao: '2.0',
                     _store: lojaAtiva,
                     data: savedData
                 };
@@ -31157,7 +31154,7 @@ ${container.innerHTML}
                     const lojaAtiva = window._currentStore || 'barueri';
                     const lojaLabel = lojaAtiva === 'caucaia' ? 'CaucaiaDoAlto' : 'Barueri';
                     const dados = {
-                        versao: '2.1',
+                        versao: '2.0',
                         _store: lojaAtiva,
                         _loja: lojaLabel,
                         data_exportacao: new Date().toISOString(),
