@@ -9726,7 +9726,7 @@ body.dark-mode,
                                 <div class="bkp-status-ic" style="background:#f3f0ff;color:#7c3aed;"><i class="fas fa-code-branch"></i></div>
                                 <div class="txt">
                                     <b>Versão do sistema</b>
-                                    <span>versão <strong>280820261559</strong></span>
+                                    <span>versão <strong>280820261627</strong></span>
                                 </div>
                             </div>
                         </div>
@@ -30220,6 +30220,10 @@ ${container.innerHTML}
                 var lbl=document.getElementById('osGeradoPagtoLabel');
                 if(lbl) lbl.textContent='Selecione a situação — isso remove da lista de Contas a Receber';
                 Modal.show('osGeradoModal');
+                // Sem saldo pendente: aplica PAGO automaticamente, sem exigir clique.
+                if (!this._saleHasPendingValue(sale)) {
+                    this._setOsGeradoPagamento('pago', true);
+                }
             },
 
             // Cancela a edição de uma venda e limpa o formulário
@@ -30400,7 +30404,68 @@ ${container.innerHTML}
                 });
             },
 
+            // Detecta se a venda (com base no formulário atual) tem valor pendente
+            // (retirada em métodos à vista/dual, ou saldo não coberto no crediário).
+            // Usada tanto para decidir "PAGO automático" quanto para bloquear
+            // "Dar baixa" quando ainda há saldo a receber.
+            _formHasPendingValue() {
+                const method = state.currentSale.paymentMethod;
+                const isDual = state.currentSale._dualMode && state.currentSale._dualPayments?.length === 2;
+                const metodosAVista = ['pix', 'cash', 'debit', 'credit'];
+
+                if (isDual) {
+                    const dp = state.currentSale._dualPayments || [];
+                    return dp.some(slot => {
+                        if (slot.method === 'installment') {
+                            const restante = Math.max(0, (slot.value || 0) - (slot.entry || 0) - (slot.retirada || 0));
+                            return restante > 0.01;
+                        }
+                        return (slot.retirada || 0) > 0.01;
+                    });
+                }
+                if (metodosAVista.includes(method)) {
+                    const entradaIds = { pix: 'pixEntrada', cash: 'cashEntrada', debit: 'debitEntrada', credit: 'creditEntrada' };
+                    const entradaEl  = document.getElementById(entradaIds[method]);
+                    const entradaVal = entradaEl ? (Utils.parseMoney(entradaEl.value) || 0) : 0;
+                    const totalFinal = state.currentSale.total || 0;
+                    return Math.max(0, totalFinal - entradaVal) > 0.01;
+                }
+                // Crediário
+                const total     = state.currentSale.total || 0;
+                const entryVal  = Utils.parseMoney(document.getElementById('entryValue')?.value)   || 0;
+                const retiradaV = Utils.parseMoney(document.getElementById('retiradaEntry')?.value) || 0;
+                return Math.max(0, total - entryVal - retiradaV) > 0.01;
+            },
+
+            // Mesma verificação, mas a partir da venda já salva (usa os valores
+            // persistidos em vez de reler o formulário — mais confiável logo após save()).
+            _saleHasPendingValue(sale) {
+                if (!sale) return false;
+                if (sale.paymentMode === 'dual' && Array.isArray(sale.dualPayments)) {
+                    return sale.dualPayments.some(slot => {
+                        if (slot.method === 'installment') {
+                            return (slot.parcelas || []).some(p => !p.paid && p.status !== 'pago');
+                        }
+                        return (slot.retirada || 0) > 0.01;
+                    });
+                }
+                const metodosAVista = ['pix', 'cash', 'debit', 'credit'];
+                if (metodosAVista.includes(sale.paymentMethod)) {
+                    return !!(sale.paymentDetails && (sale.paymentDetails.retiradaValue || 0) > 0.01);
+                }
+                // Crediário
+                const det = sale.paymentDetails;
+                if (!det) return false;
+                const retirada = parseFloat(det.retiradaValue || 0);
+                const totalParcelas = parseFloat(det.totalParcelas || 0);
+                return retirada > 0.01 || totalParcelas > 0.01;
+            },
+
             finalize() {
+                if (this._formHasPendingValue()) {
+                    Toast.show('⚠️ Esta venda tem valor pendente. Use o botão "Salvar" e escolha "Pendente" em vez de Dar Baixa.', 'warning', 4500);
+                    return;
+                }
                 Modal.showConfirm('Dar baixa nesta venda? Ela será salva e marcada como PAGA (some de Contas a Receber).', () => {
                     this.save();
                     // save() define this._osGeradoSaleId e abre o modal de confirmação;
@@ -30412,7 +30477,7 @@ ${container.innerHTML}
 
             _osGeradoSaleId: null,
 
-            _setOsGeradoPagamento(situacao) {
+            _setOsGeradoPagamento(situacao, auto) {
                 var saleId = Sales._osGeradoSaleId;
                 if (!saleId) return;
                 var sale = state.sales.find(function(s){ return s.id === saleId; });
@@ -30433,7 +30498,7 @@ ${container.innerHTML}
                     }
                     if(btnP){btnP.style.background='#28a745';btnP.style.color='white';btnP.style.borderColor='#28a745';}
                     if(btnPend){btnPend.style.background='#fff';btnPend.style.color='#555';btnPend.style.borderColor='#ddd';}
-                    if(lbl) lbl.textContent='✅ Marcado como PAGO — não aparece em Contas a Receber';
+                    if(lbl) lbl.textContent = auto ? '✅ Pago automaticamente — sem saldo pendente' : '✅ Marcado como PAGO — não aparece em Contas a Receber';
                 } else {
                     sale.paymentStatus = 'pendente';
                     sale._updatedAt = new Date().toISOString();
