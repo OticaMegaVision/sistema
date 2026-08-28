@@ -9722,7 +9722,7 @@ body.dark-mode,
                                 <div class="bkp-status-ic" style="background:#f3f0ff;color:#7c3aed;"><i class="fas fa-code-branch"></i></div>
                                 <div class="txt">
                                     <b>Versão do sistema</b>
-                                    <span>versão <strong>270820261645</strong></span>
+                                    <span>versão <strong>270820262120</strong></span>
                                 </div>
                             </div>
                         </div>
@@ -28082,25 +28082,24 @@ ${container.innerHTML}
                 if (modal) modal.style.display = 'none';
             },
 
-            // Monta UMA única mensagem: saudação/valor + o código Pix Copia-e-Cola
-            // dentro de um bloco monoespaçado (```código```), que o WhatsApp exibe
-            // com fonte de largura fixa e limites bem definidos — o cliente só
-            // precisa tocar e segurar sobre o bloco e escolher "Copiar", sem risco
-            // de selecionar texto a mais/a menos. A imagem do QR (quando suportado
-            // pelo aparelho) vai junto na mesma mensagem via menu nativo de
-            // compartilhar do dispositivo; no fallback sem compartilhamento nativo,
-            // a imagem é baixada para o cliente anexar à mesma mensagem antes de
-            // enviar, mantendo tudo em um único balão do WhatsApp.
+            // Monta UMA única mensagem contendo SOMENTE o código Pix Copia-e-Cola,
+            // sem saudação nem valor junto — o WhatsApp copia a mensagem inteira ao
+            // tocar e segurar (não isola trechos), então qualquer texto extra na
+            // mesma mensagem quebraria a colagem no app do banco. A imagem do QR
+            // (quando suportado pelo aparelho) vai junto na mesma mensagem via menu
+            // nativo de compartilhar; no fallback sem compartilhamento nativo, a
+            // imagem é baixada para o cliente anexar à mesma mensagem antes de
+            // enviar, mantendo tudo em um único balão do WhatsApp. Nome/valor
+            // continuam visíveis para o vendedor na tela de confirmação de envio.
             async sendPixWhatsApp() {
                 const payload = this.PAY._lastPixPayload;
                 if (!payload) { Toast.show('Gere o QR Code do Pix antes de enviar','warning'); return; }
                 const valorTxt = document.getElementById('pixFinal')?.textContent?.trim()
                     || this.PAY.fmt(this.PAY._lastPixValor || 0);
-                const emp = state.company?.name || 'Ótica';
                 const client = state.clients.find(c => c.id === state.currentSale.clientId);
                 const nome1  = client?.name ? client.name.split(' ')[0] : 'Cliente';
                 const phone  = (client?.whatsapp || client?.phone || '').replace(/\D/g, '');
-                const msg = `Olá, *${nome1}*! 👋\n\nSegue o Pix para pagamento de *${valorTxt}*:\n\n\`\`\`${payload}\`\`\`\n\n👆 Toque e segure no código acima para copiar\n\n_${emp}_`;
+                const msg = payload; // mensagem contém só o código — nada mais junto
                 const pngDataUrl = this.PAY._lastPixQrPng;
 
                 // 1) Tenta o compartilhamento nativo com a imagem do QR e a mensagem juntas.
@@ -28135,7 +28134,7 @@ ${container.innerHTML}
                     return;
                 }
                 WppConfirm.show({ nome: client?.name || nome1, phone,
-                    subtitle: 'Mensagem única — QR + código Pix', msg,
+                    subtitle: `Mensagem única — QR + código Pix puro (${valorTxt})`, msg,
                     url: `https://wa.me/55${phone}?text=${encodeURIComponent(msg)}` });
             },
 
