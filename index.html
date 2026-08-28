@@ -7728,12 +7728,12 @@ body.dark-mode,
                                     </div>
                                 </div>
                                 <div style="margin-top:12px;">
-                                    <label style="font-size:12px;font-weight:600;color:#555;display:block;margin-bottom:4px;">Entrada paga (R$)</label>
+                                    <label style="font-size:12px;font-weight:600;color:#555;display:block;margin-bottom:4px;">Valor pago ou entrada</label>
                                     <input type="text" inputmode="numeric" id="pixEntrada" class="form-control" value="0" oninput="Utils.maskMoney(this); Sales.PAY.pixCalc.call(Sales.PAY)" onchange="Sales.PAY.pixCalc.call(Sales.PAY)">
                                 </div>
                                 <div class="retirada-card" id="pixRetiradaCard" style="margin-top:10px;">
-                                    <label><i class="fas fa-glasses"></i> Restante na retirada</label>
-                                    <input type="text" inputmode="numeric" id="pixRetirada" class="form-control" value="0" oninput="Utils.maskMoney(this)">
+                                    <label><i class="fas fa-glasses"></i> Pagamento na retirada</label>
+                                    <input type="text" inputmode="numeric" id="pixRetirada" class="form-control" value="0" oninput="Utils.maskMoney(this); Sales.PAY.retiradaToEntrada('pix')">
                                 </div>
                                 <div id="pixAlerta" class="retirada-alert" style="display:none;margin-top:8px;">
                                     <i class="fas fa-glasses"></i>
@@ -7798,8 +7798,12 @@ body.dark-mode,
                                 </div>
                                 <div class="divisor"><div class="linha"></div><span><i class="fas fa-layer-group"></i> Ou pagamento parcial</span><div class="linha"></div></div>
                                 <div>
-                                    <label style="font-size:12px;font-weight:600;color:#555;display:block;margin-bottom:4px;">Valor a pagar na retirada</label>
+                                    <label style="font-size:12px;font-weight:600;color:#555;display:block;margin-bottom:4px;">Valor pago ou entrada</label>
                                     <input type="text" inputmode="numeric" id="cashEntrada" class="form-control" value="0" oninput="Utils.maskMoney(this); Sales.PAY.retirada('cash')">
+                                </div>
+                                <div class="retirada-card" id="cashRetiradaCard" style="margin-top:10px;">
+                                    <label><i class="fas fa-glasses"></i> Pagamento na retirada</label>
+                                    <input type="text" inputmode="numeric" id="cashRetirada" class="form-control" value="0" oninput="Utils.maskMoney(this); Sales.PAY.retiradaToEntrada('cash')">
                                 </div>
                                 <div id="cashAlerta" class="retirada-alert" style="display:none;margin-top:8px;">
                                     <i class="fas fa-glasses"></i>
@@ -7834,13 +7838,13 @@ body.dark-mode,
                                         </select>
                                     </div>
                                     <div>
-                                        <label style="font-size:12px;font-weight:600;color:#555;display:block;margin-bottom:4px;">Entrada paga (R$)</label>
+                                        <label style="font-size:12px;font-weight:600;color:#555;display:block;margin-bottom:4px;">Valor pago ou entrada</label>
                                         <input type="text" inputmode="numeric" id="debitEntrada" class="form-control" value="0" oninput="Utils.maskMoney(this); Sales.PAY.retirada('debit')">
                                     </div>
                                 </div>
                                 <div class="retirada-card" id="debitRetiradaCard" style="margin-top:10px;">
-                                    <label><i class="fas fa-glasses"></i> Restante na retirada</label>
-                                    <input type="text" inputmode="numeric" id="debitRetirada" class="form-control" value="0" oninput="Utils.maskMoney(this)">
+                                    <label><i class="fas fa-glasses"></i> Pagamento na retirada</label>
+                                    <input type="text" inputmode="numeric" id="debitRetirada" class="form-control" value="0" oninput="Utils.maskMoney(this); Sales.PAY.retiradaToEntrada('debit')">
                                 </div>
                                 <div id="debitAlerta" class="retirada-alert" style="display:none;margin-top:8px;">
                                     <i class="fas fa-glasses"></i>
@@ -7899,12 +7903,12 @@ body.dark-mode,
                                 </div>
                                 <div id="creditResumoBox" style="background:#fff;border-radius:8px;border:1px solid #e1bee7;padding:10px 14px;font-size:12px;color:#555;margin-bottom:12px;"></div>
                                 <div>
-                                    <label style="font-size:12px;font-weight:600;color:#555;display:block;margin-bottom:4px;">Entrada paga (R$) — opcional</label>
+                                    <label style="font-size:12px;font-weight:600;color:#555;display:block;margin-bottom:4px;">Valor pago ou entrada — opcional</label>
                                     <input type="text" inputmode="numeric" id="creditEntrada" class="form-control" value="0" oninput="Utils.maskMoney(this); Sales.PAY.retirada('credit')">
                                 </div>
                                 <div class="retirada-card" id="creditRetiradaCard" style="margin-top:10px;">
-                                    <label><i class="fas fa-glasses"></i> Restante na retirada</label>
-                                    <input type="text" inputmode="numeric" id="creditRetirada" class="form-control" value="0" oninput="Utils.maskMoney(this)">
+                                    <label><i class="fas fa-glasses"></i> Pagamento na retirada</label>
+                                    <input type="text" inputmode="numeric" id="creditRetirada" class="form-control" value="0" oninput="Utils.maskMoney(this); Sales.PAY.retiradaToEntrada('credit')">
                                 </div>
                                 <div id="creditAlerta" class="retirada-alert" style="display:none;margin-top:8px;">
                                     <i class="fas fa-glasses"></i>
@@ -7940,14 +7944,14 @@ body.dark-mode,
                                         </div>
                                     </div>
                                     <div class="form-group">
-                                        <label>Valor da Entrada</label>
+                                        <label>Valor pago ou entrada</label>
                                         <input type="text" inputmode="numeric" class="form-control" id="entryValue" style="font-weight:800;color:#2e7d32;font-size:1.05rem;" placeholder="0,00" oninput="Utils.maskMoney(this); Sales.PAY.instFromValue()" value="0">
                                     </div>
                                 </div>
 
                                 <!-- Retirada: cartão próprio — é outro conceito (cobrar depois) -->
                                 <div class="retirada-card">
-                                    <label><i class="fas fa-clock"></i> Cobrar na Retirada (R$)</label>
+                                    <label><i class="fas fa-clock"></i> Pagamento na retirada</label>
                                     <input type="text" inputmode="numeric" class="form-control" id="retiradaEntry" placeholder="0,00" oninput="Utils.maskMoney(this); Sales.PAY.instFromValue()" value="0">
                                 </div>
 
@@ -9722,7 +9726,7 @@ body.dark-mode,
                                 <div class="bkp-status-ic" style="background:#f3f0ff;color:#7c3aed;"><i class="fas fa-code-branch"></i></div>
                                 <div class="txt">
                                     <b>Versão do sistema</b>
-                                    <span>versão <strong>280820261335</strong></span>
+                                    <span>versão <strong>280820261559</strong></span>
                                 </div>
                             </div>
                         </div>
@@ -27534,6 +27538,28 @@ ${container.innerHTML}
                         }
                     }
                     this.updateResumoFixo(entrada, restante);
+                },
+
+                // Caminho inverso: quando o vendedor edita "Pagamento na retirada"
+                // diretamente, recalcula "Valor pago ou entrada" (= total - retirada)
+                // e reaproveita retirada() para atualizar alertas/resumo.
+                // Só se aplica a Pix, Dinheiro, Débito e Crédito — no Crediário
+                // "Entrada", "Retirada" e "Parcelas" são 3 partes independentes do
+                // total, então esse acoplamento não se aplica lá.
+                retiradaToEntrada(method) {
+                    const ids = {
+                        pix:   { entrada: 'pixEntrada',    retirada: 'pixRetirada' },
+                        cash:  { entrada: 'cashEntrada',   retirada: 'cashRetirada' },
+                        debit: { entrada: 'debitEntrada',  retirada: 'debitRetirada' },
+                        credit:{ entrada: 'creditEntrada', retirada: 'creditRetirada' },
+                    };
+                    const cfg = ids[method]; if (!cfg) return;
+                    const total     = state.currentSale.total || 0;
+                    const retiradaV = Utils.parseMoney(document.getElementById(cfg.retirada)?.value) || 0;
+                    const novaEntrada = Math.max(0, total - retiradaV);
+                    const entradaEl = document.getElementById(cfg.entrada);
+                    if (entradaEl) entradaEl.value = this.fmt(novaEntrada);
+                    this.retirada(method);
                 },
 
                 // PIX — desconto configurável (padrão 5% se não configurado)
