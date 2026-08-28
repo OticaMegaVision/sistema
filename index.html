@@ -9722,7 +9722,7 @@ body.dark-mode,
                                 <div class="bkp-status-ic" style="background:#f3f0ff;color:#7c3aed;"><i class="fas fa-code-branch"></i></div>
                                 <div class="txt">
                                     <b>Versão do sistema</b>
-                                    <span>versão <strong>270820262120</strong></span>
+                                    <span>versão <strong>280820261038</strong></span>
                                 </div>
                             </div>
                         </div>
@@ -27512,7 +27512,10 @@ ${container.innerHTML}
                             alertEl.classList.add('excedente');
                             if (alertLbl) alertLbl.textContent = '⚠️ Entrada excede o total';
                             if (alertVal) alertVal.textContent = this.fmt(excedente);
-                        } else if (restante > 0.01) {
+                        } else if (entrada > 0.01 && restante > 0.01) {
+                            // Só alerta quando o vendedor de fato digitou uma entrada
+                            // parcial — com Entrada em R$ 0,00 (nada decidido ainda),
+                            // o alerta fica oculto em vez de assumir "vai pagar na retirada".
                             alertEl.style.display = 'flex';
                             alertEl.classList.remove('excedente');
                             if (alertLbl) alertLbl.textContent = '⚠️ Cobrar na retirada';
