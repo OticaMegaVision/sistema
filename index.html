@@ -9726,7 +9726,7 @@ body.dark-mode,
                                 <div class="bkp-status-ic" style="background:#f3f0ff;color:#7c3aed;"><i class="fas fa-code-branch"></i></div>
                                 <div class="txt">
                                     <b>Versão do sistema</b>
-                                    <span>versão <strong>300820261743</strong></span>
+                                    <span>versão <strong>300820261805</strong></span>
                                 </div>
                             </div>
                         </div>
@@ -30225,6 +30225,13 @@ ${container.innerHTML}
                 // (o pagamento do saldo é dado depois em Contas a Receber).
                 if (!this._saleHasPendingValue(sale)) {
                     this._setOsGeradoPagamento('pago', true);
+                    var btnPendTravado = document.getElementById('osGeradoBtnPendente');
+                    if (btnPendTravado) {
+                        btnPendTravado.disabled = true;
+                        btnPendTravado.style.opacity = '0.45';
+                        btnPendTravado.style.cursor = 'not-allowed';
+                        btnPendTravado.title = 'Bloqueado: não há saldo pendente nesta venda';
+                    }
                 } else {
                     var btnPagoTravado = document.getElementById('osGeradoBtnPago');
                     if (btnPagoTravado) {
@@ -30515,6 +30522,10 @@ ${container.innerHTML}
                     if(btnPend){btnPend.style.background='#fff';btnPend.style.color='#555';btnPend.style.borderColor='#ddd';}
                     if(lbl) lbl.textContent = auto ? '✅ Pago automaticamente — sem saldo pendente' : '✅ Marcado como PAGO — não aparece em Contas a Receber';
                 } else {
+                    if (!this._saleHasPendingValue(sale)) {
+                        Toast.show('⚠️ Não é possível marcar como PENDENTE: esta venda não tem saldo pendente.', 'warning', 4000);
+                        return;
+                    }
                     sale.paymentStatus = 'pendente';
                     sale._updatedAt = new Date().toISOString();
                     delete sale.paidAt;
