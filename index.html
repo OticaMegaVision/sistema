@@ -9726,7 +9726,7 @@ body.dark-mode,
                                 <div class="bkp-status-ic" style="background:#f3f0ff;color:#7c3aed;"><i class="fas fa-code-branch"></i></div>
                                 <div class="txt">
                                     <b>Versão do sistema</b>
-                                    <span>versão <strong>300820261818</strong></span>
+                                    <span>versão <strong>300820261916</strong></span>
                                 </div>
                             </div>
                         </div>
@@ -30485,11 +30485,9 @@ ${container.innerHTML}
                     return;
                 }
                 Modal.showConfirm('Dar baixa nesta venda? Ela será salva e marcada como PAGA (some de Contas a Receber).', () => {
+                    // save() já detecta sozinho que não há saldo pendente (checado
+                    // acima) e marca PAGO automaticamente — não precisa reforçar aqui.
                     this.save();
-                    // save() define this._osGeradoSaleId e abre o modal de confirmação;
-                    // aplicamos a baixa (pago) automaticamente, reaproveitando a mesma
-                    // rotina usada no toggle Pago/Pendente do modal pós-salvamento.
-                    setTimeout(() => { this._setOsGeradoPagamento('pago'); }, 60);
                 });
             },
 
