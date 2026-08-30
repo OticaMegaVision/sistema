@@ -9726,7 +9726,7 @@ body.dark-mode,
                                 <div class="bkp-status-ic" style="background:#f3f0ff;color:#7c3aed;"><i class="fas fa-code-branch"></i></div>
                                 <div class="txt">
                                     <b>Versão do sistema</b>
-                                    <span>versão <strong>280820261627</strong></span>
+                                    <span>versão <strong>300820261743</strong></span>
                                 </div>
                             </div>
                         </div>
@@ -30215,14 +30215,25 @@ ${container.innerHTML}
                 Sales._osGeradoSaleId = sale.id;
                 ['osGeradoBtnPago','osGeradoBtnPendente'].forEach(function(id){
                     var b=document.getElementById(id);
-                    if(b){b.style.background='#fff';b.style.color='#555';b.style.borderColor='#ddd';}
+                    if(b){b.style.background='#fff';b.style.color='#555';b.style.borderColor='#ddd';b.disabled=false;b.style.opacity='1';b.style.cursor='pointer';b.title='';}
                 });
                 var lbl=document.getElementById('osGeradoPagtoLabel');
                 if(lbl) lbl.textContent='Selecione a situação — isso remove da lista de Contas a Receber';
                 Modal.show('osGeradoModal');
                 // Sem saldo pendente: aplica PAGO automaticamente, sem exigir clique.
+                // Com saldo pendente: trava o botão PAGO — só PENDENTE fica disponível
+                // (o pagamento do saldo é dado depois em Contas a Receber).
                 if (!this._saleHasPendingValue(sale)) {
                     this._setOsGeradoPagamento('pago', true);
+                } else {
+                    var btnPagoTravado = document.getElementById('osGeradoBtnPago');
+                    if (btnPagoTravado) {
+                        btnPagoTravado.disabled = true;
+                        btnPagoTravado.style.opacity = '0.45';
+                        btnPagoTravado.style.cursor = 'not-allowed';
+                        btnPagoTravado.title = 'Bloqueado: ainda há saldo pendente nesta venda';
+                    }
+                    if (lbl) lbl.textContent = '⚠️ Há saldo pendente — marque como PENDENTE (o pagamento é dado em Contas a Receber depois)';
                 }
             },
 
@@ -30486,6 +30497,10 @@ ${container.innerHTML}
                 var btnPend = document.getElementById('osGeradoBtnPendente');
                 var lbl = document.getElementById('osGeradoPagtoLabel');
                 if (situacao === 'pago') {
+                    if (auto !== true && this._saleHasPendingValue(sale)) {
+                        Toast.show('⚠️ Não é possível marcar como PAGO: ainda há saldo pendente nesta venda.', 'warning', 4000);
+                        return;
+                    }
                     sale.paymentStatus = 'pago';
                     sale.paidAt = new Date().toISOString();
                     sale._updatedAt = sale.paidAt;
