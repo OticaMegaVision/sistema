@@ -9726,7 +9726,7 @@ body.dark-mode,
                                 <div class="bkp-status-ic" style="background:#f3f0ff;color:#7c3aed;"><i class="fas fa-code-branch"></i></div>
                                 <div class="txt">
                                     <b>Versão do sistema</b>
-                                    <span>versão <strong>300820261805</strong></span>
+                                    <span>versão <strong>300820261818</strong></span>
                                 </div>
                             </div>
                         </div>
@@ -30240,7 +30240,7 @@ ${container.innerHTML}
                         btnPagoTravado.style.cursor = 'not-allowed';
                         btnPagoTravado.title = 'Bloqueado: ainda há saldo pendente nesta venda';
                     }
-                    if (lbl) lbl.textContent = '⚠️ Há saldo pendente — marque como PENDENTE (o pagamento é dado em Contas a Receber depois)';
+                    this._setOsGeradoPagamento('pendente', true);
                 }
             },
 
@@ -30537,7 +30537,7 @@ ${container.innerHTML}
                     }
                     if(btnP){btnP.style.background='#fff';btnP.style.color='#555';btnP.style.borderColor='#ddd';}
                     if(btnPend){btnPend.style.background='#ffc107';btnPend.style.color='#333';btnPend.style.borderColor='#ffc107';}
-                    if(lbl) lbl.textContent='⏳ Marcado como PENDENTE — aparece em Contas a Receber';
+                    if(lbl) lbl.textContent = auto ? '⏳ Pendente automaticamente — saldo em aberto nesta venda' : '⏳ Marcado como PENDENTE — aparece em Contas a Receber';
                 }
                 var idx = state.sales.findIndex(function(s){ return s.id === saleId; });
                 if (idx !== -1) state.sales[idx] = sale;
