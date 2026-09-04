@@ -8051,6 +8051,29 @@ body.dark-mode,
                                     <tbody id="installmentsTableBody"></tbody>
                                 </table>
                             </div>
+                            <!-- Fiador (opcional) — só afeta o Carnê e a Nota Promissória gerados
+                                 desta venda; não muda o cliente, Contas a Receber nem histórico. -->
+                            <div class="divisor" style="margin-top:14px;"><div class="linha"></div><span><i class="fas fa-user-shield"></i> Fiador (opcional)</span><div class="linha"></div></div>
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label for="credFiadorNome">Nome completo</label>
+                                    <input type="text" id="credFiadorNome" class="form-control" placeholder="Nome do fiador">
+                                </div>
+                                <div class="form-group">
+                                    <label for="credFiadorCpf">CPF</label>
+                                    <input type="text" id="credFiadorCpf" class="form-control" placeholder="000.000.000-00">
+                                </div>
+                            </div>
+                            <div class="form-row">
+                                <div class="form-group" style="flex:2;">
+                                    <label for="credFiadorEndereco">Endereço completo</label>
+                                    <input type="text" id="credFiadorEndereco" class="form-control" placeholder="Rua, número, bairro, cidade/UF">
+                                </div>
+                                <div class="form-group">
+                                    <label for="credFiadorTelefone">Telefone (opcional)</label>
+                                    <input type="text" id="credFiadorTelefone" class="form-control" placeholder="(00) 00000-0000">
+                                </div>
+                            </div>
                             <!-- Botões de PDF do Crediário -->
                             <div id="crediarioPdfBtns" style="display:none;margin-top:12px;display:flex;gap:8px;flex-wrap:wrap;">
                                 <button type="button" class="btn btn-pdf" onclick="Sales.gerarPDF_Carne()" style="background:#6610f2;border-color:#6610f2;">
@@ -9726,7 +9749,7 @@ body.dark-mode,
                                 <div class="bkp-status-ic" style="background:#f3f0ff;color:#7c3aed;"><i class="fas fa-code-branch"></i></div>
                                 <div class="txt">
                                     <b>Versão do sistema</b>
-                                    <span>versão <strong>300820261916</strong></span>
+                                    <span>versão <strong>040920261516</strong></span>
                                 </div>
                             </div>
                         </div>
@@ -11154,7 +11177,48 @@ body.dark-mode,
             </div>
         </div>
     </div>
-    
+
+    <!-- Fiador (opcional) — usado para emitir Carnê/Promissória em nome de um
+         fiador/avalista em vez do cliente da venda. Não afeta o cliente
+         cadastrado, Contas a Receber, histórico ou busca — só os dois
+         documentos impressos, quando preenchido. -->
+    <div class="modal" id="fiadorModal" role="dialog" aria-modal="true" aria-labelledby="fiadorTitle">
+        <div class="modal-content" style="max-width:440px;">
+            <div class="modal-header">
+                <div class="modal-title" id="fiadorTitle"><i class="fas fa-user-shield"></i> Fiador (opcional)</div>
+                <button class="modal-close" onclick="Modal.close('fiadorModal')" aria-label="Fechar">&times;</button>
+            </div>
+            <div class="modal-body">
+                <p style="font-size:0.82rem;color:#6c757d;margin-bottom:1rem;">
+                    Preencha para que o <strong>Carnê</strong> e a <strong>Nota Promissória</strong> desta venda
+                    sejam emitidos em nome do fiador. Deixe em branco para usar os dados do cliente normalmente.
+                </p>
+                <input type="hidden" id="fiadorSaleId" value="">
+                <div class="form-group">
+                    <label for="fiadorNome">Nome completo</label>
+                    <input type="text" id="fiadorNome" class="form-control" placeholder="Nome do fiador">
+                </div>
+                <div class="form-group">
+                    <label for="fiadorCpf">CPF</label>
+                    <input type="text" id="fiadorCpf" class="form-control" placeholder="000.000.000-00">
+                </div>
+                <div class="form-group">
+                    <label for="fiadorEndereco">Endereço completo</label>
+                    <input type="text" id="fiadorEndereco" class="form-control" placeholder="Rua, número, bairro, cidade/UF">
+                </div>
+                <div class="form-group">
+                    <label for="fiadorTelefone">Telefone (opcional)</label>
+                    <input type="text" id="fiadorTelefone" class="form-control" placeholder="(00) 00000-0000">
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-outline-danger" id="fiadorBtnRemover" style="display:none;" onclick="Sales.removeFiador()"><i class="fas fa-trash"></i> Remover fiador</button>
+                <button class="btn btn-outline-secondary" onclick="Modal.close('fiadorModal')">Cancelar</button>
+                <button class="btn btn-primary" onclick="Sales.saveFiador()"><i class="fas fa-save"></i> Salvar</button>
+            </div>
+        </div>
+    </div>
+
     <div class="modal" id="viewModal" role="dialog" aria-modal="true" aria-labelledby="viewTitle">
         <div class="modal-content" style="max-width:700px;max-height:90vh;overflow-y:auto;">
             <div class="modal-header">
@@ -28838,6 +28902,7 @@ ${container.innerHTML}
                     methodDiscount: sale.methodDiscount || 0,
                     paymentMethod: sale.paymentMethod,
                     paymentDetails: sale.paymentDetails ? JSON.parse(JSON.stringify(sale.paymentDetails)) : null,
+                    fiador: sale.fiador ? { ...sale.fiador } : null,
                     observations: sale.observations,
                     status: sale.status,
                     statusHistory: sale.statusHistory ? [...sale.statusHistory] : []
@@ -28853,6 +28918,10 @@ ${container.innerHTML}
                 document.getElementById('discountValue').value = sale.discount;
                 document.getElementById('additionValue').value = sale.addition;
                 document.getElementById('saleObservations').value = sale.observations || '';
+                document.getElementById('credFiadorNome').value      = sale.fiador?.name    || '';
+                document.getElementById('credFiadorCpf').value       = sale.fiador?.cpf     || '';
+                document.getElementById('credFiadorEndereco').value  = sale.fiador?.address || '';
+                document.getElementById('credFiadorTelefone').value  = sale.fiador?.phone   || '';
 
                 // Carregar cliente
                 if (sale.clientId) {
@@ -29220,11 +29289,21 @@ ${container.innerHTML}
             },
 
             async gerarPDF_Promissoria() {
-                const client = state.clients.find(c => c.id === state.currentSale.clientId);
-                const sale = state.currentSale;
-                const details = state.currentSale.paymentDetails;
+                const isSavedView = !!state._pdfSale;
+                const sale = state._pdfSale || state.currentSale;
+                const client = state.clients.find(c => c.id === sale.clientId);
+                // Fiador (opcional): quando preenchido, o documento é emitido em nome
+                // dele em vez do cliente — o cliente da venda não muda em nada mais.
+                // Numa venda já salva usa sale.fiador; numa venda em andamento (ainda
+                // não salva) lê direto os campos do painel de Crediário.
+                const fiador = isSavedView ? sale.fiador : this._fiadorFromForm();
+                const pessoa = fiador?.name ? {
+                    name: fiador.name, cpf: fiador.cpf, address: fiador.address, phone: fiador.phone
+                } : client;
+                const details = sale.paymentDetails;
                 const company = _getCompanyForDoc();
                 const squareLogo = await getSquareLogo(company.logo, 200);
+                state._pdfSale = null;
 
                 if (!details) {
                     Toast.show('Calcule as parcelas primeiro', 'warning');
@@ -29308,9 +29387,9 @@ ${container.innerHTML}
 
                             <!-- Texto jurídico -->
                             <div class="texto">
-                                <p><span class="destaque">PELA PRESENTE NOTA PROMISSÓRIA</span>, eu, <span class="destaque">${client?.name || '___________________'}</span>,
-                                portador(a) do CPF nº <span class="destaque">${client?.cpf || '___.___.___-__'}</span>,
-                                residente e domiciliado(a) na <span class="destaque">${[client?.address, client?.number, client?.neighborhood, (client?.city||'')+'/'+(client?.state||'')].filter(Boolean).join(', ')}</span>,</p>
+                                <p><span class="destaque">PELA PRESENTE NOTA PROMISSÓRIA</span>, eu, <span class="destaque">${pessoa?.name || '___________________'}</span>,
+                                portador(a) do CPF nº <span class="destaque">${pessoa?.cpf || '___.___.___-__'}</span>,
+                                residente e domiciliado(a) na <span class="destaque">${[pessoa?.address, pessoa?.number, pessoa?.neighborhood, ((pessoa?.city||'')+'/'+(pessoa?.state||'')).replace(/^\/$/,'')].filter(Boolean).join(', ')}</span>${fiador?.name ? `, na qualidade de <span class="destaque">FIADOR(A)/AVALISTA</span> do(a) comprador(a) <span class="destaque">${client?.name || '—'}</span> (CPF ${client?.cpf || '—'})` : ''},</p>
 
                                 <p><span class="destaque">PROMETO PAGAR</span> à ordem de <span class="destaque">${company.name}</span>,
                                 pessoa jurídica de direito privado, CNPJ nº <span class="destaque">${company.cnpj}</span>,
@@ -29388,9 +29467,9 @@ ${container.innerHTML}
                             <div class="assinaturas">
                                 <div class="assinatura-box">
                                     <div class="linha-assinatura"></div>
-                                    <div class="assinatura-nome">${client?.name||'___________________'}</div>
-                                    <div class="assinatura-info">CPF: ${client?.cpf||'___.___.___-__'}</div>
-                                    <div class="assinatura-role">(EMITENTE — DEVEDOR)</div>
+                                    <div class="assinatura-nome">${pessoa?.name||'___________________'}</div>
+                                    <div class="assinatura-info">CPF: ${pessoa?.cpf||'___.___.___-__'}</div>
+                                    <div class="assinatura-role">${fiador?.name ? '(EMITENTE — FIADOR/AVALISTA)' : '(EMITENTE — DEVEDOR)'}</div>
                                 </div>
                                 <div class="assinatura-box">
                                     <div class="linha-assinatura"></div>
@@ -29442,8 +29521,15 @@ ${container.innerHTML}
             async gerarPDF_Carne() {
                 // CORREÇÃO: usa _pdfSale quando disponível (chamado via _setPdfTarget),
                 // senão usa state.currentSale (formulário ativo)
+                const isSavedView = !!state._pdfSale;
                 const sale    = state._pdfSale || state.currentSale;
                 const client  = state.clients.find(c => c.id === sale.clientId);
+                // Fiador (opcional): quando preenchido, o carnê é emitido em nome
+                // dele em vez do cliente — o cliente da venda não muda em nada mais.
+                const fiador = isSavedView ? sale.fiador : this._fiadorFromForm();
+                const pessoa = fiador?.name ? {
+                    name: fiador.name, cpf: fiador.cpf, address: fiador.address, phone: fiador.phone
+                } : client;
                 const details = sale.paymentDetails;
                 const company = _getCompanyForDoc();
                 const squareLogo = await getSquareLogo(company.logo, 200);
@@ -29485,8 +29571,8 @@ ${container.innerHTML}
                         </div>
                     </div>
                     <div class="carne-cliente-bar">
-                        <div class="carne-cliente-item">Cliente<strong>${client?.name || '—'}</strong></div>
-                        <div class="carne-cliente-item">CPF<strong>${client?.cpf || '—'}</strong></div>
+                        <div class="carne-cliente-item">${fiador?.name ? 'Fiador' : 'Cliente'}<strong>${pessoa?.name || '—'}</strong></div>
+                        <div class="carne-cliente-item">CPF<strong>${pessoa?.cpf || '—'}</strong></div>
                         <div class="carne-cliente-item">Total OS<strong>${Utils.formatCurrency(sale.total)}</strong></div>
                         <div class="carne-cliente-item">Entrada<strong>${Utils.formatCurrency(details.entryValue || 0)}</strong></div>
                         <div class="carne-cliente-item">${details.installments}× de<strong>${Utils.formatCurrency(details.installmentValue)}</strong></div>
@@ -29510,7 +29596,7 @@ ${container.innerHTML}
                             <div class="carne-canhoto-title">✂ Recibo — ${nomeAbrev(company.name)}</div>
                             <div class="carne-canhoto-row"><span>OS nº</span><span>${sale.number}</span></div>
                             <div class="carne-canhoto-row"><span>Parcela</span><span>${p.number}/${details.installments}</span></div>
-                            <div class="carne-canhoto-row"><span>Cliente</span><span>${nomeAbrev(client?.name)}</span></div>
+                            <div class="carne-canhoto-row"><span>${fiador?.name ? 'Fiador' : 'Cliente'}</span><span>${nomeAbrev(pessoa?.name)}</span></div>
                             <div class="carne-canhoto-row"><span>Valor</span><span>${Utils.formatCurrency(p.value)}</span></div>
                             <div class="carne-canhoto-row"><span>Vencimento</span><span>${fd(p.dueDate)}</span></div>
                             <div class="carne-canhoto-row"><span>Pago em</span><span>___/___/___</span></div>
@@ -29524,7 +29610,7 @@ ${container.innerHTML}
                                     ${carneLogoHtml}
                                     <div>
                                         <div class="carne-dados-empresa">${company.name}</div>
-                                        <div class="carne-dados-os">OS ${sale.number} &nbsp;·&nbsp; ${client?.name || '—'} &nbsp;·&nbsp; CPF: ${client?.cpf || '—'}</div>
+                                        <div class="carne-dados-os">OS ${sale.number} &nbsp;·&nbsp; ${pessoa?.name || '—'} &nbsp;·&nbsp; CPF: ${pessoa?.cpf || '—'}${fiador?.name ? ` &nbsp;·&nbsp; Comprador: ${client?.name || '—'}` : ''}</div>
                                     </div>
                                 </div>
                                 <div class="carne-dados-venc">
@@ -29537,8 +29623,8 @@ ${container.innerHTML}
                                 <!-- Infos à esquerda -->
                                 <div class="carne-dados-info">
                                     <div class="carne-dados-row"><span>Parcela</span><span>${p.number} de ${details.installments}</span></div>
-                                    <div class="carne-dados-row"><span>Cliente</span><span>${client?.name || '—'}</span></div>
-                                    <div class="carne-dados-row"><span>Telefone</span><span>${client?.phone || '—'}</span></div>
+                                    <div class="carne-dados-row"><span>${fiador?.name ? 'Fiador' : 'Cliente'}</span><span>${pessoa?.name || '—'}</span></div>
+                                    <div class="carne-dados-row"><span>Telefone</span><span>${pessoa?.phone || '—'}</span></div>
                                     <div class="carne-dados-row"><span>CNPJ Credor</span><span>${company.cnpj || '—'}</span></div>
                                 </div>
                                 <!-- Caixa de valor -->
@@ -30133,6 +30219,9 @@ ${container.innerHTML}
                     mixedPayments: state.currentSale.mixedPayments ? [...state.currentSale.mixedPayments] : null,
                     paymentDetails: paymentDetailsToSave,
                     dualPayments: dualPaymentsToSave,
+                    // Fiador (opcional): usa o que estiver no painel agora; se estiver
+                    // vazio mas a venda (em edição) já tinha um fiador salvo, mantém.
+                    fiador: this._fiadorFromForm() || state.currentSale.fiador || null,
                     observations: document.getElementById('saleObservations').value,
                     status: document.getElementById('saleStatus').value,
                     // Bug #B Fix: preserva histórico existente na edição, não sobrescreve
@@ -30270,6 +30359,7 @@ ${container.innerHTML}
                     paymentMode: 'single',
                     mixedPayments: null,
                     paymentDetails: null,
+                    fiador: null,
                     observations: '',
                     status: 'orcamento',
                     statusHistory: []
@@ -30292,6 +30382,9 @@ ${container.innerHTML}
                 if (discountEl) { discountEl.value = '0'; }
                 if (additionEl) { additionEl.value = '0'; }
                 if (obsEl) obsEl.value = '';
+                ['credFiadorNome','credFiadorCpf','credFiadorEndereco','credFiadorTelefone'].forEach(id => {
+                    const el = document.getElementById(id); if (el) el.value = '';
+                });
                 if (typeof professionalEl !== 'undefined' && professionalEl) professionalEl.value = '';
                 const clientSelectEl = document.getElementById('clientSelect');
                 if (clientSelectEl) clientSelectEl.innerHTML = '<option value="">Selecione um cliente</option>';
@@ -30420,6 +30513,71 @@ ${container.innerHTML}
                 ['dual1ParcelaInfo','dual2ParcelaInfo'].forEach(id => {
                     const el = document.getElementById(id); if (el) el.textContent = '—';
                 });
+            },
+
+            // Lê os campos de fiador do painel de Crediário (venda em andamento,
+            // ainda não salva). Retorna null se o nome estiver vazio.
+            _fiadorFromForm() {
+                const nome = document.getElementById('credFiadorNome')?.value.trim();
+                if (!nome) return null;
+                return {
+                    name: nome,
+                    cpf: document.getElementById('credFiadorCpf')?.value.trim() || '',
+                    address: document.getElementById('credFiadorEndereco')?.value.trim() || '',
+                    phone: document.getElementById('credFiadorTelefone')?.value.trim() || ''
+                };
+            },
+
+            // ── Fiador (opcional): edita/salva/remove os dados do fiador de uma
+            // venda no crediário, direto na venda já salva — sem passar pelo
+            // fluxo completo de edição de venda (não mexe em itens, estoque,
+            // totais ou auditoria). Usado pelo Carnê e pela Nota Promissória.
+            editFiador(saleId) {
+                const sale = state.sales.find(s => s.id === saleId);
+                if (!sale) return;
+                document.getElementById('fiadorSaleId').value = saleId;
+                document.getElementById('fiadorNome').value      = sale.fiador?.name    || '';
+                document.getElementById('fiadorCpf').value       = sale.fiador?.cpf     || '';
+                document.getElementById('fiadorEndereco').value  = sale.fiador?.address || '';
+                document.getElementById('fiadorTelefone').value  = sale.fiador?.phone   || '';
+                const btnRemover = document.getElementById('fiadorBtnRemover');
+                if (btnRemover) btnRemover.style.display = sale.fiador ? '' : 'none';
+                Modal.show('fiadorModal');
+            },
+
+            saveFiador() {
+                const saleId = document.getElementById('fiadorSaleId').value;
+                const idx = state.sales.findIndex(s => s.id === saleId);
+                if (idx === -1) return;
+                const nome = document.getElementById('fiadorNome').value.trim();
+                const cpf  = document.getElementById('fiadorCpf').value.trim();
+                if (!nome) {
+                    Toast.show('Informe ao menos o nome do fiador (ou use "Remover" para não usar fiador).', 'warning');
+                    return;
+                }
+                state.sales[idx].fiador = {
+                    name: nome,
+                    cpf: cpf,
+                    address: document.getElementById('fiadorEndereco').value.trim(),
+                    phone: document.getElementById('fiadorTelefone').value.trim()
+                };
+                state.sales[idx]._updatedAt = new Date().toISOString();
+                App.saveData();
+                SupaSync.inserirVenda(state.sales[idx]); // push atualização ao Electric Cloud
+                Toast.show('✅ Fiador salvo — Carnê e Promissória já usam esses dados.', 'success');
+                Modal.close('fiadorModal');
+            },
+
+            removeFiador() {
+                const saleId = document.getElementById('fiadorSaleId').value;
+                const idx = state.sales.findIndex(s => s.id === saleId);
+                if (idx === -1) return;
+                delete state.sales[idx].fiador;
+                state.sales[idx]._updatedAt = new Date().toISOString();
+                App.saveData();
+                SupaSync.inserirVenda(state.sales[idx]);
+                Toast.show('Fiador removido — documentos voltam a usar os dados do cliente.', 'info');
+                Modal.close('fiadorModal');
             },
 
             // Detecta se a venda (com base no formulário atual) tem valor pendente
@@ -30740,9 +30898,18 @@ ${container.innerHTML}
                                 <i class="fas fa-file-pdf"></i> ✂️ Ambas as Vias (A4 — 210×297mm)
                             </button>
                             <button onclick="Sales._setPdfTarget('${sale.id}');Modal.close('viewModal');setTimeout(()=>Sales.gerarPDF_Carne(),80);"
-                                style="background:#6610f2;color:#fff;border:none;padding:10px 12px;border-radius:8px;cursor:pointer;font-weight:700;font-size:12px;display:flex;align-items:center;justify-content:center;gap:6px;grid-column:1/-1;">
+                                style="background:#6610f2;color:#fff;border:none;padding:10px 12px;border-radius:8px;cursor:pointer;font-weight:700;font-size:12px;display:flex;align-items:center;justify-content:center;gap:6px;${sale.paymentMethod==='installment'?'':'grid-column:1/-1;'}">
                                 <i class="fas fa-receipt"></i> Gerar Carnê PDF
                             </button>
+                            ${sale.paymentMethod === 'installment' ? `
+                            <button onclick="Sales._setPdfTarget('${sale.id}');Modal.close('viewModal');setTimeout(()=>Sales.gerarPDF_Promissoria(),80);"
+                                style="background:#0277bd;color:#fff;border:none;padding:10px 12px;border-radius:8px;cursor:pointer;font-weight:700;font-size:12px;display:flex;align-items:center;justify-content:center;gap:6px;">
+                                <i class="fas fa-file-alt"></i> Nota Promissória
+                            </button>
+                            <button onclick="Sales.editFiador('${sale.id}')"
+                                style="background:${sale.fiador?.name ? '#8e44ad' : '#fff'};color:${sale.fiador?.name ? '#fff' : '#8e44ad'};border:1.5px solid #8e44ad;padding:10px 12px;border-radius:8px;cursor:pointer;font-weight:700;font-size:12px;display:flex;align-items:center;justify-content:center;gap:6px;grid-column:1/-1;">
+                                <i class="fas fa-user-shield"></i> ${sale.fiador?.name ? `Fiador: ${sale.fiador.name.split(' ')[0]} (editar)` : 'Definir Fiador (opcional)'}
+                            </button>` : ''}
                         </div>
                     </div>
 
