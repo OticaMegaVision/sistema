@@ -9749,7 +9749,7 @@ body.dark-mode,
                                 <div class="bkp-status-ic" style="background:#f3f0ff;color:#7c3aed;"><i class="fas fa-code-branch"></i></div>
                                 <div class="txt">
                                     <b>Versão do sistema</b>
-                                    <span>versão <strong>040920261516</strong></span>
+                                    <span>versão <strong>040920261535</strong></span>
                                 </div>
                             </div>
                         </div>
@@ -11154,6 +11154,22 @@ body.dark-mode,
                         <button id="osGeradoBtnPendente" onclick="Sales._setOsGeradoPagamento('pendente')" style="padding:0.65rem 0.5rem;border-radius:8px;border:2px solid #ddd;background:#fff;color:#555;font-weight:600;font-size:0.88rem;cursor:pointer;transition:all .2s;">⏳ PENDENTE</button>
                     </div>
                     <p id="osGeradoPagtoLabel" style="font-size:0.78rem;color:#6c757d;margin-top:0.5rem;margin-bottom:0;">Selecione a situação — isso remove da lista de Contas a Receber</p>
+                </div>
+                <!-- Pix — QR/Copia-e-Cola continuam disponíveis aqui mesmo após salvar -->
+                <div id="osGeradoPixBox" style="display:none;background:#f0fff4;border:1px solid #c8e6c9;border-radius:10px;padding:0.75rem;margin-bottom:1rem;text-align:left;">
+                    <p style="font-size:0.75rem;font-weight:700;color:#2e7d32;text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px;">🔑 Pagamento via Pix</p>
+                    <div style="display:flex;gap:10px;align-items:center;">
+                        <div id="osGeradoPixQr" style="width:80px;height:80px;flex-shrink:0;display:flex;align-items:center;justify-content:center;background:#fff;border:1px solid #c8e6c9;border-radius:8px;">
+                            <i class="fas fa-qrcode" style="font-size:1.6rem;color:#00a884;"></i>
+                        </div>
+                        <div style="flex:1;min-width:0;">
+                            <div id="osGeradoPixHint" style="font-size:10.5px;color:#2e7d32;margin-bottom:8px;"></div>
+                            <div style="display:flex;gap:6px;flex-wrap:wrap;">
+                                <button onclick="Sales.copyPixKey()" style="background:#00a884;color:#fff;border:none;padding:6px 9px;border-radius:6px;cursor:pointer;font-weight:700;font-size:10.5px;"><i class="fas fa-copy"></i> Copiar</button>
+                                <button onclick="Sales.sendPixWhatsApp(Sales._osGeradoSaleId)" style="background:#25d366;color:#fff;border:none;padding:6px 9px;border-radius:6px;cursor:pointer;font-weight:700;font-size:10.5px;"><i class="fab fa-whatsapp"></i> Enviar</button>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </div>
             <div style="padding:0 1.5rem 0.75rem;">
@@ -27736,9 +27752,9 @@ ${container.innerHTML}
                     } catch (e) { callback(null); }
                 },
 
-                renderPixQr(chave, valor, label) {
-                    const box  = document.getElementById('pixQrCode');
-                    const hint = document.getElementById('pixQrHint');
+                renderPixQr(chave, valor, label, boxId, hintId) {
+                    const box  = document.getElementById(boxId || 'pixQrCode');
+                    const hint = document.getElementById(hintId || 'pixQrHint');
                     if (!box) return;
                     if (!chave || chave === '—') {
                         box.innerHTML = '<i class="fas fa-qrcode" style="font-size:2.2rem;color:#00a884;"></i>';
@@ -28168,6 +28184,26 @@ ${container.innerHTML}
             calcCashRetirada()              { this.PAY.retirada.call(this.PAY, 'cash'); },
             _fmtBRL(v)                      { return this.PAY.fmt(v); },
             _updateDebitSummary()           { this.PAY.debitCalc.call(this.PAY); },
+            // Regenera o QR/código Pix de uma venda já salva (ou em andamento), a
+            // partir dos mesmos dados usados na hora da venda (chave da empresa +
+            // valor). Não depende de nada extra salvo na venda — o payload Pix é
+            // sempre reconstruível a partir do total e (se houver) da entrada
+            // parcial já registrada. Usado no modal pós-salvar e na tela de
+            // detalhes da venda, pra o botão de copiar/WhatsApp continuar
+            // disponível depois de salvar.
+            regenerarPixParaVenda(sale, boxId, hintId) {
+                if (!sale) return;
+                const chave = Utils.normalizePixKey(state.company?.pix || state.company?.cnpj) || '';
+                const final = sale.total || 0;
+                const entradaVal = sale.paymentDetails?.entradaValue || 0;
+                const cobrandoEntrada = entradaVal > 0 && entradaVal < final;
+                const valorQr = cobrandoEntrada ? entradaVal : final;
+                const label = cobrandoEntrada
+                    ? 'Escaneie para pagar a entrada de ' + this.PAY.fmt(entradaVal)
+                    : 'Escaneie para pagar o valor total';
+                this.PAY.renderPixQr(chave, valorQr, label, boxId, hintId);
+            },
+
             copyPixKey() {
                 // Copia o código Pix Copia-e-Cola completo (o mesmo do QR exibido) —
                 // é o que o cliente realmente cola no app do banco. Se por algum
@@ -28214,12 +28250,17 @@ ${container.innerHTML}
             // imagem é baixada para o cliente anexar à mesma mensagem antes de
             // enviar, mantendo tudo em um único balão do WhatsApp. Nome/valor
             // continuam visíveis para o vendedor na tela de confirmação de envio.
-            async sendPixWhatsApp() {
+            async sendPixWhatsApp(saleId) {
                 const payload = this.PAY._lastPixPayload;
                 if (!payload) { Toast.show('Gere o QR Code do Pix antes de enviar','warning'); return; }
-                const valorTxt = document.getElementById('pixFinal')?.textContent?.trim()
-                    || this.PAY.fmt(this.PAY._lastPixValor || 0);
-                const client = state.clients.find(c => c.id === state.currentSale.clientId);
+                // Numa venda já salva (saleId informado), usa o valor recém-gerado
+                // pelo regenerarPixParaVenda — não lê #pixFinal, que pode estar
+                // desatualizado (é o painel da venda em andamento, não desta venda).
+                const sale = saleId ? state.sales.find(s => s.id === saleId) : state.currentSale;
+                const valorTxt = saleId
+                    ? this.PAY.fmt(this.PAY._lastPixValor || 0)
+                    : (document.getElementById('pixFinal')?.textContent?.trim() || this.PAY.fmt(this.PAY._lastPixValor || 0));
+                const client = state.clients.find(c => c.id === sale?.clientId);
                 const nome1  = client?.name ? client.name.split(' ')[0] : 'Cliente';
                 const phone  = (client?.whatsapp || client?.phone || '').replace(/\D/g, '');
                 const msg = payload; // mensagem contém só o código — nada mais junto
@@ -30309,6 +30350,16 @@ ${container.innerHTML}
                 var lbl=document.getElementById('osGeradoPagtoLabel');
                 if(lbl) lbl.textContent='Selecione a situação — isso remove da lista de Contas a Receber';
                 Modal.show('osGeradoModal');
+                // Pix: reexibe QR/copia-e-cola no modal pós-salvar (senão os botões
+                // de copiar/WhatsApp somem depois de salvar, já que o painel de
+                // pagamento da venda em andamento é resetado por clearForm()).
+                var pixBox = document.getElementById('osGeradoPixBox');
+                if (sale.paymentMethod === 'pix') {
+                    if (pixBox) pixBox.style.display = '';
+                    this.regenerarPixParaVenda(sale, 'osGeradoPixQr', 'osGeradoPixHint');
+                } else if (pixBox) {
+                    pixBox.style.display = 'none';
+                }
                 // Sem saldo pendente: aplica PAGO automaticamente, sem exigir clique.
                 // Com saldo pendente: trava o botão PAGO — só PENDENTE fica disponível
                 // (o pagamento do saldo é dado depois em Contas a Receber).
@@ -30889,6 +30940,24 @@ ${container.innerHTML}
                         ${Utils.sanitizeHTML(sale.observations)}
                     </div>` : ''}
 
+                    ${sale.paymentMethod === 'pix' ? `
+                    <!-- ── Pix — QR Code / Copia-e-Cola (disponível mesmo após salvar) ── -->
+                    <div style="margin-top:12px;padding:12px;background:#f0fff4;border:1px solid #c8e6c9;border-radius:10px;">
+                        <div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.8px;color:#2e7d32;margin-bottom:8px;">🔑 Pagamento via Pix</div>
+                        <div style="display:flex;gap:10px;align-items:center;">
+                            <div id="viewPixQr" style="width:90px;height:90px;flex-shrink:0;display:flex;align-items:center;justify-content:center;background:#fff;border:1px solid #c8e6c9;border-radius:8px;">
+                                <i class="fas fa-qrcode" style="font-size:1.8rem;color:#00a884;"></i>
+                            </div>
+                            <div style="flex:1;min-width:0;">
+                                <div id="viewPixHint" style="font-size:11px;color:#2e7d32;margin-bottom:8px;"></div>
+                                <div style="display:flex;gap:6px;flex-wrap:wrap;">
+                                    <button onclick="Sales.copyPixKey()" style="background:#00a884;color:#fff;border:none;padding:7px 10px;border-radius:6px;cursor:pointer;font-weight:700;font-size:11px;"><i class="fas fa-copy"></i> Copiar código</button>
+                                    <button onclick="Sales.sendPixWhatsApp('${sale.id}')" style="background:#25d366;color:#fff;border:none;padding:7px 10px;border-radius:6px;cursor:pointer;font-weight:700;font-size:11px;"><i class="fab fa-whatsapp"></i> Enviar WhatsApp</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>` : ''}
+
                     <!-- ── Gerar O.S. PDF ── -->
                     <div style="margin-top:12px;padding-top:12px;border-top:1px solid #ebebeb;">
                         <div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.8px;color:#333;margin-bottom:8px;">🖨️ Gerar O.S. em PDF</div>
@@ -30932,6 +31001,9 @@ ${container.innerHTML}
 
                 Modal.show('viewModal', html);
                 document.getElementById('viewTitle').innerText = `Detalhes — OS ${sale.number}`;
+                if (sale.paymentMethod === 'pix') {
+                    setTimeout(() => Sales.regenerarPixParaVenda(sale, 'viewPixQr', 'viewPixHint'), 30);
+                }
             },
 
             // ===== Lista única de status (usada no dropdown e no histórico) =====
