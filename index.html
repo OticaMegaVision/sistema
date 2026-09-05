@@ -9749,7 +9749,7 @@ body.dark-mode,
                                 <div class="bkp-status-ic" style="background:#f3f0ff;color:#7c3aed;"><i class="fas fa-code-branch"></i></div>
                                 <div class="txt">
                                     <b>Versão do sistema</b>
-                                    <span>versão <strong>040920261535</strong></span>
+                                    <span>versão <strong>040920262106</strong></span>
                                 </div>
                             </div>
                         </div>
@@ -11171,6 +11171,11 @@ body.dark-mode,
                         </div>
                     </div>
                 </div>
+            </div>
+            <div id="osGeradoComprovanteBox" style="display:none;padding:0 1.5rem 0.75rem;">
+                <button class="btn btn-outline-secondary" style="width:100%;font-size:0.82rem;font-weight:700;" onclick="Sales.gerarPDF_ComprovanteAvista(Sales._osGeradoSaleId)">
+                    <i class="fas fa-receipt"></i> Gerar Comprovante de Pagamento
+                </button>
             </div>
             <div style="padding:0 1.5rem 0.75rem;">
                 <div style="font-size:0.75rem;font-weight:700;color:#25d366;text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px;display:flex;align-items:center;gap:5px;"><i class="fab fa-whatsapp"></i> Enviar via WhatsApp</div>
@@ -29881,6 +29886,98 @@ ${container.innerHTML}
                 _imprimirDocumento(html, `COMPROVANTE_OS${sale.number}_P${parcela.number}`, '@page { size: 80mm auto; margin: 0; }');
             },
 
+            // ── Comprovante de Pagamento para vendas à vista (Pix, Dinheiro,
+            // Débito, Crédito) — reaproveita o mesmo layout visual do comprovante
+            // de parcela do crediário, mas lendo direto da venda (sem parcela).
+            // Preenche uma lacuna: vendas pagas na hora nunca passam por Contas a
+            // Receber, então não tinham nenhum comprovante formal pra imprimir/enviar.
+            async gerarPDF_ComprovanteAvista(saleId) {
+                const sale = state.sales.find(s => s.id === saleId) || state.currentSale;
+                if (!sale) { Toast.show('Venda não encontrada', 'error'); return; }
+                const client  = state.clients.find(c => c.id === sale.clientId);
+                const company = _getCompanyForDoc();
+                const squareLogo = await getSquareLogo(company.logo, 200);
+                const fd = d => d ? new Date(d + 'T12:00:00').toLocaleDateString('pt-BR') : '—';
+
+                const METODO_LABEL = { pix: 'Pix', cash: 'Dinheiro', debit: 'Cartão de Débito', credit: 'Cartão de Crédito' };
+                const formaPagamento = METODO_LABEL[sale.paymentMethod] || sale.paymentMethod || '—';
+                // Se ainda houver saldo pendente (retirada), mostra o que foi
+                // efetivamente pago agora (entrada), não o total da venda.
+                const entradaVal = sale.paymentDetails?.entradaValue;
+                const valorPago = (sale.paymentStatus === 'pendente' && entradaVal != null) ? entradaVal : (sale.total || 0);
+                const dataPagamento = sale.paidAt ? sale.paidAt.slice(0, 10) : sale.date;
+
+                const logoHtml = company.logo
+                    ? `<div class="comp-logo-circulo"><img src="${squareLogo}" width="100%" height="100%" style="display:block;border-radius:50%;"></div>`
+                    : `<div class="comp-logo-circulo"><span>👁️</span></div>`;
+
+                const html = `
+                    <div class="comprovante-wrapper">
+
+                        <div class="comp-topo">
+                            ${logoHtml}
+                            <div class="comp-empresa-nome">${company.name}</div>
+                            <div class="comp-empresa-sub">
+                                CNPJ: ${company.cnpj || '—'} &nbsp;|&nbsp;
+                                ${[company.address, company.number, company.city, company.state].filter(Boolean).join(', ')}
+                            </div>
+                        </div>
+
+                        <div class="comp-titulo">✅ Comprovante de Pagamento</div>
+
+                        <div class="comp-body">
+                            <div class="comp-grid">
+                                <div class="comp-cell">
+                                    <div class="comp-cell-label">OS Nº</div>
+                                    <div class="comp-cell-val">${sale.number}</div>
+                                </div>
+                                <div class="comp-cell">
+                                    <div class="comp-cell-label">Data do Pagamento</div>
+                                    <div class="comp-cell-val">${fd(dataPagamento)}</div>
+                                </div>
+                            </div>
+
+                            <div class="comp-cliente">
+                                <div class="comp-cliente-label">Cliente</div>
+                                <div class="comp-cliente-nome">${client?.name || '—'}</div>
+                                <div class="comp-cliente-cpf">CPF: ${client?.cpf || '—'}</div>
+                            </div>
+
+                            <div class="comp-valor-box">
+                                <div class="comp-valor-label">Valor Pago</div>
+                                <div class="comp-valor-num">${Utils.formatCurrency(valorPago)}</div>
+                                <div class="comp-valor-extenso">${Utils.numeroPorExtenso ? Utils.numeroPorExtenso(valorPago) : ''}</div>
+                            </div>
+
+                            <div class="comp-status">✅ PAGAMENTO CONFIRMADO</div>
+
+                            <div class="comp-info-pag">
+                                <div><span>Forma de pagamento</span><span>${formaPagamento}</span></div>
+                                <div><span>Recebido por</span><span>${sale.seller || '______'}</span></div>
+                                ${company.whatsapp || company.phone ? `<div><span>WhatsApp</span><span>${company.whatsapp || company.phone}</span></div>` : ''}
+                                ${company.website ? `<div><span>Site</span><span>${company.website}</span></div>` : ''}
+                            </div>
+
+                            <div class="comp-assinatura">
+                                <br>
+                                Assinatura do Cliente
+                            </div>
+                        </div>
+
+                        <div class="comp-rodape">
+                            <strong>${company.name}</strong><br>
+                            ${company.address || ''}, ${company.number || ''} — ${company.city || ''}/${company.state || ''}<br>
+                            📞 ${company.phone || ''} &nbsp; 📱 ${company.whatsapp || ''} &nbsp; ✉️ ${company.email || ''}<br>
+                            ${company.website ? '🌐 ' + company.website + '<br>' : ''}
+                            * Documento válido como comprovante de pagamento
+                        </div>
+
+                    </div>
+                `;
+
+                _imprimirDocumento(html, `COMPROVANTE_OS${sale.number}`, '@page { size: 80mm auto; margin: 0; }');
+            },
+
             // ── WhatsApp: enviar status do pedido para o cliente ──
             enviarStatusPedidoWhatsApp(saleId) {
                 const sale    = state.sales.find(s => s.id === saleId);
@@ -30360,6 +30457,11 @@ ${container.innerHTML}
                 } else if (pixBox) {
                     pixBox.style.display = 'none';
                 }
+                // Comprovante de pagamento: disponível para qualquer venda à vista
+                // (Pix/Dinheiro/Débito/Crédito) — crediário já tem seu próprio
+                // comprovante por parcela, gerado em outro lugar.
+                var comprovanteBox = document.getElementById('osGeradoComprovanteBox');
+                if (comprovanteBox) comprovanteBox.style.display = (sale.paymentMethod !== 'installment') ? '' : 'none';
                 // Sem saldo pendente: aplica PAGO automaticamente, sem exigir clique.
                 // Com saldo pendente: trava o botão PAGO — só PENDENTE fica disponível
                 // (o pagamento do saldo é dado depois em Contas a Receber).
@@ -30940,6 +31042,12 @@ ${container.innerHTML}
                         ${Utils.sanitizeHTML(sale.observations)}
                     </div>` : ''}
 
+                    ${sale.paymentMethod !== 'installment' ? `
+                    <!-- ── Comprovante de Pagamento (vendas à vista) ── -->
+                    <button onclick="Sales.gerarPDF_ComprovanteAvista('${sale.id}')"
+                        style="width:100%;margin-top:10px;background:#fff;color:#28a745;border:1.5px solid #28a745;padding:10px 12px;border-radius:8px;cursor:pointer;font-weight:700;font-size:12px;display:flex;align-items:center;justify-content:center;gap:6px;">
+                        <i class="fas fa-receipt"></i> Gerar Comprovante de Pagamento
+                    </button>` : ''}
                     ${sale.paymentMethod === 'pix' ? `
                     <!-- ── Pix — QR Code / Copia-e-Cola (disponível mesmo após salvar) ── -->
                     <div style="margin-top:12px;padding:12px;background:#f0fff4;border:1px solid #c8e6c9;border-radius:10px;">
