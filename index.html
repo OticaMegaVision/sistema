@@ -6846,81 +6846,6 @@ body.dark-mode,
                 </div>
 
                 <!-- Modal Comprovante -->
-                <div id="modalComprovante" class="modal" style="display:none;" role="dialog">
-                    <div class="modal-content" style="max-width:480px;">
-                        <div class="modal-header" style="background:linear-gradient(135deg,#28a745,#20c060);color:white;border-radius:12px 12px 0 0;">
-                            <h3 style="color:white;">✅ Baixa Registrada com Sucesso!</h3>
-                            <button class="modal-close" style="color:white;opacity:0.8;" onclick="document.getElementById('modalComprovante').style.display='none'">&times;</button>
-                        </div>
-                        <div class="modal-body" style="padding:1.2rem;">
-                            <!-- Recibo visual profissional -->
-                            <div id="comprovanteVisual" style="background:#fff;border:1px solid #e0e0e0;border-radius:10px;overflow:hidden;box-shadow:0 2px 12px rgba(0,0,0,0.08);">
-                                <!-- Cabeçalho empresa -->
-                                <div id="compHeader" style="background:linear-gradient(135deg,#ff6b00,#ff9500);padding:14px 16px;display:flex;align-items:center;gap:12px;">
-                                    <div id="compLogo" style="width:44px;height:44px;border-radius:50%;background:rgba(255,255,255,0.25);border:2px solid rgba(255,255,255,0.6);display:flex;align-items:center;justify-content:center;font-size:20px;overflow:hidden;flex-shrink:0;position:relative;"></div>
-                                    <div>
-                                        <div id="compEmpNome" style="font-size:1rem;font-weight:800;color:#fff;line-height:1.1;"></div>
-                                        <div id="compEmpCnpj" style="font-size:0.72rem;color:rgba(255,255,255,0.85);margin-top:2px;"></div>
-                                    </div>
-                                    <div style="margin-left:auto;text-align:right;">
-                                        <div style="font-size:0.65rem;color:rgba(255,255,255,0.7);text-transform:uppercase;letter-spacing:0.5px;">Comprovante</div>
-                                        <div style="font-size:0.75rem;font-weight:800;color:#fff;">RECEBIMENTO</div>
-                                    </div>
-                                </div>
-                                <!-- Faixa verde confirmação -->
-                                <div style="background:#f0fff4;border-bottom:1px solid #c3e6cb;padding:8px 16px;display:flex;align-items:center;gap:8px;">
-                                    <span style="font-size:1.1rem;">✅</span>
-                                    <span style="font-size:0.82rem;font-weight:700;color:#155724;">Pagamento recebido e confirmado</span>
-                                    <span id="compDataPag" style="margin-left:auto;font-size:0.75rem;color:#555;"></span>
-                                </div>
-                                <!-- Corpo do recibo -->
-                                <div style="padding:14px 16px;">
-                                    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px;">
-                                        <div style="background:#f8f9fa;border-radius:7px;padding:10px;">
-                                            <div style="font-size:0.62rem;color:#888;text-transform:uppercase;font-weight:700;letter-spacing:0.3px;">Descrição</div>
-                                            <div id="compDescricao" style="font-size:0.85rem;font-weight:700;color:#212529;margin-top:2px;"></div>
-                                        </div>
-                                        <div style="background:#f0fff4;border-radius:7px;padding:10px;border:1px solid #c3e6cb;">
-                                            <div style="font-size:0.62rem;color:#555;text-transform:uppercase;font-weight:700;letter-spacing:0.3px;">Valor Recebido</div>
-                                            <div id="compValor" style="font-size:1.15rem;font-weight:900;color:#28a745;margin-top:2px;"></div>
-                                        </div>
-                                    </div>
-                                    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px;">
-                                        <div>
-                                            <div style="font-size:0.62rem;color:#888;text-transform:uppercase;font-weight:700;">Cliente / Parte</div>
-                                            <div id="compCliente" style="font-size:0.82rem;font-weight:600;color:#333;margin-top:2px;"></div>
-                                        </div>
-                                        <div>
-                                            <div style="font-size:0.62rem;color:#888;text-transform:uppercase;font-weight:700;">Categoria</div>
-                                            <div id="compCategoria" style="font-size:0.82rem;font-weight:600;color:#333;margin-top:2px;"></div>
-                                        </div>
-                                        <div>
-                                            <div style="font-size:0.62rem;color:#888;text-transform:uppercase;font-weight:700;">Vencimento</div>
-                                            <div id="compVencimento" style="font-size:0.82rem;font-weight:600;color:#333;margin-top:2px;"></div>
-                                        </div>
-                                        <div>
-                                            <div style="font-size:0.62rem;color:#888;text-transform:uppercase;font-weight:700;">Forma de Pagamento</div>
-                                            <div id="compFormaPag" style="font-size:0.82rem;font-weight:600;color:#333;margin-top:2px;">—</div>
-                                        </div>
-                                    </div>
-                                    <div id="compObsRow" style="display:none;background:#fffbf0;border-radius:7px;padding:8px 10px;border-left:3px solid #ffcc00;margin-bottom:8px;">
-                                        <div style="font-size:0.62rem;color:#888;text-transform:uppercase;font-weight:700;">Observações</div>
-                                        <div id="compObs" style="font-size:0.8rem;color:#444;margin-top:2px;"></div>
-                                    </div>
-                                </div>
-                                <!-- Rodapé -->
-                                <div style="background:#f8f9fa;border-top:1px dashed #ddd;padding:8px 16px;display:flex;justify-content:space-between;align-items:center;">
-                                    <span style="font-size:0.68rem;color:#aaa;">Sistema ÓticaVision Pro</span>
-                                    <span id="compEmitidoEm" style="font-size:0.68rem;color:#aaa;"></span>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="modal-footer">
-                            <button class="btn btn-secondary" onclick="document.getElementById('modalComprovante').style.display='none'">Fechar</button>
-                            <button class="btn btn-primary" onclick="ContasManager.imprimirComprovante()"><i class="fas fa-print"></i> Imprimir Comprovante</button>
-                        </div>
-                    </div>
-                </div>
                 </div>
 
                 <div class="dash-tabpanel" data-tabpanel="alertas" style="display:none;">
@@ -9749,7 +9674,7 @@ body.dark-mode,
                                 <div class="bkp-status-ic" style="background:#f3f0ff;color:#7c3aed;"><i class="fas fa-code-branch"></i></div>
                                 <div class="txt">
                                     <b>Versão do sistema</b>
-                                    <span>versão <strong>050920261925</strong></span>
+                                    <span>versão <strong>050920261932</strong></span>
                                 </div>
                             </div>
                         </div>
@@ -11239,6 +11164,86 @@ body.dark-mode,
             </div>
         </div>
     </div>
+
+
+    <!-- Comprovante de Pagamento (movido para fora de qualquer <section> —
+         antes ficava dentro da section #dashboard e só aparecia quando essa
+         aba estava ativa; agora é um modal global, igual aos outros. -->
+                <div id="modalComprovante" class="modal" style="display:none;" role="dialog">
+                    <div class="modal-content" style="max-width:480px;">
+                        <div class="modal-header" style="background:linear-gradient(135deg,#28a745,#20c060);color:white;border-radius:12px 12px 0 0;">
+                            <h3 style="color:white;">✅ Baixa Registrada com Sucesso!</h3>
+                            <button class="modal-close" style="color:white;opacity:0.8;" onclick="document.getElementById('modalComprovante').style.display='none'">&times;</button>
+                        </div>
+                        <div class="modal-body" style="padding:1.2rem;">
+                            <!-- Recibo visual profissional -->
+                            <div id="comprovanteVisual" style="background:#fff;border:1px solid #e0e0e0;border-radius:10px;overflow:hidden;box-shadow:0 2px 12px rgba(0,0,0,0.08);">
+                                <!-- Cabeçalho empresa -->
+                                <div id="compHeader" style="background:linear-gradient(135deg,#ff6b00,#ff9500);padding:14px 16px;display:flex;align-items:center;gap:12px;">
+                                    <div id="compLogo" style="width:44px;height:44px;border-radius:50%;background:rgba(255,255,255,0.25);border:2px solid rgba(255,255,255,0.6);display:flex;align-items:center;justify-content:center;font-size:20px;overflow:hidden;flex-shrink:0;position:relative;"></div>
+                                    <div>
+                                        <div id="compEmpNome" style="font-size:1rem;font-weight:800;color:#fff;line-height:1.1;"></div>
+                                        <div id="compEmpCnpj" style="font-size:0.72rem;color:rgba(255,255,255,0.85);margin-top:2px;"></div>
+                                    </div>
+                                    <div style="margin-left:auto;text-align:right;">
+                                        <div style="font-size:0.65rem;color:rgba(255,255,255,0.7);text-transform:uppercase;letter-spacing:0.5px;">Comprovante</div>
+                                        <div style="font-size:0.75rem;font-weight:800;color:#fff;">RECEBIMENTO</div>
+                                    </div>
+                                </div>
+                                <!-- Faixa verde confirmação -->
+                                <div style="background:#f0fff4;border-bottom:1px solid #c3e6cb;padding:8px 16px;display:flex;align-items:center;gap:8px;">
+                                    <span style="font-size:1.1rem;">✅</span>
+                                    <span style="font-size:0.82rem;font-weight:700;color:#155724;">Pagamento recebido e confirmado</span>
+                                    <span id="compDataPag" style="margin-left:auto;font-size:0.75rem;color:#555;"></span>
+                                </div>
+                                <!-- Corpo do recibo -->
+                                <div style="padding:14px 16px;">
+                                    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px;">
+                                        <div style="background:#f8f9fa;border-radius:7px;padding:10px;">
+                                            <div style="font-size:0.62rem;color:#888;text-transform:uppercase;font-weight:700;letter-spacing:0.3px;">Descrição</div>
+                                            <div id="compDescricao" style="font-size:0.85rem;font-weight:700;color:#212529;margin-top:2px;"></div>
+                                        </div>
+                                        <div style="background:#f0fff4;border-radius:7px;padding:10px;border:1px solid #c3e6cb;">
+                                            <div style="font-size:0.62rem;color:#555;text-transform:uppercase;font-weight:700;letter-spacing:0.3px;">Valor Recebido</div>
+                                            <div id="compValor" style="font-size:1.15rem;font-weight:900;color:#28a745;margin-top:2px;"></div>
+                                        </div>
+                                    </div>
+                                    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px;">
+                                        <div>
+                                            <div style="font-size:0.62rem;color:#888;text-transform:uppercase;font-weight:700;">Cliente / Parte</div>
+                                            <div id="compCliente" style="font-size:0.82rem;font-weight:600;color:#333;margin-top:2px;"></div>
+                                        </div>
+                                        <div>
+                                            <div style="font-size:0.62rem;color:#888;text-transform:uppercase;font-weight:700;">Categoria</div>
+                                            <div id="compCategoria" style="font-size:0.82rem;font-weight:600;color:#333;margin-top:2px;"></div>
+                                        </div>
+                                        <div>
+                                            <div style="font-size:0.62rem;color:#888;text-transform:uppercase;font-weight:700;">Vencimento</div>
+                                            <div id="compVencimento" style="font-size:0.82rem;font-weight:600;color:#333;margin-top:2px;"></div>
+                                        </div>
+                                        <div>
+                                            <div style="font-size:0.62rem;color:#888;text-transform:uppercase;font-weight:700;">Forma de Pagamento</div>
+                                            <div id="compFormaPag" style="font-size:0.82rem;font-weight:600;color:#333;margin-top:2px;">—</div>
+                                        </div>
+                                    </div>
+                                    <div id="compObsRow" style="display:none;background:#fffbf0;border-radius:7px;padding:8px 10px;border-left:3px solid #ffcc00;margin-bottom:8px;">
+                                        <div style="font-size:0.62rem;color:#888;text-transform:uppercase;font-weight:700;">Observações</div>
+                                        <div id="compObs" style="font-size:0.8rem;color:#444;margin-top:2px;"></div>
+                                    </div>
+                                </div>
+                                <!-- Rodapé -->
+                                <div style="background:#f8f9fa;border-top:1px dashed #ddd;padding:8px 16px;display:flex;justify-content:space-between;align-items:center;">
+                                    <span style="font-size:0.68rem;color:#aaa;">Sistema ÓticaVision Pro</span>
+                                    <span id="compEmitidoEm" style="font-size:0.68rem;color:#aaa;"></span>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="modal-footer">
+                            <button class="btn btn-secondary" onclick="document.getElementById('modalComprovante').style.display='none'">Fechar</button>
+                            <button class="btn btn-primary" onclick="ContasManager.imprimirComprovante()"><i class="fas fa-print"></i> Imprimir Comprovante</button>
+                        </div>
+                    </div>
+                </div>
 
     <div class="modal" id="viewModal" role="dialog" aria-modal="true" aria-labelledby="viewTitle">
         <div class="modal-content" style="max-width:700px;max-height:90vh;overflow-y:auto;">
