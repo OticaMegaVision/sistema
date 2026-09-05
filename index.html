@@ -9749,7 +9749,7 @@ body.dark-mode,
                                 <div class="bkp-status-ic" style="background:#f3f0ff;color:#7c3aed;"><i class="fas fa-code-branch"></i></div>
                                 <div class="txt">
                                     <b>Versão do sistema</b>
-                                    <span>versão <strong>040920262106</strong></span>
+                                    <span>versão <strong>050920261117</strong></span>
                                 </div>
                             </div>
                         </div>
@@ -19171,6 +19171,22 @@ body.dark-mode,
             iframe.onload = () => {
                 setTimeout(() => {
                     try {
+                        // ✅ FIX "página em branco/receipt encolhido" (relatório aprovado):
+                        // páginas com altura "auto" (recibos de 80mm) nem sempre têm o
+                        // tamanho customizado respeitado por navegadores/drivers de
+                        // "salvar como PDF" — muitos ignoram a página inteira e caem no
+                        // padrão (A4), deixando o conteúdo pequeno num canto. Medindo a
+                        // altura real do conteúdo e fixando width×height exatos (em vez
+                        // de deixar a altura "automática"), o tamanho customizado passa
+                        // a ser respeitado de forma bem mais confiável.
+                        if (/auto/i.test(pageCss)) {
+                            const alturaPx = doc.body.scrollHeight || doc.documentElement.scrollHeight || 0;
+                            const alturaMm = Math.ceil(alturaPx * 25.4 / 96) + 4; // +4mm de folga de segurança
+                            const cssFixo = pageCss.replace(/auto/i, alturaMm + 'mm');
+                            const styleFix = doc.createElement('style');
+                            styleFix.textContent = cssFixo;
+                            doc.head.appendChild(styleFix);
+                        }
                         iframe.contentWindow.focus();
                         iframe.contentWindow.print();
                     } catch (e) {
