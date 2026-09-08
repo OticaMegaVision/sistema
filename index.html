@@ -1173,6 +1173,16 @@ var qrcode=function(){function r(t,e){if(void 0===t.length)throw new Error(t.len
         .acc-month-tab.active { background:#fff; color:var(--primary-dark); box-shadow:0 2px 6px rgba(16,24,40,.1); }
         .dark-mode .acc-month-tab.active { background:#2d2d2d; color:#ffb27a; }
 
+        .acc-month-nav { display:flex; align-items:center; gap:4px; background:var(--light); border-radius:10px; padding:4px; }
+        .dark-mode .acc-month-nav { background:#1a1a1a; }
+        .acc-month-arrow { border:none; background:#fff; color:var(--gray); width:26px; height:26px; border-radius:7px; cursor:pointer; display:flex; align-items:center; justify-content:center; font-size:0.68rem; transition:var(--transition); }
+        .acc-month-arrow:hover { color:var(--primary-dark); }
+        .acc-month-arrow:disabled { opacity:.4; cursor:not-allowed; }
+        .dark-mode .acc-month-arrow { background:#2d2d2d; color:var(--gray); }
+        .acc-month-label { padding:0 10px; font-size:0.74rem; font-weight:700; color:var(--primary-dark); cursor:pointer; white-space:nowrap; user-select:none; }
+        .dark-mode .acc-month-label { color:#ffb27a; }
+        .acc-month-label:hover { text-decoration:underline; }
+
         .acc-body { display:grid; grid-template-columns:260px 1fr; gap:20px; }
         @media (max-width:760px) { .acc-body { grid-template-columns:1fr; } }
         .acc-boxes { display:flex; flex-direction:column; gap:12px; }
@@ -20941,8 +20951,9 @@ tbody tr td{border:1.5px solid #000;padding:2mm;text-align:center;font-weight:70
 
             // Sub-aba do card "Comparativo de Desempenho": 'desempenho' (OS/Meta, original)
             // ou 'acumulado' (nova aba "Vendas Acumuladas" — curva acumulada mês atual x mês anterior)
-            _cmpView: 'desempenho',
+            _cmpView: 'acumulado',
             _accChart: null,     // instância do Chart.js da aba "Vendas Acumuladas"
+            _accMonth: null,     // mês selecionado na aba "Vendas Acumuladas" ('YYYY-MM-01') — null = mês atual
 
             setGlassesPeriod(period, btn) {
                 this._glassesPeriod = period;
@@ -21620,40 +21631,24 @@ tbody tr td{border:1.5px solid #000;padding:2mm;text-align:center;font-weight:70
                         </div>
 
                         <div class="dashv2-subview-tabs" id="dashCmpViewTabs">
-                            <div class="dashv2-subview-tab ${this._cmpView==='desempenho'?'active':''}" data-view="desempenho" onclick="Dashboard.setCmpView('desempenho')"><i class="fas fa-gauge-high"></i>Desempenho</div>
                             <div class="dashv2-subview-tab ${this._cmpView==='acumulado'?'active':''}" data-view="acumulado" onclick="Dashboard.setCmpView('acumulado')"><i class="fas fa-chart-line"></i>Vendas Acumuladas</div>
-                        </div>
-
-                        <div id="dashCmpViewDesempenho" style="${this._cmpView==='acumulado'?'display:none;':''}">
-                            <div class="dashv2-period-tabs" id="dashCmpTabs">
-                                <div class="dashv2-period-tab ${this._cmpPeriod==='dia'?'active':''}" data-period="dia" onclick="Dashboard.setCmpPeriod('dia')">Dia</div>
-                                <div class="dashv2-period-tab ${this._cmpPeriod==='semana'?'active':''}" data-period="semana" onclick="Dashboard.setCmpPeriod('semana')">Semana</div>
-                                <div class="dashv2-period-tab ${this._cmpPeriod==='mes'?'active':''}" data-period="mes" onclick="Dashboard.setCmpPeriod('mes')">Mês</div>
-                                <div class="dashv2-period-tab ${this._cmpPeriod==='ano'?'active':''}" data-period="ano" onclick="Dashboard.setCmpPeriod('ano')">Ano</div>
-                                <div class="dashv2-period-tab custom-tab ${this._cmpPeriod==='custom'?'active':''}" data-period="custom" onclick="Dashboard.setCmpPeriod('custom')" title="Período personalizado"><i class="fas fa-calendar-week" style="font-size:0.68rem;"></i></div>
-                            </div>
-
-                            <div class="dashv2-custom-range ${this._cmpPeriod==='custom'?'show':''}" id="dashCmpCustomRange">
-                                <label>De <input type="date" id="dashCmpFrom" value="${this._cmpFrom || ''}"></label>
-                                <label>Até <input type="date" id="dashCmpTo" value="${this._cmpTo || ''}"></label>
-                                <button onclick="Dashboard.applyCmpCustomRange()">Aplicar</button>
-                            </div>
-
-                            <div class="dashv2-compare-row" id="dashCmpCompareRow"></div>
-
-                            <div class="dashv2-canvas-wrap" id="dashCmpCanvasWrap"><canvas id="dashCmpCanvas"></canvas></div>
-
-                            <div class="dashv2-insight-row" id="dashCmpInsights"></div>
-
-                            <div class="dashv2-ai-note" id="dashCmpAiNote" style="display:none;"></div>
+                            <div class="dashv2-subview-tab ${this._cmpView==='desempenho'?'active':''}" data-view="desempenho" onclick="Dashboard.setCmpView('desempenho')"><i class="fas fa-gauge-high"></i>Desempenho</div>
                         </div>
 
                         <div id="dashCmpViewAcumulado" style="${this._cmpView==='desempenho'?'display:none;':''}">
                             <div class="acc-head">
                                 <span class="acc-subtitle">Total de vendas acumuladas no mês anterior: <strong id="accTotAnterior">—</strong></span>
-                                <div class="acc-month-tabs">
-                                    <div class="acc-month-tab active" id="accMesAtualTab">—</div>
+                                <div class="acc-month-nav">
+                                    <button class="acc-month-arrow" onclick="Dashboard.shiftAccMonth(-1)" title="Mês anterior"><i class="fas fa-chevron-left"></i></button>
+                                    <span class="acc-month-label" id="accMesAtualTab" onclick="Dashboard.toggleAccMonthEdit()" title="Clique para escolher outro mês">—</span>
+                                    <button class="acc-month-arrow" id="accNextMonthBtn" onclick="Dashboard.shiftAccMonth(1)" title="Próximo mês"><i class="fas fa-chevron-right"></i></button>
                                 </div>
+                            </div>
+
+                            <div class="dashv2-custom-range" id="accMonthEditRow">
+                                <label>Mês <input type="month" id="accMonthInput"></label>
+                                <button onclick="Dashboard.applyAccMonth()">Aplicar</button>
+                                <button type="button" onclick="Dashboard.resetAccMonth()" style="background:var(--light-gray);color:var(--dark);">Mês atual</button>
                             </div>
 
                             <div class="acc-body">
@@ -21685,11 +21680,35 @@ tbody tr td{border:1.5px solid #000;padding:2mm;text-align:center;font-weight:70
                             </div>
 
                             <div class="acc-legend-row">
-                                <span><span class="acc-legend-dot" style="background:#ff6b00;"></span>Mês atual (acumulado dia a dia)</span>
+                                <span><span class="acc-legend-dot" style="background:#ff6b00;"></span>Mês selecionado (acumulado dia a dia)</span>
                                 <span><span class="acc-legend-dot" style="background:#c2c8d0;"></span>Mês anterior (acumulado dia a dia)</span>
                             </div>
 
                             <div class="dashv2-ai-note" id="dashAccAiNote" style="display:none;"></div>
+                        </div>
+
+                        <div id="dashCmpViewDesempenho" style="${this._cmpView==='acumulado'?'display:none;':''}">
+                            <div class="dashv2-period-tabs" id="dashCmpTabs">
+                                <div class="dashv2-period-tab ${this._cmpPeriod==='dia'?'active':''}" data-period="dia" onclick="Dashboard.setCmpPeriod('dia')">Dia</div>
+                                <div class="dashv2-period-tab ${this._cmpPeriod==='semana'?'active':''}" data-period="semana" onclick="Dashboard.setCmpPeriod('semana')">Semana</div>
+                                <div class="dashv2-period-tab ${this._cmpPeriod==='mes'?'active':''}" data-period="mes" onclick="Dashboard.setCmpPeriod('mes')">Mês</div>
+                                <div class="dashv2-period-tab ${this._cmpPeriod==='ano'?'active':''}" data-period="ano" onclick="Dashboard.setCmpPeriod('ano')">Ano</div>
+                                <div class="dashv2-period-tab custom-tab ${this._cmpPeriod==='custom'?'active':''}" data-period="custom" onclick="Dashboard.setCmpPeriod('custom')" title="Período personalizado"><i class="fas fa-calendar-week" style="font-size:0.68rem;"></i></div>
+                            </div>
+
+                            <div class="dashv2-custom-range ${this._cmpPeriod==='custom'?'show':''}" id="dashCmpCustomRange">
+                                <label>De <input type="date" id="dashCmpFrom" value="${this._cmpFrom || ''}"></label>
+                                <label>Até <input type="date" id="dashCmpTo" value="${this._cmpTo || ''}"></label>
+                                <button onclick="Dashboard.applyCmpCustomRange()">Aplicar</button>
+                            </div>
+
+                            <div class="dashv2-compare-row" id="dashCmpCompareRow"></div>
+
+                            <div class="dashv2-canvas-wrap" id="dashCmpCanvasWrap"><canvas id="dashCmpCanvas"></canvas></div>
+
+                            <div class="dashv2-insight-row" id="dashCmpInsights"></div>
+
+                            <div class="dashv2-ai-note" id="dashCmpAiNote" style="display:none;"></div>
                         </div>
                     </div>
                 `;
@@ -22125,30 +22144,76 @@ tbody tr td{border:1.5px solid #000;padding:2mm;text-align:center;font-weight:70
                 });
             },
 
+            // Mês atual (1º dia, ISO) — usado como teto para não deixar navegar para o futuro
+            _accCurMonthStartISO() {
+                const now = new Date();
+                return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`;
+            },
+            // Navega para o mês anterior/seguinte na aba "Vendas Acumuladas" (delta: -1 ou 1)
+            shiftAccMonth(delta) {
+                const curMonthStartISO = this._accCurMonthStartISO();
+                const base = this._accMonth || curMonthStartISO;
+                const target = this._shiftMonths(base, delta);
+                if (target > curMonthStartISO) return; // não permite ir para o futuro
+                this._accMonth = (target === curMonthStartISO) ? null : target;
+                this.renderAcumulado();
+            },
+            // Mostra/esconde o campo de edição direta do mês (input type=month)
+            toggleAccMonthEdit() {
+                const row = document.getElementById('accMonthEditRow');
+                if (!row) return;
+                const willShow = !row.classList.contains('show');
+                row.classList.toggle('show', willShow);
+                if (willShow) {
+                    const base = this._accMonth || this._accCurMonthStartISO();
+                    const input = document.getElementById('accMonthInput');
+                    if (input) input.value = base.slice(0, 7);
+                }
+            },
+            applyAccMonth() {
+                const input = document.getElementById('accMonthInput');
+                const chosen = input?.value ? input.value + '-01' : '';
+                const curMonthStartISO = this._accCurMonthStartISO();
+                if (!chosen) { Toast.show('⚠️ Selecione um mês válido.', 'danger', 3000); return; }
+                if (chosen > curMonthStartISO) { Toast.show('⚠️ Não é possível escolher um mês futuro.', 'danger', 3000); return; }
+                this._accMonth = (chosen === curMonthStartISO) ? null : chosen;
+                document.getElementById('accMonthEditRow')?.classList.remove('show');
+                this.renderAcumulado();
+            },
+            resetAccMonth() {
+                this._accMonth = null;
+                document.getElementById('accMonthEditRow')?.classList.remove('show');
+                this.renderAcumulado();
+            },
+
             _doRenderAcumulado() {
                 const canvas = document.getElementById('dashAccCanvas');
                 if (!canvas || !window.Chart) return;
 
                 const mesesNome = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
                 const now = new Date();
-                const todayISO = this._isoLocal(now);
-                const curMonthStartISO = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`;
-                const prevMonthStartISO = this._shiftMonths(curMonthStartISO, -1);
-                const daysInCurMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
-                const daysInPrevMonth = new Date(now.getFullYear(), now.getMonth(), 0).getDate();
-                const todayDayNum = now.getDate();
+                const curMonthStartISO = this._accCurMonthStartISO();
+                const selMonthStartISO = this._accMonth || curMonthStartISO;
+                const isCurrentMonth = selMonthStartISO === curMonthStartISO;
+                const selDate = new Date(selMonthStartISO + 'T12:00:00');
+                const daysInSelMonth = new Date(selDate.getFullYear(), selDate.getMonth() + 1, 0).getDate();
+                const prevMonthStartISO = this._shiftMonths(selMonthStartISO, -1);
+                const daysInPrevMonth = new Date(selDate.getFullYear(), selDate.getMonth(), 0).getDate();
+                // Mês atual: corta em "hoje". Mês passado: mostra o mês fechado (completo).
+                const cutoffDay = isCurrentMonth ? now.getDate() : daysInSelMonth;
 
-                // Séries acumuladas: mês anterior (mês cheio) e mês atual (só até hoje)
+                // Séries acumuladas: mês anterior (mês cheio) e mês selecionado (até o corte)
                 const prevSeriesFull = this._cmpCumulativeSeries(prevMonthStartISO, daysInPrevMonth);
-                const curSeriesSoFar = this._cmpCumulativeSeries(curMonthStartISO, todayDayNum);
+                const curSeriesSoFar = this._cmpCumulativeSeries(selMonthStartISO, cutoffDay);
 
                 const totalAnterior = prevSeriesFull[daysInPrevMonth - 1] || 0;
-                const valorAtual = curSeriesSoFar[todayDayNum - 1] || 0;
-                const idxMesmoDiaPrev = Math.min(todayDayNum, daysInPrevMonth) - 1;
+                const valorAtual = curSeriesSoFar[cutoffDay - 1] || 0;
+                const idxMesmoDiaPrev = Math.min(cutoffDay, daysInPrevMonth) - 1;
                 const valorAnteriorMesmoPeriodo = prevSeriesFull[idxMesmoDiaPrev] || 0;
+                const lastCoveredISO = this._shiftDays(selMonthStartISO, cutoffDay - 1);
 
                 const fmtDia = (iso) => { const d = new Date(iso + 'T12:00:00'); return `${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}`; };
-                const rangeAtualTxt = `${fmtDia(curMonthStartISO)} a ${fmtDia(todayISO)}`;
+                const rangeAtualTxt = `${fmtDia(selMonthStartISO)} a ${fmtDia(lastCoveredISO)}`;
                 const rangeAnteriorTxt = `${fmtDia(prevMonthStartISO)} a ${fmtDia(this._shiftDays(prevMonthStartISO, idxMesmoDiaPrev))}`;
 
                 const pctAtual = totalAnterior > 0 ? (valorAtual / totalAnterior * 100) : 0;
@@ -22158,7 +22223,7 @@ tbody tr td{border:1.5px solid #000;padding:2mm;text-align:center;font-weight:70
                 // Preenche textos e barras
                 const setTxt = (id, txt) => { const e = document.getElementById(id); if (e) e.textContent = txt; };
                 setTxt('accTotAnterior', Utils.formatCurrency(totalAnterior));
-                setTxt('accMesAtualTab', `${mesesNome[now.getMonth()]} de ${now.getFullYear()}`);
+                setTxt('accMesAtualTab', `${mesesNome[selDate.getMonth()]} de ${selDate.getFullYear()}`);
                 setTxt('accRangeAtual', rangeAtualTxt);
                 setTxt('accValAtual', Utils.formatCurrency(valorAtual));
                 setTxt('accPctAtual', fmtPct(pctAtual));
@@ -22167,6 +22232,10 @@ tbody tr td{border:1.5px solid #000;padding:2mm;text-align:center;font-weight:70
                 setTxt('accValAnterior', Utils.formatCurrency(valorAnteriorMesmoPeriodo));
                 setTxt('accPctAnterior', fmtPct(pctAnterior));
                 setTxt('accFracAnterior', `${Utils.formatCurrency(valorAnteriorMesmoPeriodo)} / ${Utils.formatCurrency(totalAnterior)}`);
+
+                // Desabilita a seta de "próximo mês" quando já está no mês atual
+                const nextBtn = document.getElementById('accNextMonthBtn');
+                if (nextBtn) nextBtn.disabled = isCurrentMonth;
 
                 const barAtual = document.getElementById('accBarAtual');
                 const barAnterior = document.getElementById('accBarAnterior');
@@ -22186,22 +22255,26 @@ tbody tr td{border:1.5px solid #000;padding:2mm;text-align:center;font-weight:70
                     deltaTxt.textContent = `${Math.abs(diffPct)}% ${up ? 'acima' : 'abaixo'} do mesmo período do mês anterior`;
                 }
 
-                // Nota com projeção de fechamento do mês, no ritmo atual
+                // Nota com projeção de fechamento do mês (só faz sentido pro mês corrente em andamento)
                 const noteEl = document.getElementById('dashAccAiNote');
                 if (noteEl) {
-                    if (valorAtual > 0) {
-                        const ritmoDiario = valorAtual / todayDayNum;
-                        const projecao = ritmoDiario * daysInCurMonth;
+                    if (valorAtual > 0 && isCurrentMonth) {
+                        const ritmoDiario = valorAtual / cutoffDay;
+                        const projecao = ritmoDiario * daysInSelMonth;
                         noteEl.style.display = 'flex';
-                        noteEl.innerHTML = `<i class="fas fa-sparkles"></i> No dia ${todayDayNum}, o mês está <strong>${Math.abs(diffPct)}% ${diffPct >= 0 ? 'acima' : 'abaixo'}</strong> do mesmo ponto do mês anterior. Mantendo o ritmo, deve fechar perto de <strong>${Utils.formatCurrency(projecao)}</strong>.`;
+                        noteEl.innerHTML = `<i class="fas fa-sparkles"></i> No dia ${cutoffDay}, o mês está <strong>${Math.abs(diffPct)}% ${diffPct >= 0 ? 'acima' : 'abaixo'}</strong> do mesmo ponto do mês anterior. Mantendo o ritmo, deve fechar perto de <strong>${Utils.formatCurrency(projecao)}</strong>.`;
+                    } else if (valorAtual > 0) {
+                        noteEl.style.display = 'flex';
+                        noteEl.innerHTML = `<i class="fas fa-sparkles"></i> O mês fechou <strong>${Math.abs(diffPct)}% ${diffPct >= 0 ? 'acima' : 'abaixo'}</strong> do mês anterior.`;
                     } else {
                         noteEl.style.display = 'none';
                     }
                 }
 
-                // Gráfico de curva acumulada (mês atual x mês anterior)
+                // Gráfico de curva acumulada (mês selecionado x mês anterior)
                 const isDark = document.body.classList.contains('dark-mode');
-                const labels = Array.from({ length: daysInPrevMonth }, (_, i) => i + 1);
+                const totalDiasEixo = Math.max(daysInPrevMonth, daysInSelMonth);
+                const labels = Array.from({ length: totalDiasEixo }, (_, i) => i + 1);
                 const dataAnterior = labels.map((_, i) => i < prevSeriesFull.length ? prevSeriesFull[i] : null);
                 const dataAtual = labels.map((_, i) => i < curSeriesSoFar.length ? curSeriesSoFar[i] : null);
 
@@ -22213,7 +22286,7 @@ tbody tr td{border:1.5px solid #000;padding:2mm;text-align:center;font-weight:70
                         labels,
                         datasets: [
                             { label: 'Mês anterior', data: dataAnterior, borderColor: '#c2c8d0', backgroundColor: 'rgba(194,200,208,0.25)', fill: true, tension: 0.25, pointRadius: 0, borderWidth: 2 },
-                            { label: 'Mês atual', data: dataAtual, borderColor: '#ff6b00', backgroundColor: 'rgba(255,107,0,0.18)', fill: true, tension: 0.25, pointRadius: 2, pointBackgroundColor: '#ff6b00', borderWidth: 2.5 }
+                            { label: 'Mês selecionado', data: dataAtual, borderColor: '#ff6b00', backgroundColor: 'rgba(255,107,0,0.18)', fill: true, tension: 0.25, pointRadius: 2, pointBackgroundColor: '#ff6b00', borderWidth: 2.5 }
                         ]
                     },
                     options: {
