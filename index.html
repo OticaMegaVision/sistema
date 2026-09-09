@@ -1156,6 +1156,63 @@ var qrcode=function(){function r(t,e){if(void 0===t.length)throw new Error(t.len
         .dashv2-ai-note i { color:var(--primary); margin-top:1px; }
         .dark-mode .dashv2-ai-note { background:linear-gradient(135deg,#2e1f10,#231a10); border-color:#4a331a; color:#ffcb94; }
 
+        /* ===== Sub-abas do card Comparativo: "Desempenho" x "Vendas Acumuladas" ===== */
+        .dashv2-subview-tabs { display:flex; gap:6px; margin-bottom:16px; border-bottom:1px solid var(--light-gray); }
+        .dashv2-subview-tab { padding:8px 4px; margin-bottom:-1px; font-size:0.78rem; font-weight:700; color:var(--gray); cursor:pointer; border-bottom:2px solid transparent; transition:var(--transition); display:flex; align-items:center; gap:6px; user-select:none; }
+        .dashv2-subview-tab i { font-size:0.72rem; }
+        .dashv2-subview-tab.active { color:var(--primary-dark); border-bottom-color:var(--primary); }
+        .dark-mode .dashv2-subview-tab.active { color:#ffb27a; }
+
+        /* ===== Aba "Vendas Acumuladas" ===== */
+        .acc-head { display:flex; align-items:flex-start; justify-content:space-between; gap:14px; flex-wrap:wrap; margin-bottom:14px; }
+        .acc-subtitle { font-size:0.74rem; color:var(--gray); font-weight:500; }
+        .acc-subtitle strong { color:var(--dark); font-weight:700; }
+        .acc-month-tabs { display:flex; background:var(--light); border-radius:10px; padding:3px; gap:2px; }
+        .dark-mode .acc-month-tabs { background:#1a1a1a; }
+        .acc-month-tab { padding:7px 13px; border-radius:8px; font-size:0.72rem; font-weight:700; color:var(--gray); cursor:pointer; white-space:nowrap; transition:var(--transition); user-select:none; }
+        .acc-month-tab.active { background:#fff; color:var(--primary-dark); box-shadow:0 2px 6px rgba(16,24,40,.1); }
+        .dark-mode .acc-month-tab.active { background:#2d2d2d; color:#ffb27a; }
+
+        .acc-month-nav { display:flex; align-items:center; gap:4px; background:var(--light); border-radius:10px; padding:4px; }
+        .dark-mode .acc-month-nav { background:#1a1a1a; }
+        .acc-month-arrow { border:none; background:#fff; color:var(--gray); width:26px; height:26px; border-radius:7px; cursor:pointer; display:flex; align-items:center; justify-content:center; font-size:0.68rem; transition:var(--transition); }
+        .acc-month-arrow:hover { color:var(--primary-dark); }
+        .acc-month-arrow:disabled { opacity:.4; cursor:not-allowed; }
+        .dark-mode .acc-month-arrow { background:#2d2d2d; color:var(--gray); }
+        .acc-month-label { padding:0 10px; font-size:0.74rem; font-weight:700; color:var(--primary-dark); cursor:pointer; white-space:nowrap; user-select:none; }
+        .dark-mode .acc-month-label { color:#ffb27a; }
+        .acc-month-label:hover { text-decoration:underline; }
+
+        .acc-body { display:grid; grid-template-columns:260px 1fr; gap:20px; }
+        @media (max-width:760px) { .acc-body { grid-template-columns:1fr; } }
+        .acc-boxes { display:flex; flex-direction:column; gap:12px; }
+        .acc-box { background:var(--light); border-radius:12px; padding:12px 14px; }
+        .dark-mode .acc-box { background:#1a1a1a; }
+        .acc-box-head { display:flex; align-items:center; justify-content:space-between; gap:8px; margin-bottom:8px; flex-wrap:wrap; }
+        .acc-box-label { font-size:0.64rem; font-weight:800; letter-spacing:.04em; text-transform:uppercase; color:var(--gray); }
+        .acc-box.atual .acc-box-label { color:var(--primary-dark); }
+        .dark-mode .acc-box.atual .acc-box-label { color:#ffb27a; }
+        .acc-range { font-size:0.66rem; color:var(--gray); background:#fff; border:1px solid var(--light-gray); padding:3px 8px; border-radius:20px; display:flex; align-items:center; gap:5px; font-weight:600; white-space:nowrap; }
+        .dark-mode .acc-range { background:#2d2d2d; border-color:#3a3a3a; }
+        .acc-value { font-size:1.02rem; font-weight:800; color:var(--dark); margin-top:2px; }
+        .acc-bar-track { height:9px; border-radius:20px; background:var(--light-gray); overflow:hidden; margin:9px 0 7px; }
+        .dark-mode .acc-bar-track { background:#2d2d2d; }
+        .acc-bar-fill { height:100%; border-radius:20px; transition:width 1s ease; }
+        .acc-box.atual .acc-bar-fill { background:linear-gradient(90deg,#ffb27a,var(--primary)); }
+        .acc-box.anterior .acc-bar-fill { background:#c2c8d0; }
+        .acc-box-foot { display:flex; align-items:center; justify-content:space-between; font-size:0.7rem; color:var(--gray); font-weight:600; }
+        .acc-box.atual .acc-box-foot span:first-child { color:var(--primary-dark); font-weight:800; }
+        .dark-mode .acc-box.atual .acc-box-foot span:first-child { color:#ffb27a; }
+        .acc-box.anterior .acc-box-foot span:first-child { color:#6b7280; font-weight:800; }
+        .acc-delta { display:flex; align-items:center; gap:6px; font-size:0.72rem; font-weight:700; padding:8px 12px; border-radius:10px; }
+        .acc-delta.up { background:#dcfce7; color:#15803d; }
+        .acc-delta.down { background:#fee2e2; color:#b91c1c; }
+        .dark-mode .acc-delta.up { background:#14532d; color:#86efac; }
+        .dark-mode .acc-delta.down { background:#450a0a; color:#fca5a5; }
+        .acc-chart-wrap { position:relative; min-height:230px; }
+        .acc-legend-row { display:flex; gap:18px; margin-top:10px; font-size:0.68rem; color:var(--gray); font-weight:600; flex-wrap:wrap; }
+        .acc-legend-dot { width:9px; height:9px; border-radius:3px; display:inline-block; margin-right:6px; }
+
         .card {
             background: white;
             border-radius: var(--r-lg);
@@ -6655,7 +6712,6 @@ body.dark-mode,
                 </div>
 
                 <div class="dash-tabpanel" data-tabpanel="comparativo" style="display:none;">
-                    <div id="dashboardVendasAcumuladas"></div>
                     <div id="dashboardComparativo"></div>
                 </div>
 
@@ -9675,7 +9731,7 @@ body.dark-mode,
                                 <div class="bkp-status-ic" style="background:#f3f0ff;color:#7c3aed;"><i class="fas fa-code-branch"></i></div>
                                 <div class="txt">
                                     <b>Versão do sistema</b>
-                                    <span>versão <strong>080920262213</strong></span>
+                                    <span>versão <strong>050920261932</strong></span>
                                 </div>
                             </div>
                         </div>
@@ -20893,6 +20949,12 @@ tbody tr td{border:1.5px solid #000;padding:2mm;text-align:center;font-weight:70
                                      // recriá-lo — e apagar o que o usuário está digitando —
                                      // toda vez que updateCards() roda em segundo plano
 
+            // Sub-aba do card "Comparativo de Desempenho": 'desempenho' (OS/Meta, original)
+            // ou 'acumulado' (nova aba "Vendas Acumuladas" — curva acumulada mês atual x mês anterior)
+            _cmpView: 'acumulado',
+            _accChart: null,     // instância do Chart.js da aba "Vendas Acumuladas"
+            _accMonth: null,     // mês selecionado na aba "Vendas Acumuladas" ('YYYY-MM-01') — null = mês atual
+
             setGlassesPeriod(period, btn) {
                 this._glassesPeriod = period;
                 // Atualiza estilo dos botões
@@ -21537,12 +21599,6 @@ tbody tr td{border:1.5px solid #000;padding:2mm;text-align:center;font-weight:70
                 } else {
                     this._syncCmpTabsUI();
                 }
-                // Vendas Acumuladas — mesmo cuidado: markup construído uma única vez
-                // (o <input type="month"> não pode ser recriado a cada updateCards()).
-                if (!this._vaMarkupBuilt || !document.getElementById('dashVaBars')) {
-                    this.renderVendasAcumuladasMarkup();
-                    this._vaMarkupBuilt = true;
-                }
             },
 
             // Sincroniza apenas a aba ativa e a visibilidade do range customizado do
@@ -21554,6 +21610,14 @@ tbody tr td{border:1.5px solid #000;padding:2mm;text-align:center;font-weight:70
                 });
                 const custom = document.getElementById('dashCmpCustomRange');
                 if (custom) custom.classList.toggle('show', this._cmpPeriod === 'custom');
+
+                document.querySelectorAll('#dashCmpViewTabs .dashv2-subview-tab').forEach(t => {
+                    t.classList.toggle('active', t.dataset.view === this._cmpView);
+                });
+                const viewDesempenho = document.getElementById('dashCmpViewDesempenho');
+                const viewAcumulado = document.getElementById('dashCmpViewAcumulado');
+                if (viewDesempenho) viewDesempenho.style.display = (this._cmpView === 'acumulado') ? 'none' : '';
+                if (viewAcumulado) viewAcumulado.style.display = (this._cmpView === 'desempenho') ? 'none' : '';
             },
 
             // Injeta o card "Comparativo de Desempenho" na aba própria (fora de #dashboardCards)
@@ -21566,258 +21630,88 @@ tbody tr td{border:1.5px solid #000;padding:2mm;text-align:center;font-weight:70
                             <span class="dashv2-chart-title"><i class="fas fa-chart-column"></i>Comparativo de Desempenho</span>
                         </div>
 
-                        <div class="dashv2-period-tabs" id="dashCmpTabs">
-                            <div class="dashv2-period-tab ${this._cmpPeriod==='dia'?'active':''}" data-period="dia" onclick="Dashboard.setCmpPeriod('dia')">Dia</div>
-                            <div class="dashv2-period-tab ${this._cmpPeriod==='semana'?'active':''}" data-period="semana" onclick="Dashboard.setCmpPeriod('semana')">Semana</div>
-                            <div class="dashv2-period-tab ${this._cmpPeriod==='mes'?'active':''}" data-period="mes" onclick="Dashboard.setCmpPeriod('mes')">Mês</div>
-                            <div class="dashv2-period-tab ${this._cmpPeriod==='ano'?'active':''}" data-period="ano" onclick="Dashboard.setCmpPeriod('ano')">Ano</div>
-                            <div class="dashv2-period-tab custom-tab ${this._cmpPeriod==='custom'?'active':''}" data-period="custom" onclick="Dashboard.setCmpPeriod('custom')" title="Período personalizado"><i class="fas fa-calendar-week" style="font-size:0.68rem;"></i></div>
+                        <div class="dashv2-subview-tabs" id="dashCmpViewTabs">
+                            <div class="dashv2-subview-tab ${this._cmpView==='acumulado'?'active':''}" data-view="acumulado" onclick="Dashboard.setCmpView('acumulado')"><i class="fas fa-chart-line"></i>Vendas Acumuladas</div>
+                            <div class="dashv2-subview-tab ${this._cmpView==='desempenho'?'active':''}" data-view="desempenho" onclick="Dashboard.setCmpView('desempenho')"><i class="fas fa-gauge-high"></i>Desempenho</div>
                         </div>
 
-                        <div class="dashv2-custom-range ${this._cmpPeriod==='custom'?'show':''}" id="dashCmpCustomRange">
-                            <label>De <input type="date" id="dashCmpFrom" value="${this._cmpFrom || ''}"></label>
-                            <label>Até <input type="date" id="dashCmpTo" value="${this._cmpTo || ''}"></label>
-                            <button onclick="Dashboard.applyCmpCustomRange()">Aplicar</button>
-                        </div>
-
-                        <div class="dashv2-compare-row" id="dashCmpCompareRow"></div>
-
-                        <div class="dashv2-canvas-wrap" id="dashCmpCanvasWrap"><canvas id="dashCmpCanvas"></canvas></div>
-
-                        <div class="dashv2-insight-row" id="dashCmpInsights"></div>
-
-                        <div class="dashv2-ai-note" id="dashCmpAiNote" style="display:none;"></div>
-                    </div>
-                `;
-            },
-
-            // ===================================================================
-            // VENDAS ACUMULADAS (card no topo da aba Comparativo) — período atual
-            // vs mesmo intervalo do mês anterior, com curva acumulada dia a dia.
-            // Reaproveita _isoLocal/_shiftDays/_shiftMonths/_salesInRange/_cmpTotal
-            // já usados pelo card Comparativo (OS/Meta), sem duplicar essa lógica.
-            // ===================================================================
-            _vaMonth: null,           // 'YYYY-MM' do mês de referência (null = mês atual)
-            _vaMode: 'mes',           // 'mes' | '12meses'
-            _vaActivePreset: 'atual', // 'atual' | 'anterior' | '12meses' | 'custom'
-
-            _vaCurrentMonthIso() {
-                const now = new Date();
-                return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
-            },
-            _vaMonthShift(monthIso, n) {
-                const [y, m] = monthIso.split('-').map(Number);
-                const d = new Date(y, m - 1 + n, 1);
-                return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
-            },
-            _vaMonthLabel(monthIso) {
-                const [y, m] = monthIso.split('-').map(Number);
-                const nomes = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
-                return `${nomes[m - 1]} de ${y}`;
-            },
-            _vaDaysInMonth(monthIso) {
-                const [y, m] = monthIso.split('-').map(Number);
-                return new Date(y, m, 0).getDate();
-            },
-            _vaFmtRange(day1, day2, monthIso) {
-                const [, m] = monthIso.split('-');
-                const dd = n => String(n).padStart(2, '0');
-                return day1 === day2 ? `${dd(day1)}/${dd(m)}` : `${dd(day1)}/${dd(m)} a ${dd(day2)}/${dd(m)}`;
-            },
-
-            // Botões de preset (Mês anterior / mês atual / Últimos 12 meses)
-            _vaSetPreset(preset) {
-                this._vaActivePreset = preset;
-                if (preset === 'atual') { this._vaMode = 'mes'; this._vaMonth = this._vaCurrentMonthIso(); }
-                else if (preset === 'anterior') { this._vaMode = 'mes'; this._vaMonth = this._vaMonthShift(this._vaCurrentMonthIso(), -1); }
-                else if (preset === '12meses') { this._vaMode = '12meses'; this._vaMonth = this._vaMonth || this._vaCurrentMonthIso(); }
-                this.renderVendasAcumuladasMarkup();
-                this.renderVendasAcumuladas();
-            },
-            // Ícone de calendário — permite escolher QUALQUER mês, não só os presets
-            _vaEditMonth(value) {
-                if (!value) return;
-                this._vaMonth = value;
-                this._vaMode = 'mes';
-                this._vaActivePreset = 'custom';
-                this.renderVendasAcumuladasMarkup();
-                this.renderVendasAcumuladas();
-            },
-
-            renderVendasAcumuladasMarkup() {
-                const el = document.getElementById('dashboardVendasAcumuladas');
-                if (!el) return;
-                if (!this._vaMonth) this._vaMonth = this._vaCurrentMonthIso();
-                const ativoAtual = this._vaActivePreset === 'atual' || this._vaActivePreset === 'custom';
-                const labelMeio = this._vaActivePreset === 'custom' ? this._vaMonthLabel(this._vaMonth) : this._vaMonthLabel(this._vaCurrentMonthIso());
-                el.innerHTML = `
-                    <div class="card" style="--card-accent:#ff6b00;margin-bottom:16px;">
-                        <div class="dashv2-chart-head" style="flex-wrap:wrap;gap:8px;">
-                            <span class="dashv2-chart-title"><i class="fas fa-chart-area"></i>Vendas Acumuladas</span>
-                        </div>
-                        <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin:6px 0 12px;">
-                            <div class="dashv2-period-tabs" style="flex-wrap:wrap;">
-                                <div class="dashv2-period-tab ${this._vaActivePreset==='anterior'?'active':''}" onclick="Dashboard._vaSetPreset('anterior')">Mês anterior</div>
-                                <div class="dashv2-period-tab ${ativoAtual?'active':''}" onclick="Dashboard._vaSetPreset('atual')">${labelMeio}</div>
-                                <div class="dashv2-period-tab ${this._vaActivePreset==='12meses'?'active':''}" onclick="Dashboard._vaSetPreset('12meses')">Últimos 12 meses</div>
+                        <div id="dashCmpViewAcumulado" style="${this._cmpView==='desempenho'?'display:none;':''}">
+                            <div class="acc-head">
+                                <span class="acc-subtitle">Total de vendas acumuladas no mês anterior: <strong id="accTotAnterior">—</strong></span>
+                                <div class="acc-month-nav">
+                                    <button class="acc-month-arrow" onclick="Dashboard.shiftAccMonth(-1)" title="Mês anterior"><i class="fas fa-chevron-left"></i></button>
+                                    <span class="acc-month-label" id="accMesAtualTab" onclick="Dashboard.toggleAccMonthEdit()" title="Clique para escolher outro mês">—</span>
+                                    <button class="acc-month-arrow" id="accNextMonthBtn" onclick="Dashboard.shiftAccMonth(1)" title="Próximo mês"><i class="fas fa-chevron-right"></i></button>
+                                </div>
                             </div>
-                            <label style="position:relative;display:inline-flex;align-items:center;justify-content:center;width:26px;height:26px;border-radius:6px;border:1px solid #ddd;color:#ff6b00;cursor:pointer;flex-shrink:0;" title="Escolher outro mês">
-                                <i class="fas fa-calendar-alt" style="font-size:0.75rem;"></i>
-                                <input type="month" value="${this._vaMonth}" onchange="Dashboard._vaEditMonth(this.value)" style="position:absolute;inset:0;opacity:0;cursor:pointer;">
-                            </label>
+
+                            <div class="dashv2-custom-range" id="accMonthEditRow">
+                                <label>Mês <input type="month" id="accMonthInput"></label>
+                                <button onclick="Dashboard.applyAccMonth()">Aplicar</button>
+                                <button type="button" onclick="Dashboard.resetAccMonth()" style="background:var(--light-gray);color:var(--dark);">Mês atual</button>
+                            </div>
+
+                            <div class="acc-body">
+                                <div class="acc-boxes">
+                                    <div class="acc-box atual">
+                                        <div class="acc-box-head">
+                                            <span class="acc-box-label">Período atual</span>
+                                            <span class="acc-range"><i class="far fa-calendar"></i> <span id="accRangeAtual">—</span></span>
+                                        </div>
+                                        <div class="acc-value" id="accValAtual">—</div>
+                                        <div class="acc-bar-track"><div class="acc-bar-fill" id="accBarAtual" style="width:0%"></div></div>
+                                        <div class="acc-box-foot"><span id="accPctAtual">—</span><span id="accFracAtual">—</span></div>
+                                    </div>
+
+                                    <div class="acc-box anterior">
+                                        <div class="acc-box-head">
+                                            <span class="acc-box-label">Mesmo período · mês anterior</span>
+                                            <span class="acc-range"><i class="far fa-calendar"></i> <span id="accRangeAnterior">—</span></span>
+                                        </div>
+                                        <div class="acc-value" id="accValAnterior">—</div>
+                                        <div class="acc-bar-track"><div class="acc-bar-fill" id="accBarAnterior" style="width:0%"></div></div>
+                                        <div class="acc-box-foot"><span id="accPctAnterior">—</span><span id="accFracAnterior">—</span></div>
+                                    </div>
+
+                                    <div class="acc-delta" id="accDelta"><i class="fas fa-minus"></i> <span id="accDeltaTxt">—</span></div>
+                                </div>
+
+                                <div class="acc-chart-wrap"><canvas id="dashAccCanvas"></canvas></div>
+                            </div>
+
+                            <div class="acc-legend-row">
+                                <span><span class="acc-legend-dot" style="background:#ff6b00;"></span>Mês selecionado (acumulado dia a dia)</span>
+                                <span><span class="acc-legend-dot" style="background:#c2c8d0;"></span>Mês anterior (acumulado dia a dia)</span>
+                            </div>
+
+                            <div class="dashv2-ai-note" id="dashAccAiNote" style="display:none;"></div>
                         </div>
-                        <div id="dashVaHeaderTotal" style="font-size:0.78rem;color:#888;margin-bottom:10px;"></div>
-                        <div id="dashVaBars"></div>
-                        <div id="dashVaLegend" style="display:flex;gap:14px;font-size:0.72rem;color:#666;margin:10px 0 4px;"></div>
-                        <div class="dashv2-canvas-wrap" style="height:190px;"><canvas id="dashVaCanvas"></canvas></div>
+
+                        <div id="dashCmpViewDesempenho" style="${this._cmpView==='acumulado'?'display:none;':''}">
+                            <div class="dashv2-period-tabs" id="dashCmpTabs">
+                                <div class="dashv2-period-tab ${this._cmpPeriod==='dia'?'active':''}" data-period="dia" onclick="Dashboard.setCmpPeriod('dia')">Dia</div>
+                                <div class="dashv2-period-tab ${this._cmpPeriod==='semana'?'active':''}" data-period="semana" onclick="Dashboard.setCmpPeriod('semana')">Semana</div>
+                                <div class="dashv2-period-tab ${this._cmpPeriod==='mes'?'active':''}" data-period="mes" onclick="Dashboard.setCmpPeriod('mes')">Mês</div>
+                                <div class="dashv2-period-tab ${this._cmpPeriod==='ano'?'active':''}" data-period="ano" onclick="Dashboard.setCmpPeriod('ano')">Ano</div>
+                                <div class="dashv2-period-tab custom-tab ${this._cmpPeriod==='custom'?'active':''}" data-period="custom" onclick="Dashboard.setCmpPeriod('custom')" title="Período personalizado"><i class="fas fa-calendar-week" style="font-size:0.68rem;"></i></div>
+                            </div>
+
+                            <div class="dashv2-custom-range ${this._cmpPeriod==='custom'?'show':''}" id="dashCmpCustomRange">
+                                <label>De <input type="date" id="dashCmpFrom" value="${this._cmpFrom || ''}"></label>
+                                <label>Até <input type="date" id="dashCmpTo" value="${this._cmpTo || ''}"></label>
+                                <button onclick="Dashboard.applyCmpCustomRange()">Aplicar</button>
+                            </div>
+
+                            <div class="dashv2-compare-row" id="dashCmpCompareRow"></div>
+
+                            <div class="dashv2-canvas-wrap" id="dashCmpCanvasWrap"><canvas id="dashCmpCanvas"></canvas></div>
+
+                            <div class="dashv2-insight-row" id="dashCmpInsights"></div>
+
+                            <div class="dashv2-ai-note" id="dashCmpAiNote" style="display:none;"></div>
+                        </div>
                     </div>
                 `;
-            },
-
-            renderVendasAcumuladas() {
-                if (this._activeDashTab !== 'comparativo') return; // Chart.js não mede canvas escondido
-                const canvas = document.getElementById('dashVaCanvas');
-                if (!canvas) return;
-                window._ensureChartJS((ok) => { if (ok) this._doRenderVendasAcumuladas(); });
-            },
-
-            // Soma acumulada dia a dia dentro de um mês (array de tamanho maxDays)
-            _vaCumulativeByDay(monthIso, maxDays) {
-                const [y, m] = monthIso.split('-').map(Number);
-                const arr = [];
-                let acc = 0;
-                for (let d = 1; d <= maxDays; d++) {
-                    const iso = `${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
-                    acc += this._cmpTotal(iso, this._shiftDays(iso, 1));
-                    arr.push(acc);
-                }
-                return arr;
-            },
-
-            _doRenderVendasAcumuladas() {
-                const canvas = document.getElementById('dashVaCanvas');
-                if (!canvas || !window.Chart) return;
-                const isDark   = document.body.classList.contains('dark-mode');
-                const headerEl = document.getElementById('dashVaHeaderTotal');
-                const barsEl   = document.getElementById('dashVaBars');
-                const legendEl = document.getElementById('dashVaLegend');
-
-                if (this._vaMode === '12meses') {
-                    const meses = [];
-                    for (let i = 11; i >= 0; i--) meses.push(this._vaMonthShift(this._vaMonth, -i));
-                    const totals = meses.map(mIso => {
-                        const from = mIso + '-01';
-                        return this._cmpTotal(from, this._shiftMonths(from, 1));
-                    });
-                    const somaTotal = totals.reduce((a, b) => a + b, 0);
-                    if (headerEl) headerEl.innerHTML = `Total no período: <strong>${Utils.formatCurrency(somaTotal)}</strong>`;
-                    if (barsEl) barsEl.innerHTML = '';
-                    if (legendEl) legendEl.innerHTML = '';
-
-                    if (this._vaChart) { try { this._vaChart.destroy(); } catch (e) {} this._vaChart = null; }
-                    const ctx = canvas.getContext('2d');
-                    this._vaChart = new Chart(ctx, {
-                        type: 'bar',
-                        data: { labels: meses.map(mIso => this._vaMonthLabel(mIso).split(' de ')[0].slice(0, 3)), datasets: [{ data: totals, backgroundColor: '#ff6b00cc', borderRadius: 6, maxBarThickness: 26 }] },
-                        options: {
-                            responsive: true, maintainAspectRatio: false,
-                            plugins: { legend: { display: false }, tooltip: { callbacks: { label: c => Utils.formatCurrency(c.parsed.y) } } },
-                            scales: {
-                                x: { grid: { display: false }, ticks: { font: { size: 10 }, color: '#6c757d' } },
-                                y: { grid: { color: isDark ? 'rgba(255,255,255,.08)' : 'rgba(108,117,125,.15)' }, ticks: { font: { size: 9 }, color: '#6c757d', callback: v => 'R$' + (v / 1000).toFixed(0) + 'k' }, beginAtZero: true }
-                            }
-                        }
-                    });
-                    this._vaLastMode = '12meses';
-                    return;
-                }
-
-                // Modo mensal: acumulado dia a dia — mês selecionado vs mesmo nº de
-                // dias do mês anterior (comparação justa, como na barra de progresso)
-                const monthIso     = this._vaMonth;
-                const prevMonthIso = this._vaMonthShift(monthIso, -1);
-                const daysCur      = this._vaDaysInMonth(monthIso);
-                const daysPrev     = this._vaDaysInMonth(prevMonthIso);
-                const isRealCurrentMonth = monthIso === this._vaCurrentMonthIso();
-                const elapsedDays  = isRealCurrentMonth ? Math.min(new Date().getDate(), daysCur) : daysCur;
-
-                const curFull  = this._vaCumulativeByDay(monthIso, daysCur);
-                const prevFull = this._vaCumulativeByDay(prevMonthIso, daysPrev);
-                const curDisplay = curFull.map((v, i) => (i < elapsedDays ? v : null));
-
-                const valorAtual = curFull[elapsedDays - 1] || 0;
-                const idxPrevMatch = Math.min(elapsedDays, daysPrev) - 1;
-                const valorAnteriorMesmoPeriodo = prevFull[idxPrevMatch] || 0;
-                const totalMesAnterior = prevFull[daysPrev - 1] || 0;
-
-                const pctAtual    = totalMesAnterior > 0 ? (valorAtual / totalMesAnterior * 100) : 0;
-                const pctAnterior = totalMesAnterior > 0 ? (valorAnteriorMesmoPeriodo / totalMesAnterior * 100) : 0;
-
-                if (headerEl) headerEl.innerHTML = `Total de vendas acumuladas no mês anterior: <strong>${Utils.formatCurrency(totalMesAnterior)}</strong>`;
-
-                if (barsEl) barsEl.innerHTML = `
-                    <div style="margin-bottom:10px;">
-                        <div style="display:flex;justify-content:space-between;font-size:0.78rem;margin-bottom:3px;">
-                            <span><strong>Período atual</strong> · ${this._vaFmtRange(1, elapsedDays, monthIso)}</span>
-                            <span><strong>${Utils.formatCurrency(valorAtual)}</strong></span>
-                        </div>
-                        <div style="height:8px;border-radius:4px;background:${isDark ? 'rgba(255,255,255,.08)' : '#eee'};overflow:hidden;">
-                            <div style="height:100%;width:${Math.min(100, pctAtual)}%;background:#ff6b00;border-radius:4px;"></div>
-                        </div>
-                        <div style="font-size:0.7rem;color:#888;margin-top:2px;">${pctAtual.toFixed(2)}% de ${Utils.formatCurrency(totalMesAnterior)}</div>
-                    </div>
-                    <div>
-                        <div style="display:flex;justify-content:space-between;font-size:0.78rem;margin-bottom:3px;">
-                            <span><strong>Período anterior</strong> · ${this._vaFmtRange(1, Math.min(elapsedDays, daysPrev), prevMonthIso)}</span>
-                            <span><strong>${Utils.formatCurrency(valorAnteriorMesmoPeriodo)}</strong></span>
-                        </div>
-                        <div style="height:8px;border-radius:4px;background:${isDark ? 'rgba(255,255,255,.08)' : '#eee'};overflow:hidden;">
-                            <div style="height:100%;width:${Math.min(100, pctAnterior)}%;background:#f2b705;border-radius:4px;"></div>
-                        </div>
-                        <div style="font-size:0.7rem;color:#888;margin-top:2px;">${pctAnterior.toFixed(2)}% de ${Utils.formatCurrency(totalMesAnterior)}</div>
-                    </div>
-                `;
-
-                if (legendEl) legendEl.innerHTML = `
-                    <span style="display:flex;align-items:center;gap:4px;"><span style="width:10px;height:2px;background:#ff6b00;display:inline-block;"></span>${this._vaMonthLabel(monthIso)}</span>
-                    <span style="display:flex;align-items:center;gap:4px;"><span style="width:10px;height:2px;border-top:1px dashed #f2b705;display:inline-block;"></span>${this._vaMonthLabel(prevMonthIso)}</span>
-                `;
-
-                const maxDays = Math.max(daysCur, daysPrev);
-                const labels = Array.from({ length: maxDays }, (_, i) => i + 1);
-
-                const sameShape = this._vaChart && this._vaLastMode === 'mes'
-                    && this._vaChart.data.labels.length === maxDays && this._vaLastIsDark === isDark;
-                this._vaLastIsDark = isDark;
-                this._vaLastMode = 'mes';
-
-                if (sameShape) {
-                    this._vaChart.data.datasets[0].data = curDisplay;
-                    this._vaChart.data.datasets[1].data = prevFull;
-                    this._vaChart.update('none');
-                    return;
-                }
-
-                if (this._vaChart) { try { this._vaChart.destroy(); } catch (e) {} this._vaChart = null; }
-                const ctx = canvas.getContext('2d');
-                this._vaChart = new Chart(ctx, {
-                    type: 'line',
-                    data: {
-                        labels,
-                        datasets: [
-                            { data: curDisplay, borderColor: '#ff6b00', backgroundColor: 'rgba(255,107,0,0.12)', fill: true, borderWidth: 2, pointRadius: 0, tension: 0.15 },
-                            { data: prevFull,   borderColor: '#f2b705', backgroundColor: 'rgba(242,183,5,0.08)', borderDash: [4, 3], fill: true, borderWidth: 2, pointRadius: 0, tension: 0.15 }
-                        ]
-                    },
-                    options: {
-                        responsive: true, maintainAspectRatio: false,
-                        plugins: { legend: { display: false }, tooltip: { callbacks: { label: c => Utils.formatCurrency(c.parsed.y) } } },
-                        scales: {
-                            x: { ticks: { font: { size: 9 }, color: '#6c757d', maxTicksLimit: 10 }, grid: { display: false } },
-                            y: { ticks: { font: { size: 9 }, color: '#6c757d', callback: v => 'R$' + (v / 1000).toFixed(0) + 'k' }, grid: { color: isDark ? 'rgba(255,255,255,.08)' : 'rgba(108,117,125,.15)' }, beginAtZero: true }
-                        }
-                    }
-                });
             },
 
             // Controla qual aba do Dashboard está visível (Visão Geral / Comparativo / Financeiro / Alertas / Histórico).
@@ -21837,7 +21731,7 @@ tbody tr td{border:1.5px solid #000;padding:2mm;text-align:center;font-weight:70
                 if (recentSalesPanel) recentSalesPanel.style.display = (tab === 'geral') ? '' : 'none';
                 // O gráfico do comparativo só é desenhado quando a aba fica visível
                 // (Chart.js não mede corretamente um canvas dentro de um elemento display:none)
-                if (tab === 'comparativo') { this.renderComparativo(); this.renderVendasAcumuladas(); }
+                if (tab === 'comparativo') this.renderCmpActive();
             },
 
             async editGoal() {
@@ -21852,7 +21746,7 @@ tbody tr td{border:1.5px solid #000;padding:2mm;text-align:center;font-weight:70
                 state.company.salesGoal = parsed;
                 await App.saveData();
                 this.updateCards();
-                this.renderComparativo();
+                this.renderCmpActive();
                 Toast.show('✅ Meta atualizada!', 'success', 2500);
             },
 
@@ -22033,9 +21927,28 @@ tbody tr td{border:1.5px solid #000;padding:2mm;text-align:center;font-weight:70
                 this.renderComparativo();
             },
 
+            // Alterna entre as sub-abas do card Comparativo: 'desempenho' (OS/Meta) ou
+            // 'acumulado' (nova aba "Vendas Acumuladas")
+            setCmpView(view) {
+                this._cmpView = view;
+                document.querySelectorAll('#dashCmpViewTabs .dashv2-subview-tab').forEach(t => {
+                    t.classList.toggle('active', t.dataset.view === view);
+                });
+                const viewDesempenho = document.getElementById('dashCmpViewDesempenho');
+                const viewAcumulado = document.getElementById('dashCmpViewAcumulado');
+                if (viewDesempenho) viewDesempenho.style.display = (view === 'acumulado') ? 'none' : '';
+                if (viewAcumulado) viewAcumulado.style.display = (view === 'desempenho') ? 'none' : '';
+                this.renderCmpActive();
+            },
+            // Desenha o gráfico da sub-aba que estiver visível no momento
+            renderCmpActive() {
+                if (this._cmpView === 'acumulado') this.renderAcumulado();
+                else this.renderComparativo();
+            },
+
             // Carrega Chart.js sob demanda e (re)desenha o gráfico comparativo
             renderComparativo() {
-                if (this._activeDashTab !== 'comparativo') return; // evita desenhar canvas escondido (display:none)
+                if (this._activeDashTab !== 'comparativo' || this._cmpView !== 'desempenho') return; // evita desenhar canvas escondido (display:none)
                 const canvas = document.getElementById('dashCmpCanvas');
                 if (!canvas) return;
                 window._ensureChartJS((ok) => {
@@ -22200,6 +22113,198 @@ tbody tr td{border:1.5px solid #000;padding:2mm;text-align:center;font-weight:70
                 } else {
                     noteEl.style.display = 'none';
                 }
+            },
+
+            // ===================================================================
+            // VENDAS ACUMULADAS — sub-aba do card "Comparativo de Desempenho"
+            // Curva de vendas acumuladas dia a dia do mês atual x mesmo intervalo
+            // do mês anterior (mesma ideia da referência enviada pelo usuário).
+            // ===================================================================
+
+            // Soma vendas dia a dia a partir de fromISO, acumulando ao longo de `days` dias
+            _cmpCumulativeSeries(fromISO, days) {
+                let acc = 0;
+                const arr = [];
+                for (let i = 0; i < days; i++) {
+                    const dayFrom = this._shiftDays(fromISO, i);
+                    const dayTo = this._shiftDays(fromISO, i + 1);
+                    acc += this._cmpTotal(dayFrom, dayTo);
+                    arr.push(acc);
+                }
+                return arr;
+            },
+
+            renderAcumulado() {
+                if (this._activeDashTab !== 'comparativo' || this._cmpView !== 'acumulado') return;
+                const canvas = document.getElementById('dashAccCanvas');
+                if (!canvas) return;
+                window._ensureChartJS((ok) => {
+                    if (!ok) return;
+                    this._doRenderAcumulado();
+                });
+            },
+
+            // Mês atual (1º dia, ISO) — usado como teto para não deixar navegar para o futuro
+            _accCurMonthStartISO() {
+                const now = new Date();
+                return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`;
+            },
+            // Navega para o mês anterior/seguinte na aba "Vendas Acumuladas" (delta: -1 ou 1)
+            shiftAccMonth(delta) {
+                const curMonthStartISO = this._accCurMonthStartISO();
+                const base = this._accMonth || curMonthStartISO;
+                const target = this._shiftMonths(base, delta);
+                if (target > curMonthStartISO) return; // não permite ir para o futuro
+                this._accMonth = (target === curMonthStartISO) ? null : target;
+                this.renderAcumulado();
+            },
+            // Mostra/esconde o campo de edição direta do mês (input type=month)
+            toggleAccMonthEdit() {
+                const row = document.getElementById('accMonthEditRow');
+                if (!row) return;
+                const willShow = !row.classList.contains('show');
+                row.classList.toggle('show', willShow);
+                if (willShow) {
+                    const base = this._accMonth || this._accCurMonthStartISO();
+                    const input = document.getElementById('accMonthInput');
+                    if (input) input.value = base.slice(0, 7);
+                }
+            },
+            applyAccMonth() {
+                const input = document.getElementById('accMonthInput');
+                const chosen = input?.value ? input.value + '-01' : '';
+                const curMonthStartISO = this._accCurMonthStartISO();
+                if (!chosen) { Toast.show('⚠️ Selecione um mês válido.', 'danger', 3000); return; }
+                if (chosen > curMonthStartISO) { Toast.show('⚠️ Não é possível escolher um mês futuro.', 'danger', 3000); return; }
+                this._accMonth = (chosen === curMonthStartISO) ? null : chosen;
+                document.getElementById('accMonthEditRow')?.classList.remove('show');
+                this.renderAcumulado();
+            },
+            resetAccMonth() {
+                this._accMonth = null;
+                document.getElementById('accMonthEditRow')?.classList.remove('show');
+                this.renderAcumulado();
+            },
+
+            _doRenderAcumulado() {
+                const canvas = document.getElementById('dashAccCanvas');
+                if (!canvas || !window.Chart) return;
+
+                const mesesNome = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
+                const now = new Date();
+                const curMonthStartISO = this._accCurMonthStartISO();
+                const selMonthStartISO = this._accMonth || curMonthStartISO;
+                const isCurrentMonth = selMonthStartISO === curMonthStartISO;
+                const selDate = new Date(selMonthStartISO + 'T12:00:00');
+                const daysInSelMonth = new Date(selDate.getFullYear(), selDate.getMonth() + 1, 0).getDate();
+                const prevMonthStartISO = this._shiftMonths(selMonthStartISO, -1);
+                const daysInPrevMonth = new Date(selDate.getFullYear(), selDate.getMonth(), 0).getDate();
+                // Mês atual: corta em "hoje". Mês passado: mostra o mês fechado (completo).
+                const cutoffDay = isCurrentMonth ? now.getDate() : daysInSelMonth;
+
+                // Séries acumuladas: mês anterior (mês cheio) e mês selecionado (até o corte)
+                const prevSeriesFull = this._cmpCumulativeSeries(prevMonthStartISO, daysInPrevMonth);
+                const curSeriesSoFar = this._cmpCumulativeSeries(selMonthStartISO, cutoffDay);
+
+                const totalAnterior = prevSeriesFull[daysInPrevMonth - 1] || 0;
+                const valorAtual = curSeriesSoFar[cutoffDay - 1] || 0;
+                const idxMesmoDiaPrev = Math.min(cutoffDay, daysInPrevMonth) - 1;
+                const valorAnteriorMesmoPeriodo = prevSeriesFull[idxMesmoDiaPrev] || 0;
+                const lastCoveredISO = this._shiftDays(selMonthStartISO, cutoffDay - 1);
+
+                const fmtDia = (iso) => { const d = new Date(iso + 'T12:00:00'); return `${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}`; };
+                const rangeAtualTxt = `${fmtDia(selMonthStartISO)} a ${fmtDia(lastCoveredISO)}`;
+                const rangeAnteriorTxt = `${fmtDia(prevMonthStartISO)} a ${fmtDia(this._shiftDays(prevMonthStartISO, idxMesmoDiaPrev))}`;
+
+                const pctAtual = totalAnterior > 0 ? (valorAtual / totalAnterior * 100) : 0;
+                const pctAnterior = totalAnterior > 0 ? (valorAnteriorMesmoPeriodo / totalAnterior * 100) : 0;
+                const fmtPct = (v) => v.toFixed(2).replace('.', ',') + '%';
+
+                // Preenche textos e barras
+                const setTxt = (id, txt) => { const e = document.getElementById(id); if (e) e.textContent = txt; };
+                setTxt('accTotAnterior', Utils.formatCurrency(totalAnterior));
+                setTxt('accMesAtualTab', `${mesesNome[selDate.getMonth()]} de ${selDate.getFullYear()}`);
+                setTxt('accRangeAtual', rangeAtualTxt);
+                setTxt('accValAtual', Utils.formatCurrency(valorAtual));
+                setTxt('accPctAtual', fmtPct(pctAtual));
+                setTxt('accFracAtual', `${Utils.formatCurrency(valorAtual)} / ${Utils.formatCurrency(totalAnterior)}`);
+                setTxt('accRangeAnterior', rangeAnteriorTxt);
+                setTxt('accValAnterior', Utils.formatCurrency(valorAnteriorMesmoPeriodo));
+                setTxt('accPctAnterior', fmtPct(pctAnterior));
+                setTxt('accFracAnterior', `${Utils.formatCurrency(valorAnteriorMesmoPeriodo)} / ${Utils.formatCurrency(totalAnterior)}`);
+
+                // Desabilita a seta de "próximo mês" quando já está no mês atual
+                const nextBtn = document.getElementById('accNextMonthBtn');
+                if (nextBtn) nextBtn.disabled = isCurrentMonth;
+
+                const barAtual = document.getElementById('accBarAtual');
+                const barAnterior = document.getElementById('accBarAnterior');
+                if (barAtual) setTimeout(() => { barAtual.style.width = Math.min(100, pctAtual) + '%'; }, 80);
+                if (barAnterior) setTimeout(() => { barAnterior.style.width = Math.min(100, pctAnterior) + '%'; }, 80);
+
+                // Badge de variação vs mesmo período do mês anterior
+                const diffPct = valorAnteriorMesmoPeriodo > 0
+                    ? Math.round(((valorAtual - valorAnteriorMesmoPeriodo) / valorAnteriorMesmoPeriodo) * 100)
+                    : (valorAtual > 0 ? 100 : 0);
+                const deltaBox = document.getElementById('accDelta');
+                const deltaTxt = document.getElementById('accDeltaTxt');
+                if (deltaBox && deltaTxt) {
+                    const up = diffPct >= 0;
+                    deltaBox.className = 'acc-delta ' + (up ? 'up' : 'down');
+                    deltaBox.querySelector('i').className = 'fas fa-arrow-' + (up ? 'up' : 'down');
+                    deltaTxt.textContent = `${Math.abs(diffPct)}% ${up ? 'acima' : 'abaixo'} do mesmo período do mês anterior`;
+                }
+
+                // Nota com projeção de fechamento do mês (só faz sentido pro mês corrente em andamento)
+                const noteEl = document.getElementById('dashAccAiNote');
+                if (noteEl) {
+                    if (valorAtual > 0 && isCurrentMonth) {
+                        const ritmoDiario = valorAtual / cutoffDay;
+                        const projecao = ritmoDiario * daysInSelMonth;
+                        noteEl.style.display = 'flex';
+                        noteEl.innerHTML = `<i class="fas fa-sparkles"></i> No dia ${cutoffDay}, o mês está <strong>${Math.abs(diffPct)}% ${diffPct >= 0 ? 'acima' : 'abaixo'}</strong> do mesmo ponto do mês anterior. Mantendo o ritmo, deve fechar perto de <strong>${Utils.formatCurrency(projecao)}</strong>.`;
+                    } else if (valorAtual > 0) {
+                        noteEl.style.display = 'flex';
+                        noteEl.innerHTML = `<i class="fas fa-sparkles"></i> O mês fechou <strong>${Math.abs(diffPct)}% ${diffPct >= 0 ? 'acima' : 'abaixo'}</strong> do mês anterior.`;
+                    } else {
+                        noteEl.style.display = 'none';
+                    }
+                }
+
+                // Gráfico de curva acumulada (mês selecionado x mês anterior)
+                const isDark = document.body.classList.contains('dark-mode');
+                const totalDiasEixo = Math.max(daysInPrevMonth, daysInSelMonth);
+                const labels = Array.from({ length: totalDiasEixo }, (_, i) => i + 1);
+                const dataAnterior = labels.map((_, i) => i < prevSeriesFull.length ? prevSeriesFull[i] : null);
+                const dataAtual = labels.map((_, i) => i < curSeriesSoFar.length ? curSeriesSoFar[i] : null);
+
+                if (this._accChart) { try { this._accChart.destroy(); } catch (e) {} this._accChart = null; }
+                const ctx = canvas.getContext('2d');
+                this._accChart = new Chart(ctx, {
+                    type: 'line',
+                    data: {
+                        labels,
+                        datasets: [
+                            { label: 'Mês anterior', data: dataAnterior, borderColor: '#c2c8d0', backgroundColor: 'rgba(194,200,208,0.25)', fill: true, tension: 0.25, pointRadius: 0, borderWidth: 2 },
+                            { label: 'Mês selecionado', data: dataAtual, borderColor: '#ff6b00', backgroundColor: 'rgba(255,107,0,0.18)', fill: true, tension: 0.25, pointRadius: 2, pointBackgroundColor: '#ff6b00', borderWidth: 2.5 }
+                        ]
+                    },
+                    options: {
+                        responsive: true, maintainAspectRatio: false,
+                        interaction: { mode: 'index', intersect: false },
+                        plugins: {
+                            legend: { display: false },
+                            tooltip: {
+                                backgroundColor: '#212529', padding: 9, cornerRadius: 8,
+                                callbacks: { label: c => `${c.dataset.label}: ${Utils.formatCurrency(c.parsed.y)}` }
+                            }
+                        },
+                        scales: {
+                            x: { grid: { display: false }, ticks: { font: { size: 10 }, color: '#6c757d', maxTicksLimit: 16 } },
+                            y: { grid: { color: isDark ? 'rgba(255,255,255,.08)' : 'rgba(108,117,125,.12)' }, ticks: { font: { size: 10 }, color: '#6c757d', callback: v => Utils.formatCurrency(v) } }
+                        }
+                    }
+                });
             },
 
             updateSalesChart() {
