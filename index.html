@@ -22121,8 +22121,8 @@ tbody tr td{border:1.5px solid #000;padding:2mm;text-align:center;font-weight:70
                     const dailyNeeded = daysLeft > 0 ? remaining / daysLeft : 0;
                     noteEl.style.display = 'flex';
                     noteEl.innerHTML = remaining > 0
-                        ? `<i class="fas fa-sparkles"></i> No ritmo atual de <strong>${Utils.formatCurrency(dailyNeeded)}/dia</strong>, faltam <strong>${Utils.formatCurrency(remaining)}</strong> para bater a meta em ${daysLeft} dia${daysLeft !== 1 ? 's' : ''}.`
-                        : `<i class="fas fa-sparkles"></i> Meta do mês batida! 🎉`;
+                        ? `<i class="fas fa-sparkles"></i><span>No ritmo atual de <strong>${Utils.formatCurrency(dailyNeeded)}/dia</strong>, faltam <strong>${Utils.formatCurrency(remaining)}</strong> para bater a meta em ${daysLeft} dia${daysLeft !== 1 ? 's' : ''}.</span>`
+                        : `<i class="fas fa-sparkles"></i><span>Meta do mês batida! 🎉</span>`;
                 } else {
                     noteEl.style.display = 'none';
                 }
@@ -22297,10 +22297,10 @@ tbody tr td{border:1.5px solid #000;padding:2mm;text-align:center;font-weight:70
                         const ritmoDiario = valorAtual / cutoffDay;
                         const projecao = ritmoDiario * daysInSelMonth;
                         noteEl.style.display = 'flex';
-                        noteEl.innerHTML = `<i class="fas fa-sparkles"></i> No dia ${cutoffDay}, o mês está <strong>${Math.abs(diffPct)}% ${diffPct >= 0 ? 'acima' : 'abaixo'}</strong> do mesmo ponto do mês anterior. Mantendo o ritmo, deve fechar perto de <strong>${Utils.formatCurrency(projecao)}</strong>.`;
+                        noteEl.innerHTML = `<i class="fas fa-sparkles"></i><span>No dia ${cutoffDay}, o mês está <strong>${Math.abs(diffPct)}% ${diffPct >= 0 ? 'acima' : 'abaixo'}</strong> do mesmo ponto do mês anterior. Mantendo o ritmo, deve fechar perto de <strong>${Utils.formatCurrency(projecao)}</strong>.</span>`;
                     } else if (valorAtual > 0) {
                         noteEl.style.display = 'flex';
-                        noteEl.innerHTML = `<i class="fas fa-sparkles"></i> O mês fechou <strong>${Math.abs(diffPct)}% ${diffPct >= 0 ? 'acima' : 'abaixo'}</strong> do mês anterior.`;
+                        noteEl.innerHTML = `<i class="fas fa-sparkles"></i><span>O mês fechou <strong>${Math.abs(diffPct)}% ${diffPct >= 0 ? 'acima' : 'abaixo'}</strong> do mês anterior.</span>`;
                     } else {
                         noteEl.style.display = 'none';
                     }
@@ -22373,7 +22373,7 @@ tbody tr td{border:1.5px solid #000;padding:2mm;text-align:center;font-weight:70
                     const idxMax = valores.indexOf(maxVal);
                     if (maxVal > 0) {
                         noteEl.style.display = 'flex';
-                        noteEl.innerHTML = `<i class="fas fa-sparkles"></i> O melhor mês do período foi <strong>${labels[idxMax]}</strong>, com <strong>${Utils.formatCurrency(maxVal)}</strong> em vendas.`;
+                        noteEl.innerHTML = `<i class="fas fa-sparkles"></i><span>O melhor mês do período foi <strong>${labels[idxMax]}</strong>, com <strong>${Utils.formatCurrency(maxVal)}</strong> em vendas.</span>`;
                     } else {
                         noteEl.style.display = 'none';
                     }
