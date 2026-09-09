@@ -1165,6 +1165,8 @@ var qrcode=function(){function r(t,e){if(void 0===t.length)throw new Error(t.len
 
         /* ===== Aba "Vendas Acumuladas" ===== */
         .acc-head { display:flex; align-items:flex-start; justify-content:space-between; gap:14px; flex-wrap:wrap; margin-bottom:14px; }
+        .acc-controls { display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
+        .acc-body.full-width { grid-template-columns:1fr; }
         .acc-subtitle { font-size:0.74rem; color:var(--gray); font-weight:500; }
         .acc-subtitle strong { color:var(--dark); font-weight:700; }
         .acc-month-tabs { display:flex; background:var(--light); border-radius:10px; padding:3px; gap:2px; }
@@ -20954,6 +20956,7 @@ tbody tr td{border:1.5px solid #000;padding:2mm;text-align:center;font-weight:70
             _cmpView: 'acumulado',
             _accChart: null,     // instância do Chart.js da aba "Vendas Acumuladas"
             _accMonth: null,     // mês selecionado na aba "Vendas Acumuladas" ('YYYY-MM-01') — null = mês atual
+            _accViewMode: 'mensal', // 'mensal' (curva acumulada) | 'anual' (últimos 12 meses)
 
             setGlassesPeriod(period, btn) {
                 this._glassesPeriod = period;
@@ -21637,11 +21640,17 @@ tbody tr td{border:1.5px solid #000;padding:2mm;text-align:center;font-weight:70
 
                         <div id="dashCmpViewAcumulado" style="${this._cmpView==='desempenho'?'display:none;':''}">
                             <div class="acc-head">
-                                <span class="acc-subtitle">Total de vendas acumuladas no mês anterior: <strong id="accTotAnterior">—</strong></span>
-                                <div class="acc-month-nav">
-                                    <button class="acc-month-arrow" onclick="Dashboard.shiftAccMonth(-1)" title="Mês anterior"><i class="fas fa-chevron-left"></i></button>
-                                    <span class="acc-month-label" id="accMesAtualTab" onclick="Dashboard.toggleAccMonthEdit()" title="Clique para escolher outro mês">—</span>
-                                    <button class="acc-month-arrow" id="accNextMonthBtn" onclick="Dashboard.shiftAccMonth(1)" title="Próximo mês"><i class="fas fa-chevron-right"></i></button>
+                                <span class="acc-subtitle" id="accSubtitle">—</span>
+                                <div class="acc-controls">
+                                    <div class="acc-month-tabs" id="accModeTabs">
+                                        <div class="acc-month-tab active" data-mode="mensal" onclick="Dashboard.setAccViewMode('mensal')">Mensal</div>
+                                        <div class="acc-month-tab" data-mode="anual" onclick="Dashboard.setAccViewMode('anual')">Últimos 12 meses</div>
+                                    </div>
+                                    <div class="acc-month-nav" id="accMonthNavWrap">
+                                        <button class="acc-month-arrow" onclick="Dashboard.shiftAccMonth(-1)" title="Mês anterior"><i class="fas fa-chevron-left"></i></button>
+                                        <span class="acc-month-label" id="accMesAtualTab" onclick="Dashboard.toggleAccMonthEdit()" title="Clique para escolher outro mês">—</span>
+                                        <button class="acc-month-arrow" id="accNextMonthBtn" onclick="Dashboard.shiftAccMonth(1)" title="Próximo mês"><i class="fas fa-chevron-right"></i></button>
+                                    </div>
                                 </div>
                             </div>
 
@@ -21651,8 +21660,8 @@ tbody tr td{border:1.5px solid #000;padding:2mm;text-align:center;font-weight:70
                                 <button type="button" onclick="Dashboard.resetAccMonth()" style="background:var(--light-gray);color:var(--dark);">Mês atual</button>
                             </div>
 
-                            <div class="acc-body">
-                                <div class="acc-boxes">
+                            <div class="acc-body" id="accBodyWrap">
+                                <div class="acc-boxes" id="accBoxesSection">
                                     <div class="acc-box atual">
                                         <div class="acc-box-head">
                                             <span class="acc-box-label">Período atual</span>
@@ -21679,9 +21688,13 @@ tbody tr td{border:1.5px solid #000;padding:2mm;text-align:center;font-weight:70
                                 <div class="acc-chart-wrap"><canvas id="dashAccCanvas"></canvas></div>
                             </div>
 
-                            <div class="acc-legend-row">
+                            <div class="acc-legend-row" id="accLegendMensal">
                                 <span><span class="acc-legend-dot" style="background:#ff6b00;"></span>Mês selecionado (acumulado dia a dia)</span>
                                 <span><span class="acc-legend-dot" style="background:#c2c8d0;"></span>Mês anterior (acumulado dia a dia)</span>
+                            </div>
+                            <div class="acc-legend-row" id="accLegendAnual" style="display:none;">
+                                <span><span class="acc-legend-dot" style="background:#ff6b00;"></span>Mês atual</span>
+                                <span><span class="acc-legend-dot" style="background:#c2c8d0;"></span>Meses anteriores</span>
                             </div>
 
                             <div class="dashv2-ai-note" id="dashAccAiNote" style="display:none;"></div>
@@ -22185,8 +22198,29 @@ tbody tr td{border:1.5px solid #000;padding:2mm;text-align:center;font-weight:70
                 document.getElementById('accMonthEditRow')?.classList.remove('show');
                 this.renderAcumulado();
             },
+            // Alterna entre a curva acumulada do mês (mensal) e o gráfico dos últimos 12 meses (anual)
+            setAccViewMode(mode) {
+                this._accViewMode = mode;
+                document.querySelectorAll('#accModeTabs .acc-month-tab').forEach(t => {
+                    t.classList.toggle('active', t.dataset.mode === mode);
+                });
+                const monthNav = document.getElementById('accMonthNavWrap');
+                const boxes = document.getElementById('accBoxesSection');
+                const body = document.getElementById('accBodyWrap');
+                const legendMensal = document.getElementById('accLegendMensal');
+                const legendAnual = document.getElementById('accLegendAnual');
+                const isAnual = mode === 'anual';
+                if (monthNav) monthNav.style.display = isAnual ? 'none' : '';
+                if (boxes) boxes.style.display = isAnual ? 'none' : '';
+                if (body) body.classList.toggle('full-width', isAnual);
+                if (legendMensal) legendMensal.style.display = isAnual ? 'none' : '';
+                if (legendAnual) legendAnual.style.display = isAnual ? '' : 'none';
+                document.getElementById('accMonthEditRow')?.classList.remove('show');
+                this.renderAcumulado();
+            },
 
             _doRenderAcumulado() {
+                if (this._accViewMode === 'anual') { this._doRenderAcumuladoAnual(); return; }
                 const canvas = document.getElementById('dashAccCanvas');
                 if (!canvas || !window.Chart) return;
 
@@ -22222,7 +22256,8 @@ tbody tr td{border:1.5px solid #000;padding:2mm;text-align:center;font-weight:70
 
                 // Preenche textos e barras
                 const setTxt = (id, txt) => { const e = document.getElementById(id); if (e) e.textContent = txt; };
-                setTxt('accTotAnterior', Utils.formatCurrency(totalAnterior));
+                const subEl = document.getElementById('accSubtitle');
+                if (subEl) subEl.innerHTML = `Total de vendas acumuladas no mês anterior: <strong>${Utils.formatCurrency(totalAnterior)}</strong>`;
                 setTxt('accMesAtualTab', `${mesesNome[selDate.getMonth()]} de ${selDate.getFullYear()}`);
                 setTxt('accRangeAtual', rangeAtualTxt);
                 setTxt('accValAtual', Utils.formatCurrency(valorAtual));
@@ -22301,6 +22336,68 @@ tbody tr td{border:1.5px solid #000;padding:2mm;text-align:center;font-weight:70
                         },
                         scales: {
                             x: { grid: { display: false }, ticks: { font: { size: 10 }, color: '#6c757d', maxTicksLimit: 16 } },
+                            y: { grid: { color: isDark ? 'rgba(255,255,255,.08)' : 'rgba(108,117,125,.12)' }, ticks: { font: { size: 10 }, color: '#6c757d', callback: v => Utils.formatCurrency(v) } }
+                        }
+                    }
+                });
+            },
+
+            // Modo "Últimos 12 meses" — total vendido por mês (barras), mês atual em destaque
+            _doRenderAcumuladoAnual() {
+                const canvas = document.getElementById('dashAccCanvas');
+                if (!canvas || !window.Chart) return;
+
+                const mesesAbrev = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
+                const now = new Date();
+                const labels = [];
+                const valores = [];
+                for (let i = 11; i >= 0; i--) {
+                    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+                    const monthStartISO = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-01`;
+                    const nextMonthStartISO = this._shiftMonths(monthStartISO, 1);
+                    const total = this._cmpTotal(monthStartISO, nextMonthStartISO);
+                    labels.push(`${mesesAbrev[d.getMonth()]}/${String(d.getFullYear()).slice(2)}`);
+                    valores.push(total);
+                }
+
+                const totalPeriodo = valores.reduce((a, b) => a + b, 0);
+                const mesesComVenda = valores.filter(v => v > 0).length;
+                const media = mesesComVenda > 0 ? totalPeriodo / mesesComVenda : 0;
+
+                const subEl = document.getElementById('accSubtitle');
+                if (subEl) subEl.innerHTML = `Total vendido nos últimos 12 meses: <strong>${Utils.formatCurrency(totalPeriodo)}</strong> · média mensal <strong>${Utils.formatCurrency(media)}</strong>`;
+
+                const noteEl = document.getElementById('dashAccAiNote');
+                if (noteEl) {
+                    const maxVal = Math.max(...valores);
+                    const idxMax = valores.indexOf(maxVal);
+                    if (maxVal > 0) {
+                        noteEl.style.display = 'flex';
+                        noteEl.innerHTML = `<i class="fas fa-sparkles"></i> O melhor mês do período foi <strong>${labels[idxMax]}</strong>, com <strong>${Utils.formatCurrency(maxVal)}</strong> em vendas.`;
+                    } else {
+                        noteEl.style.display = 'none';
+                    }
+                }
+
+                const isDark = document.body.classList.contains('dark-mode');
+                const cores = valores.map((_, i) => i === valores.length - 1 ? '#ff6b00' : (isDark ? '#3a3a3a' : '#c2c8d0'));
+
+                if (this._accChart) { try { this._accChart.destroy(); } catch (e) {} this._accChart = null; }
+                const ctx = canvas.getContext('2d');
+                this._accChart = new Chart(ctx, {
+                    type: 'bar',
+                    data: { labels, datasets: [{ label: 'Total vendido', data: valores, backgroundColor: cores, borderRadius: 6, maxBarThickness: 42 }] },
+                    options: {
+                        responsive: true, maintainAspectRatio: false,
+                        plugins: {
+                            legend: { display: false },
+                            tooltip: {
+                                backgroundColor: '#212529', padding: 9, cornerRadius: 8,
+                                callbacks: { label: c => `Total: ${Utils.formatCurrency(c.parsed.y)}` }
+                            }
+                        },
+                        scales: {
+                            x: { grid: { display: false }, ticks: { font: { size: 10 }, color: '#6c757d' } },
                             y: { grid: { color: isDark ? 'rgba(255,255,255,.08)' : 'rgba(108,117,125,.12)' }, ticks: { font: { size: 10 }, color: '#6c757d', callback: v => Utils.formatCurrency(v) } }
                         }
                     }
