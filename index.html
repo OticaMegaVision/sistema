@@ -9733,7 +9733,7 @@ body.dark-mode,
                                 <div class="bkp-status-ic" style="background:#f3f0ff;color:#7c3aed;"><i class="fas fa-code-branch"></i></div>
                                 <div class="txt">
                                     <b>Versão do sistema</b>
-                                    <span>versão <strong>090920261026</strong></span>
+                                    <span>versão <strong>090920261035</strong></span>
                                 </div>
                             </div>
                         </div>
@@ -20946,6 +20946,7 @@ tbody tr td{border:1.5px solid #000;padding:2mm;text-align:center;font-weight:70
             _cmpFrom: null,      // usado apenas quando _cmpPeriod === 'custom'
             _cmpTo: null,
             _cmpChart: null,     // instância do Chart.js
+            _cmpChartType: 'area', // 'area' (linha com área, estilo Vendas Acumuladas) | 'bar' (barras verticais)
             _cmpMarkupBuilt: false, // ✅ FIX bug "datas voltam sozinhas": controla se o HTML do
                                      // card (com os inputs de data) já foi criado, para não
                                      // recriá-lo — e apagar o que o usuário está digitando —
@@ -21717,6 +21718,11 @@ tbody tr td{border:1.5px solid #000;padding:2mm;text-align:center;font-weight:70
 
                             <div class="dashv2-compare-row" id="dashCmpCompareRow"></div>
 
+                            <div class="acc-month-tabs" id="cmpChartTypeTabs" style="margin-bottom:8px;">
+                                <div class="acc-month-tab ${this._cmpChartType==='area'?'active':''}" data-type="area" onclick="Dashboard.setCmpChartType('area')">Área</div>
+                                <div class="acc-month-tab ${this._cmpChartType==='bar'?'active':''}" data-type="bar" onclick="Dashboard.setCmpChartType('bar')">Barras</div>
+                            </div>
+
                             <div class="dashv2-canvas-wrap" id="dashCmpCanvasWrap"><canvas id="dashCmpCanvas"></canvas></div>
 
                             <div class="dashv2-insight-row" id="dashCmpInsights"></div>
@@ -21958,6 +21964,16 @@ tbody tr td{border:1.5px solid #000;padding:2mm;text-align:center;font-weight:70
                 if (this._cmpView === 'acumulado') this.renderAcumulado();
                 else this.renderComparativo();
             },
+            // Alterna o tipo de visualização do gráfico "Desempenho": 'area' (linha com
+            // área, estilo Vendas Acumuladas) ou 'bar' (barras verticais)
+            setCmpChartType(type) {
+                this._cmpChartType = type;
+                document.querySelectorAll('#cmpChartTypeTabs .acc-month-tab').forEach(t => {
+                    t.classList.toggle('active', t.dataset.type === type);
+                });
+                if (this._cmpChart) { try { this._cmpChart.destroy(); } catch (e) {} this._cmpChart = null; }
+                this.renderComparativo();
+            },
 
             // Carrega Chart.js sob demanda e (re)desenha o gráfico comparativo
             renderComparativo() {
@@ -21995,8 +22011,10 @@ tbody tr td{border:1.5px solid #000;padding:2mm;text-align:center;font-weight:70
                 this._cmpLastGoal   = goal;
                 const sameShape = this._cmpChart
                     && this._cmpChart.data.labels.length === buckets.length
-                    && this._cmpLastIsDark === isDark;
+                    && this._cmpLastIsDark === isDark
+                    && this._cmpLastChartType === this._cmpChartType;
                 this._cmpLastIsDark = isDark;
+                this._cmpLastChartType = this._cmpChartType;
 
                 if (sameShape) {
                     this._cmpChart.data.labels = buckets.map(b => b.label);
@@ -22009,26 +22027,56 @@ tbody tr td{border:1.5px solid #000;padding:2mm;text-align:center;font-weight:70
 
                 if (this._cmpChart) { try { this._cmpChart.destroy(); } catch (e) {} this._cmpChart = null; }
                 const ctx = canvas.getContext('2d');
-                // Mesmo estilo visual do card "Vendas Acumuladas": linha com área preenchida em laranja
-                this._cmpChart = new Chart(ctx, {
-                    type: 'line',
-                    data: { labels: buckets.map(b => b.label), datasets: [{ data: osValues, borderColor: '#ff6b00', backgroundColor: 'rgba(255,107,0,0.18)', fill: true, tension: 0.25, pointRadius: 2, pointBackgroundColor: '#ff6b00', borderWidth: 2.5 }] },
-                    options: {
-                        responsive: true, maintainAspectRatio: false,
-                        interaction: { mode: 'index', intersect: false },
-                        plugins: {
-                            legend: { display: false },
-                            tooltip: {
-                                backgroundColor: '#212529', padding: 9, cornerRadius: 8,
-                                callbacks: { label: c => `${c.parsed.y} OS · ${this._cmpLastGoal > 0 ? this._cmpLastMeta[c.dataIndex] + '% · ' : ''}${Utils.formatCurrency(this._cmpLastTotals[c.dataIndex])}` }
+                const tooltipLabel = (c) => `${c.parsed.y} OS · ${this._cmpLastGoal > 0 ? this._cmpLastMeta[c.dataIndex] + '% · ' : ''}${Utils.formatCurrency(this._cmpLastTotals[c.dataIndex])}`;
+                if (this._cmpChartType === 'bar') {
+                    // Barras verticais modernas, com o valor de OS acima de cada barra
+                    this._cmpChart = new Chart(ctx, {
+                        type: 'bar',
+                        data: { labels: buckets.map(b => b.label), datasets: [{ data: osValues, backgroundColor: '#ff6b00cc', hoverBackgroundColor: '#ff6b00', borderRadius: 6, maxBarThickness: 30 }] },
+                        options: {
+                            responsive: true, maintainAspectRatio: false,
+                            plugins: {
+                                legend: { display: false },
+                                tooltip: { backgroundColor: '#212529', padding: 9, cornerRadius: 8, callbacks: { label: tooltipLabel } }
+                            },
+                            scales: {
+                                x: { grid: { display: false }, ticks: { font: { size: 10 }, color: '#6c757d' } },
+                                y: { grid: { color: isDark ? 'rgba(255,255,255,.08)' : 'rgba(108,117,125,.12)' }, ticks: { font: { size: 10 }, color: '#6c757d' }, beginAtZero: true }
                             }
                         },
-                        scales: {
-                            x: { grid: { display: false }, ticks: { font: { size: 10 }, color: '#6c757d' } },
-                            y: { grid: { color: isDark ? 'rgba(255,255,255,.08)' : 'rgba(108,117,125,.12)' }, ticks: { font: { size: 10 }, color: '#6c757d' }, beginAtZero: true }
+                        plugins: [{
+                            id: 'dashv2ValueLabel',
+                            afterDatasetsDraw: (chart) => {
+                                const { ctx } = chart;
+                                const dsMeta = chart.getDatasetMeta(0);
+                                ctx.save();
+                                ctx.font = '600 10px Inter, sans-serif';
+                                ctx.fillStyle = isDark ? '#ffcb94' : '#8a5a1f';
+                                ctx.textAlign = 'center';
+                                dsMeta.data.forEach((bar, i) => { ctx.fillText(osValues[i], bar.x, bar.y - 8); });
+                                ctx.restore();
+                            }
+                        }]
+                    });
+                } else {
+                    // Mesmo estilo visual do card "Vendas Acumuladas": linha com área preenchida em laranja
+                    this._cmpChart = new Chart(ctx, {
+                        type: 'line',
+                        data: { labels: buckets.map(b => b.label), datasets: [{ data: osValues, borderColor: '#ff6b00', backgroundColor: 'rgba(255,107,0,0.18)', fill: true, tension: 0.25, pointRadius: 2, pointBackgroundColor: '#ff6b00', borderWidth: 2.5 }] },
+                        options: {
+                            responsive: true, maintainAspectRatio: false,
+                            interaction: { mode: 'index', intersect: false },
+                            plugins: {
+                                legend: { display: false },
+                                tooltip: { backgroundColor: '#212529', padding: 9, cornerRadius: 8, callbacks: { label: tooltipLabel } }
+                            },
+                            scales: {
+                                x: { grid: { display: false }, ticks: { font: { size: 10 }, color: '#6c757d' } },
+                                y: { grid: { color: isDark ? 'rgba(255,255,255,.08)' : 'rgba(108,117,125,.12)' }, ticks: { font: { size: 10 }, color: '#6c757d' }, beginAtZero: true }
+                            }
                         }
-                    }
-                });
+                    });
+                }
 
                 this._renderCmpCompareRow();
                 this._renderCmpInsights(buckets, osValues, metaValues, totalsRS, goal);
