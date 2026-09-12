@@ -9733,7 +9733,7 @@ body.dark-mode,
                                 <div class="bkp-status-ic" style="background:#f3f0ff;color:#7c3aed;"><i class="fas fa-code-branch"></i></div>
                                 <div class="txt">
                                     <b>Versão do sistema</b>
-                                    <span>versão <strong>110920262104</strong></span>
+                                    <span>versão <strong>120920261156</strong></span>
                                 </div>
                             </div>
                         </div>
@@ -17284,7 +17284,8 @@ body.dark-mode,
                             ${statusBadge}
                             <div class="conta-item-actions">
                                 ${!c.pago && !c._readonly ? `<button class="ci-action-btn check" title="Dar Baixa" onclick="ContasManager.darBaixa('${c.id}')"><i class="fas fa-check"></i></button>` : ''}
-                                ${!c.pago && c._readonly ? `<button class="ci-action-btn check" title="Dar Baixa" onclick="ContasManager.darBaixaVenda('${c.id}')"><i class="fas fa-check"></i></button>` : ''}
+                                ${!c.pago && c._readonly && String(c.id).startsWith('desp_') ? `<button class="ci-action-btn check" title="Dar Baixa" onclick="ContasManager.darBaixaDespesa('${c.id}')"><i class="fas fa-check"></i></button>` : ''}
+                                ${!c.pago && c._readonly && !String(c.id).startsWith('desp_') ? `<button class="ci-action-btn check" title="Dar Baixa" onclick="ContasManager.darBaixaVenda('${c.id}')"><i class="fas fa-check"></i></button>` : ''}
                                 ${wppBtn}
                                 ${!c._readonly ? `<button class="ci-action-btn recibo" title="Comprovante" onclick="ContasManager.gerarComprovante('${c.id}')"><i class="fas fa-receipt"></i></button>` : ''}
                                 ${reciboVendaBtn}
@@ -17479,6 +17480,119 @@ body.dark-mode,
                         overlay.remove();
                         Toast.show('⚠️ Esta conta foi alterada em outro dispositivo. Atualize a lista e tente novamente.', 'warning', 5000);
                         ContasManager.renderAll().catch(()=>{});
+                    }
+                };
+            },
+
+            // Dar baixa em item de despesa exibido em Contas a Pagar (id 'desp_<expId>').
+            // Antes, esses itens chamavam por engano darBaixaVenda (feita só para IDs
+            // no formato 'venda_...'), que não reconhecia o prefixo 'desp_' e retornava
+            // sem fazer nada — o botão de baixa das despesas simplesmente não funcionava.
+            darBaixaDespesa(itemId) {
+                const expId = itemId.slice('desp_'.length);
+                const exp = (state.expenses || []).find(e => e.id === expId);
+                if (!exp) { Toast.show('Despesa não encontrada', 'warning'); return; }
+
+                const supplierMap = {};
+                (state.suppliers || []).forEach(s => { if (s.id) supplierMap[s.id] = s.name || s.id; });
+                const parteNome = supplierMap[exp.supplierId] || exp.supplierId || '';
+
+                const defaultVal = parseFloat(exp.value || 0).toLocaleString('pt-BR', {minimumFractionDigits:2, maximumFractionDigits:2});
+                const overlay = document.createElement('div');
+                overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:99999;display:flex;align-items:center;justify-content:center;';
+                overlay.innerHTML = `<div style="background:#fff;border-radius:14px;padding:24px;width:340px;box-shadow:0 8px 32px rgba(0,0,0,0.25);font-family:inherit;">
+                    <h3 style="margin:0 0 6px;font-size:1rem;color:#28a745;">💰 Dar Baixa</h3>
+                    <p style="font-size:0.8rem;color:#666;margin:0 0 14px;">${exp.desc || exp.description || 'Despesa'} — Valor original: <strong>R$ ${defaultVal}</strong></p>
+                    <label style="font-size:0.8rem;font-weight:700;color:#333;display:block;margin-bottom:4px;">Valor pago (R$)</label>
+                    <input type="text" inputmode="numeric" id="_dbxVal" value="${defaultVal}" oninput="Utils.maskMoney(this)"
+                        style="width:100%;padding:10px;border:2px solid #28a745;border-radius:8px;font-size:1rem;box-sizing:border-box;margin-bottom:12px;">
+                    <label style="font-size:0.8rem;font-weight:700;color:#333;display:block;margin-bottom:4px;">Forma de pagamento</label>
+                    <select id="_dbxForma" style="width:100%;padding:10px;border:2px solid #ddd;border-radius:8px;font-size:0.9rem;box-sizing:border-box;margin-bottom:12px;">
+                        <option value="">— Selecionar —</option>
+                        <option value="PIX">PIX</option>
+                        <option value="Dinheiro">Dinheiro</option>
+                        <option value="Débito">Cartão Débito</option>
+                        <option value="Crédito">Cartão Crédito</option>
+                        <option value="Transferência">Transferência</option>
+                        <option value="Boleto">Boleto</option>
+                    </select>
+                    <label style="font-size:0.8rem;font-weight:700;color:#333;display:block;margin-bottom:4px;">Observação (opcional)</label>
+                    <input type="text" id="_dbxObs" placeholder="Ex: Pago com desconto..."
+                        style="width:100%;padding:8px;border:2px solid #ddd;border-radius:8px;font-size:0.88rem;box-sizing:border-box;margin-bottom:14px;">
+                    <div style="display:flex;gap:10px;">
+                        <button id="_dbxCancel" style="flex:1;padding:10px;border:2px solid #ccc;border-radius:8px;background:#fff;cursor:pointer;font-weight:700;font-size:0.88rem;">Cancelar</button>
+                        <button id="_dbxConfirm" style="flex:1;padding:10px;border:none;border-radius:8px;background:#28a745;color:#fff;cursor:pointer;font-weight:700;font-size:0.88rem;">✔ Confirmar</button>
+                    </div>
+                </div>`;
+                document.body.appendChild(overlay);
+                overlay.querySelector('#_dbxCancel').onclick = () => overlay.remove();
+                overlay.onclick = e => { if (e.target === overlay) overlay.remove(); };
+                overlay.querySelector('#_dbxConfirm').onclick = function() {
+                    if (this._dbxExecuting) return;
+                    const paidVal = Utils.parseMoney(overlay.querySelector('#_dbxVal').value) || 0;
+                    const forma   = overlay.querySelector('#_dbxForma').value || '—';
+                    const obs     = overlay.querySelector('#_dbxObs')?.value?.trim() || '';
+                    if (paidVal <= 0) { Toast.show('Informe um valor válido', 'warning'); return; }
+                    this._dbxExecuting = true; this.disabled = true; this.textContent = '⏳ Salvando...';
+
+                    // Relê a despesa mais atual no momento da confirmação (mesmo padrão
+                    // usado em ContasManager.darBaixa / darBaixaVenda) para nunca gravar
+                    // em cima de uma versão desatualizada.
+                    const freshExp = (state.expenses || []).find(e => e.id === expId);
+                    if (!freshExp) {
+                        this._dbxExecuting = false; this.disabled = false; this.textContent = '✔ Confirmar';
+                        overlay.remove();
+                        Toast.show('⚠️ Esta despesa foi alterada em outro dispositivo. Atualize a lista e tente novamente.', 'warning', 5000);
+                        ContasManager.renderAll().catch(()=>{});
+                        return;
+                    }
+
+                    const valorOriginal = parseFloat(freshExp.value || 0);
+                    const isParcial = paidVal < valorOriginal - 0.009;
+                    const now = new Date().toISOString();
+
+                    if (isParcial) {
+                        const saldo = Math.max(0, valorOriginal - paidVal);
+                        if (!freshExp.pagamentosParciais) freshExp.pagamentosParciais = [];
+                        freshExp.pagamentosParciais.push({ data: now, valor: paidVal, forma, obs });
+                        freshExp.valorOriginal = freshExp.valorOriginal || valorOriginal;
+                        freshExp.value = parseFloat(saldo.toFixed(2));
+                        freshExp.status = 'pendente';
+                        freshExp.paymentMethod = forma;
+                        freshExp.updated_at = now;
+                    } else {
+                        freshExp.status = 'pago';
+                        freshExp.paymentMethod = forma;
+                        freshExp.paidValue = paidVal;
+                        freshExp.paidDate = now.slice(0,10);
+                        if (obs) freshExp.notes = (freshExp.notes ? freshExp.notes + ' — ' : '') + obs;
+                        freshExp.updated_at = now;
+                    }
+
+                    App.saveData();
+                    SupaSync.upsertDespesa(freshExp);
+                    overlay.remove();
+                    Expenses.renderTable();
+                    Expenses.updateSummary();
+                    ContasManager.renderAll().catch(()=>{});
+                    Dashboard.update().catch(()=>{});
+
+                    if (isParcial) {
+                        const saldoRestante = parseFloat(freshExp.value || 0);
+                        Toast.show(`💰 Pagamento parcial de R$ ${paidVal.toFixed(2).replace('.',',')} registrado. Saldo restante: R$ ${saldoRestante.toFixed(2).replace('.',',')}`, 'warning', 5000);
+                        ContasManager._exibirComprovanteModal({
+                            tipo: 'pagar', descricao: freshExp.desc || freshExp.description || 'Despesa',
+                            valor: paidVal, parte: parteNome, categoria: freshExp.category || 'Despesa',
+                            vencimento: freshExp.date || '', pago: true, dataPagamento: now, formaPagamento: forma || '—',
+                            obs: (obs ? obs + ' — ' : '') + `Pagamento parcial. Saldo restante: R$ ${saldoRestante.toFixed(2).replace('.',',')}`
+                        });
+                    } else {
+                        Toast.show('Baixa registrada! ✅', 'success');
+                        ContasManager._exibirComprovanteModal({
+                            tipo: 'pagar', descricao: freshExp.desc || freshExp.description || 'Despesa',
+                            valor: paidVal, parte: parteNome, categoria: freshExp.category || 'Despesa',
+                            vencimento: freshExp.date || '', pago: true, dataPagamento: now, formaPagamento: forma || '—', obs
+                        });
                     }
                 };
             },
@@ -24463,6 +24577,11 @@ tbody tr td{border:1.5px solid #000;padding:2mm;text-align:center;font-weight:70
                 this.clearForm();
                 this.renderTable();
                 this.updateSummary();
+                // ✅ FIX "Contas a Pagar só atualiza com F5": salvar/editar uma despesa
+                // aqui nunca avisava o painel de Contas a Pagar (as despesas aparecem
+                // lá injetadas automaticamente) para se redesenhar — ele só refletia o
+                // novo status ao trocar de aba e voltar, ou recarregar a página.
+                if (window.ContasManager) ContasManager.renderAll().catch(()=>{});
                 Dashboard.update().catch(()=>{});
                 Toast.show('Despesa salva com sucesso!');
             },
@@ -24502,6 +24621,7 @@ tbody tr td{border:1.5px solid #000;padding:2mm;text-align:center;font-weight:70
                     LocalFirst.deleteItem('expenses', id);
                     this.renderTable();
                     this.updateSummary();
+                    if (window.ContasManager) ContasManager.renderAll().catch(()=>{});
                     Dashboard.update().catch(()=>{});
                     Toast.show('Despesa excluída com sucesso!');
                 });
