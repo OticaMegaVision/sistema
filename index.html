@@ -9733,7 +9733,7 @@ body.dark-mode,
                                 <div class="bkp-status-ic" style="background:#f3f0ff;color:#7c3aed;"><i class="fas fa-code-branch"></i></div>
                                 <div class="txt">
                                     <b>Versão do sistema</b>
-                                    <span>versão <strong>120920261156</strong></span>
+                                    <span>versão <strong>120920261902</strong></span>
                                 </div>
                             </div>
                         </div>
@@ -15475,9 +15475,19 @@ body.dark-mode,
                     const storeId = window._currentStore || 'barueri';
                     await _supabaseFullPush(storeId);
                     if (!silent) Toast.show('☁️ Enviado ao Supabase', 'success', 2000);
+                    // ✅ FIX RETRY-SUPABASE: sucesso — cancela qualquer nova tentativa
+                    // agendada (o Supabase nunca fazia isso, diferente de Drive/OneDrive).
+                    _clearPendingPush();
                 } catch(e) {
                     console.warn('[CloudSync] supabasePush falhou:', e.message);
                     if (!silent) Toast.show('⚠️ Falha ao enviar ao Supabase: ' + e.message, 'warning');
+                    // ✅ FIX RETRY-SUPABASE: antes, um push automático (silent) que
+                    // falhasse (ex: timeout do servidor) era só logado no console e
+                    // esquecido — sem nova tentativa, o dado só saía do aparelho se o
+                    // usuário editasse outra coisa (reagendando um push novo) ou
+                    // apertasse "Enviar agora"/desse F5 no outro aparelho. Agora usa a
+                    // mesma retentativa com backoff que Drive/OneDrive já tinham.
+                    else _scheduleRetryPush();
                 } finally {
                     _pushing = false;
                 }
@@ -16217,9 +16227,9 @@ body.dark-mode,
             }
 
             // ── RETRY: agenda uma nova tentativa de push após falha ────────────
-            // Chamado pelo catch() de gdrivePush/onedrivePush quando "silent"
-            // (push automático). Nunca interfere no push manual (botão), que já
-            // mostra o erro direto pro usuário via Toast.
+            // Chamado pelo catch() de gdrivePush/onedrivePush/supabasePush quando
+            // "silent" (push automático). Nunca interfere no push manual (botão),
+            // que já mostra o erro direto pro usuário via Toast.
             function _markPendingPush() {
                 try { localStorage.setItem(PENDING_PUSH_KEY, JSON.stringify({ ts: Date.now(), store: window._currentStore || 'barueri' })); } catch(_e) {}
             }
