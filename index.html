@@ -9733,7 +9733,7 @@ body.dark-mode,
                                 <div class="bkp-status-ic" style="background:#f3f0ff;color:#7c3aed;"><i class="fas fa-code-branch"></i></div>
                                 <div class="txt">
                                     <b>Versão do sistema</b>
-                                    <span>versão <strong>120920261902</strong></span>
+                                    <span>versão <strong>160920262027</strong></span>
                                 </div>
                             </div>
                         </div>
@@ -23032,10 +23032,26 @@ tbody tr td{border:1.5px solid #000;padding:2mm;text-align:center;font-weight:70
                 const _elCpfOb = document.getElementById('clientCpf');
                 [_elNome, _elNasc, _elCpfOb].forEach(el => el && el.classList.remove('error'));
 
+                // ✅ FIX CPF-MENOR-DE-IDADE: CPF só é obrigatório se o cliente for
+                // maior de idade (calculado pela Data de Nascimento) — crianças e
+                // adolescentes muitas vezes não têm CPF ainda.
+                let _clienteMaiorIdade = true;
+                const _naschVal = (_elNasc.value || '').trim();
+                if (_naschVal) {
+                    const _nasc = new Date(_naschVal + 'T00:00:00');
+                    if (!isNaN(_nasc.getTime())) {
+                        const _hoje = new Date();
+                        let _idade = _hoje.getFullYear() - _nasc.getFullYear();
+                        const _m = _hoje.getMonth() - _nasc.getMonth();
+                        if (_m < 0 || (_m === 0 && _hoje.getDate() < _nasc.getDate())) _idade--;
+                        _clienteMaiorIdade = _idade >= 18;
+                    }
+                }
+
                 const _faltando = [];
                 if (!(_elNome.value || '').trim())  { _faltando.push('Nome completo');     _elNome.classList.add('error'); }
-                if (!(_elNasc.value || '').trim())  { _faltando.push('Data de Nascimento'); _elNasc.classList.add('error'); }
-                if (!(_elCpfOb.value || '').trim()) { _faltando.push('CPF');                _elCpfOb.classList.add('error'); }
+                if (!_naschVal)                     { _faltando.push('Data de Nascimento'); _elNasc.classList.add('error'); }
+                if (_clienteMaiorIdade && !(_elCpfOb.value || '').trim()) { _faltando.push('CPF'); _elCpfOb.classList.add('error'); }
 
                 if (_faltando.length) {
                     Toast.show(`Preencha para salvar: ${_faltando.join(', ')}`, 'warning', 6000);
