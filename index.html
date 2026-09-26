@@ -9737,7 +9737,7 @@ body.dark-mode,
                                 <div class="bkp-status-ic" style="background:#f3f0ff;color:#7c3aed;"><i class="fas fa-code-branch"></i></div>
                                 <div class="txt">
                                     <b>Versão do sistema</b>
-                                    <span>versão <strong>160920262224</strong></span>
+                                    <span>versão <strong>260920261336</strong></span>
                                 </div>
                             </div>
                         </div>
@@ -23797,16 +23797,28 @@ tbody tr td{border:1.5px solid #000;padding:2mm;text-align:center;font-weight:70
                 SectionSubTabs_set(document.getElementById('products'), subtab);
             },
 
+            // ✅ FIX FILTRO-PRODUTO-TOLERANTE: ignora acentos, espaços extras e
+            // caracteres como - . / ao comparar, pra não perder o produto por
+            // pequena diferença de formatação no código digitado.
+            _normalizeSearch(v) {
+                return (v || '')
+                    .toString()
+                    .normalize('NFD').replace(/[\u0300-\u036f]/g, '') // remove acentos
+                    .toLowerCase()
+                    .replace(/[^a-z0-9]/g, ''); // remove espaços, traços, pontos etc.
+            },
+
             renderTable() {
                 const tbody = document.querySelector('#productsTable tbody');
                 if (!tbody) return;
                 // Filtra por busca
-                const term = (document.getElementById('searchProduct')?.value || '').toLowerCase().trim();
+                const termRaw = (document.getElementById('searchProduct')?.value || '').toLowerCase().trim();
+                const term = this._normalizeSearch(termRaw);
                 const list = term
                     ? (state.products || []).filter(p =>
-                        (p.name||'').toLowerCase().includes(term) ||
-                        (p.code||'').toLowerCase().includes(term) ||
-                        (p.category||'').toLowerCase().includes(term))
+                        this._normalizeSearch(p.name).includes(term) ||
+                        this._normalizeSearch(p.code).includes(term) ||
+                        this._normalizeSearch(p.category).includes(term))
                     : (state.products || []);
                 // Atualiza badge de contagem
                 const badge = document.getElementById('productsCountBadge');
@@ -27061,7 +27073,7 @@ ${container.innerHTML}
             // ===== Searchable Select (busca por nome/código nos itens da venda) =====
             // Remove acentos p/ comparação (ex: "óculos" casa com "oculos")
             _ssNormalize(str) {
-                return (str || '').toString().normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+                return (str || '').toString().normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9]/g, '');
             },
 
             // Filtra as <option> do select oculto conforme o texto digitado e renderiza a lista
@@ -27180,7 +27192,8 @@ ${container.innerHTML}
                         lentes.forEach(p => {
                             const opt = document.createElement('option');
                             opt.value = p.id + '|' + p.price;
-                            opt.textContent = p.name + ' - ' + Utils2.fmt(p.price) + (p.qty <= 0 ? ' (sem estoque)' : '');
+                            const codeLabel = p.code ? '[' + p.code + '] ' : '';
+                            opt.textContent = codeLabel + p.name + ' - ' + Utils2.fmt(p.price) + (p.qty <= 0 ? ' (sem estoque)' : '');
                             if (p.qty <= 0) opt.disabled = true;
                             selLente.appendChild(opt);
                         });
