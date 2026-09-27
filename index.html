@@ -7356,6 +7356,10 @@ body.dark-mode,
                                     <select id="lenteSelect" style="display:none;">
                                         <option value="">🔍 Escolha uma lente...</option>
                                     </select>
+                                    <button type="button" onclick="Sales.editarProdutoBusca('lente')"
+                                        style="padding:7px;border-radius:8px;border:1.5px solid #ffcc80;background:#fff;color:#e65100;font-weight:600;font-size:0.76rem;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px;">
+                                        <i class="fas fa-pen"></i> Editar nome/valor desta lente
+                                    </button>
                                     <button type="button" onclick="Sales.openQuickProduct('lente')"
                                         style="padding:8px;border-radius:8px;border:1.5px dashed #ffcc80;background:#fff;color:#e65100;font-weight:700;font-size:0.78rem;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px;">
                                         <i class="fas fa-plus-circle"></i> Cadastrar Produto
@@ -7397,6 +7401,10 @@ body.dark-mode,
                                     <select id="armacaoSelect" style="display:none;">
                                         <option value="">🔍 Escolha uma armação...</option>
                                     </select>
+                                    <button type="button" onclick="Sales.editarProdutoBusca('armacao')"
+                                        style="padding:7px;border-radius:8px;border:1.5px solid #ffb385;background:#fff;color:#e85500;font-weight:600;font-size:0.76rem;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px;">
+                                        <i class="fas fa-pen"></i> Editar nome/valor desta armação
+                                    </button>
                                     <button type="button" onclick="Sales.openQuickProduct('armacao')"
                                         style="padding:8px;border-radius:8px;border:1.5px dashed #ffb385;background:#fff;color:#e85500;font-weight:700;font-size:0.78rem;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px;">
                                         <i class="fas fa-plus-circle"></i> Cadastrar Produto
@@ -9737,7 +9745,7 @@ body.dark-mode,
                                 <div class="bkp-status-ic" style="background:#f3f0ff;color:#7c3aed;"><i class="fas fa-code-branch"></i></div>
                                 <div class="txt">
                                     <b>Versão do sistema</b>
-                                    <span>versão <strong>260920262330</strong></span>
+                                    <span>versão <strong>260920262347</strong></span>
                                 </div>
                             </div>
                         </div>
@@ -28140,6 +28148,79 @@ ${container.innerHTML}
                 }
             },
 
+            // ✅ FEATURE EDITAR-NOME-VALOR-BUSCA: permite ajustar nome/valor do
+            // produto encontrado na busca, só para esta venda ou também no
+            // cadastro do produto (pergunta toda vez, nunca decide sozinho).
+            editarProdutoBusca(tipo) {
+                const selectId = tipo === 'lente' ? 'lenteSelect' : 'armacaoSelect';
+                const searchId = tipo === 'lente' ? 'lenteSearch' : 'armacaoSearch';
+                const select = document.getElementById(selectId);
+                if (!select || !select.value) { Toast.show('Selecione um produto primeiro', 'warning'); return; }
+                const [prodId, priceStr] = select.value.split('|');
+                const prod = state.products.find(p => p.id === prodId);
+                if (!prod) { Toast.show('Produto não encontrado', 'warning'); return; }
+                const precoAtual = this._prodOverrides?.[prodId]?.price ?? parseFloat(priceStr) ?? prod.price;
+                const nomeAtual = this._prodOverrides?.[prodId]?.name ?? prod.name;
+
+                const overlay = document.createElement('div');
+                overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:99999;display:flex;align-items:center;justify-content:center;';
+                overlay.innerHTML = `<div style="background:#fff;border-radius:14px;padding:24px;width:340px;box-shadow:0 8px 32px rgba(0,0,0,0.25);font-family:inherit;">
+                    <h3 style="margin:0 0 6px;font-size:1rem;color:#e65100;">✏️ Editar produto</h3>
+                    <p style="font-size:0.78rem;color:#666;margin:0 0 14px;">Vale só pra esta venda, a não ser que você marque a opção abaixo.</p>
+                    <label style="font-size:0.8rem;font-weight:700;color:#333;display:block;margin-bottom:4px;">Nome</label>
+                    <input type="text" id="_epbNome" value="${(nomeAtual||'').replace(/"/g,'&quot;')}"
+                        style="width:100%;padding:10px;border:2px solid #ffcc80;border-radius:8px;font-size:0.9rem;box-sizing:border-box;margin-bottom:12px;">
+                    <label style="font-size:0.8rem;font-weight:700;color:#333;display:block;margin-bottom:4px;">Valor (R$)</label>
+                    <input type="text" inputmode="numeric" id="_epbValor" value="${Number(precoAtual||0).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2})}" oninput="Utils.maskMoney(this)"
+                        style="width:100%;padding:10px;border:2px solid #ffcc80;border-radius:8px;font-size:0.9rem;box-sizing:border-box;margin-bottom:12px;">
+                    <label style="display:flex;align-items:center;gap:6px;font-size:0.8rem;color:#333;margin-bottom:16px;cursor:pointer;">
+                        <input type="checkbox" id="_epbAtualizarCadastro" style="width:auto;margin:0;">
+                        Atualizar também no cadastro do produto (afeta vendas futuras)
+                    </label>
+                    <div style="display:flex;gap:10px;">
+                        <button id="_epbCancel" style="flex:1;padding:10px;border:2px solid #ccc;border-radius:8px;background:#fff;cursor:pointer;font-weight:700;font-size:0.88rem;">Cancelar</button>
+                        <button id="_epbConfirm" style="flex:1;padding:10px;border:none;border-radius:8px;background:#e65100;color:#fff;cursor:pointer;font-weight:700;font-size:0.88rem;">✔ Aplicar</button>
+                    </div>
+                </div>`;
+                document.body.appendChild(overlay);
+                overlay.querySelector('#_epbCancel').onclick = () => overlay.remove();
+                overlay.onclick = e => { if (e.target === overlay) overlay.remove(); };
+                overlay.querySelector('#_epbConfirm').onclick = () => {
+                    const novoNome = (overlay.querySelector('#_epbNome').value || '').trim();
+                    const novoValor = Utils.parseMoney(overlay.querySelector('#_epbValor').value) || 0;
+                    if (!novoNome) { Toast.show('Informe o nome', 'warning'); return; }
+                    if (novoValor <= 0) { Toast.show('Informe um valor maior que zero', 'warning'); return; }
+                    const atualizarCadastro = overlay.querySelector('#_epbAtualizarCadastro').checked;
+
+                    if (!this._prodOverrides) this._prodOverrides = {};
+                    this._prodOverrides[prodId] = { name: novoNome, price: novoValor };
+
+                    // Reflete na busca imediatamente (nome exibido + valor usado ao adicionar)
+                    select.value = prodId + '|' + novoValor;
+                    const srch = document.getElementById(searchId);
+                    if (srch) { srch.value = novoNome; srch.classList.add('ss-has-value'); }
+
+                    if (atualizarCadastro) {
+                        prod.name = novoNome;
+                        prod.price = novoValor;
+                        prod.updated_at = new Date().toISOString();
+                        App.saveData();
+                        SupaSync.upsertProduto(prod);
+                        if (typeof Products !== 'undefined') { try { Products.renderTable(); } catch(_e) {} }
+                        this.populateSaleSelects();
+                        // Reaplica seleção/edição depois de repopular o select
+                        const selAgain = document.getElementById(selectId);
+                        if (selAgain) selAgain.value = prodId + '|' + novoValor;
+                        const srchAgain = document.getElementById(searchId);
+                        if (srchAgain) { srchAgain.value = novoNome; srchAgain.classList.add('ss-has-value'); }
+                        Toast.show('Produto atualizado no cadastro e nesta venda!', 'success');
+                    } else {
+                        Toast.show('Alterado só para esta venda.', 'success');
+                    }
+                    overlay.remove();
+                };
+            },
+
             addLente() {
                 const select = document.getElementById('lenteSelect');
                 const qty = parseInt(document.getElementById('lenteQty').value) || 1;
@@ -28147,9 +28228,11 @@ ${container.innerHTML}
                 const [prodId, priceStr] = select.value.split('|');
                 const price = parseFloat(priceStr);
                 const prod = state.products.find(p => p.id === prodId);
-                const name = prod ? prod.name : select.options[select.selectedIndex].text.split(' - ')[0];
+                const override = this._prodOverrides?.[prodId];
+                const name = override?.name || (prod ? prod.name : select.options[select.selectedIndex].text.split(' - ')[0]);
                 if (prod && prod.qty < qty) { Toast.show('Estoque insuficiente! Disponível: ' + prod.qty, 'warning'); return; }
                 state.currentSale.items.push({ type: 'lente', productId: prodId, name, qty, price, subtotal: price * qty });
+                if (this._prodOverrides) delete this._prodOverrides[prodId];
                 select.value = '';
                 this._ssReset('lenteSearch');
                 document.getElementById('lenteQty').value = 1;
@@ -28164,7 +28247,8 @@ ${container.innerHTML}
                 const [prodId, priceStr] = select.value.split('|');
                 const price = parseFloat(priceStr);
                 const prod = state.products.find(p => p.id === prodId);
-                const name = prod ? prod.name : select.options[select.selectedIndex].text.split(' - ')[0];
+                const override = this._prodOverrides?.[prodId];
+                const name = override?.name || (prod ? prod.name : select.options[select.selectedIndex].text.split(' - ')[0]);
                 const code = prod ? (prod.code || '') : '';
                 const color = prod ? (prod.color || '') : '';
                 const frameType = prod ? (prod.frameType || '') : '';
@@ -28176,6 +28260,7 @@ ${container.innerHTML}
                     vertical: document.getElementById('armacaoVertical')?.value || ''
                 };
                 state.currentSale.items.push({ type: 'armacao', productId: prodId, code, name, color, frameType, frameMeasures, qty, price, subtotal: price * qty });
+                if (this._prodOverrides) delete this._prodOverrides[prodId];
                 select.value = '';
                 this._ssReset('armacaoSearch');
                 document.getElementById('armacaoQty').value = 1;
