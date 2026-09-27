@@ -9737,7 +9737,7 @@ body.dark-mode,
                                 <div class="bkp-status-ic" style="background:#f3f0ff;color:#7c3aed;"><i class="fas fa-code-branch"></i></div>
                                 <div class="txt">
                                     <b>Versão do sistema</b>
-                                    <span>versão <strong>260920261336</strong></span>
+                                    <span>versão <strong>260920262330</strong></span>
                                 </div>
                             </div>
                         </div>
@@ -24144,9 +24144,33 @@ tbody tr td{border:1.5px solid #000;padding:2mm;text-align:center;font-weight:70
                     Toast.show('Preencha todos os campos obrigatórios', 'warning');
                     return;
                 }
-                
+
+                // ✅ FIX CÓDIGO-DUPLICADO: trava o salvamento se já existir outro
+                // produto com o mesmo código, em vez de deixar cadastrar e colidir
+                // depois. Ignora o próprio produto quando está editando.
+                const _codeEl = document.getElementById('productCode');
+                _codeEl.classList.remove('error');
+                const _codeTipado = (_codeEl.value || '').trim();
+                if (_codeTipado) {
+                    const _dupCode = (state.products || []).find(p =>
+                        p.id !== state.editingId &&
+                        (p.code || '').trim().toLowerCase() === _codeTipado.toLowerCase()
+                    );
+                    if (_dupCode) {
+                        Toast.show(`Já existe um produto com o código "${_dupCode.code}" (${_dupCode.name}). Corrija o código antes de salvar.`, 'warning', 6000);
+                        _codeEl.classList.add('error');
+                        _codeEl.focus();
+                        return;
+                    }
+                }
+
                 const product = {
-                    id: state.editingId || 'PROD-' + (state.products.length + 1).toString().padStart(3, '0'),
+                    // ✅ FIX ID-COLIDINDO: o id interno usava 'PROD-' + total de produtos,
+                    // o que colidia com produtos já existentes (ex: importados com outro
+                    // padrão de código) e fazia um produto novo sobrescrever um antigo por
+                    // baixo dos panos — sumindo depois da sincronização. Agora usa o mesmo
+                    // gerador de id único já usado em Clientes/Vendas/Despesas.
+                    id: state.editingId || Utils.generateId('PROD'),
                     code: document.getElementById('productCode').value,
                     category: document.getElementById('productCategory').value,
                     name: document.getElementById('productName').value,
