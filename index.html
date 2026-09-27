@@ -9745,7 +9745,7 @@ body.dark-mode,
                                 <div class="bkp-status-ic" style="background:#f3f0ff;color:#7c3aed;"><i class="fas fa-code-branch"></i></div>
                                 <div class="txt">
                                     <b>Versão do sistema</b>
-                                    <span>versão <strong>260920262347</strong></span>
+                                    <span>versão <strong>270920260654</strong></span>
                                 </div>
                             </div>
                         </div>
@@ -28195,11 +28195,6 @@ ${container.innerHTML}
                     if (!this._prodOverrides) this._prodOverrides = {};
                     this._prodOverrides[prodId] = { name: novoNome, price: novoValor };
 
-                    // Reflete na busca imediatamente (nome exibido + valor usado ao adicionar)
-                    select.value = prodId + '|' + novoValor;
-                    const srch = document.getElementById(searchId);
-                    if (srch) { srch.value = novoNome; srch.classList.add('ss-has-value'); }
-
                     if (atualizarCadastro) {
                         prod.name = novoNome;
                         prod.price = novoValor;
@@ -28208,13 +28203,24 @@ ${container.innerHTML}
                         SupaSync.upsertProduto(prod);
                         if (typeof Products !== 'undefined') { try { Products.renderTable(); } catch(_e) {} }
                         this.populateSaleSelects();
-                        // Reaplica seleção/edição depois de repopular o select
+                        // Reaplica seleção depois de repopular o select — agora existe uma
+                        // <option> com esse preço, então setar o value funciona normalmente.
                         const selAgain = document.getElementById(selectId);
                         if (selAgain) selAgain.value = prodId + '|' + novoValor;
                         const srchAgain = document.getElementById(searchId);
                         if (srchAgain) { srchAgain.value = novoNome; srchAgain.classList.add('ss-has-value'); }
                         Toast.show('Produto atualizado no cadastro e nesta venda!', 'success');
                     } else {
+                        // ✅ FIX EDITAR-SÓ-ESTA-VENDA: antes tentava forçar select.value
+                        // pro novo preço, mas como nenhuma <option> tem esse valor, o
+                        // <select> ficava sem seleção válida e "Adicionar" parava de
+                        // funcionar ("Selecione uma lente/armação"). Agora o select
+                        // continua apontando pro mesmo produto/preço original (a opção
+                        // já existe), e só o nome exibido na busca + o valor usado ao
+                        // adicionar (via _prodOverrides, lido em addLente/addArmacao)
+                        // mudam — sem mexer no value do select.
+                        const srch = document.getElementById(searchId);
+                        if (srch) { srch.value = novoNome; srch.classList.add('ss-has-value'); }
                         Toast.show('Alterado só para esta venda.', 'success');
                     }
                     overlay.remove();
@@ -28226,9 +28232,9 @@ ${container.innerHTML}
                 const qty = parseInt(document.getElementById('lenteQty').value) || 1;
                 if (!select || !select.value) { Toast.show('Selecione uma lente', 'warning'); return; }
                 const [prodId, priceStr] = select.value.split('|');
-                const price = parseFloat(priceStr);
                 const prod = state.products.find(p => p.id === prodId);
                 const override = this._prodOverrides?.[prodId];
+                const price = override?.price ?? parseFloat(priceStr);
                 const name = override?.name || (prod ? prod.name : select.options[select.selectedIndex].text.split(' - ')[0]);
                 if (prod && prod.qty < qty) { Toast.show('Estoque insuficiente! Disponível: ' + prod.qty, 'warning'); return; }
                 state.currentSale.items.push({ type: 'lente', productId: prodId, name, qty, price, subtotal: price * qty });
@@ -28245,9 +28251,9 @@ ${container.innerHTML}
                 const qty = parseInt(document.getElementById('armacaoQty').value) || 1;
                 if (!select || !select.value) { Toast.show('Selecione uma armação', 'warning'); return; }
                 const [prodId, priceStr] = select.value.split('|');
-                const price = parseFloat(priceStr);
                 const prod = state.products.find(p => p.id === prodId);
                 const override = this._prodOverrides?.[prodId];
+                const price = override?.price ?? parseFloat(priceStr);
                 const name = override?.name || (prod ? prod.name : select.options[select.selectedIndex].text.split(' - ')[0]);
                 const code = prod ? (prod.code || '') : '';
                 const color = prod ? (prod.color || '') : '';
