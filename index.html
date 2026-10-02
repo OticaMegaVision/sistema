@@ -24007,7 +24007,6 @@ tbody tr td{border:1.5px solid #000;padding:2mm;text-align:center;font-weight:70
             // por código com produtos já cadastrados, recalcular preço de
             // venda pelo markup e atualizar/cadastrar automaticamente.
             // ══════════════════════════════════════════════════════════════
-            _miaInited: false,
             _miaProdutosProcessados: [],
             _miaLabDetectado: '',
 
@@ -24036,7 +24035,14 @@ tbody tr td{border:1.5px solid #000;padding:2mm;text-align:center;font-weight:70
                 this.miaRenderMarkupConfig();
                 this.miaRenderHistorico();
                 this.miaUpdateStats();
-                if (!this._miaInited) { this.miaSetupDropZone(); this._miaInited = true; }
+                // ✅ FIX BOTÃO-PDF-PARA-DE-FUNCIONAR: antes isso só rodava UMA vez por
+                // sessão (guardado por this._miaInited). Se a tela de Produtos é
+                // redesenhada em algum momento (troca de loja, novo login etc.), o
+                // elemento antigo perde o clique e a flag nunca deixava a função rodar
+                // de novo — o botão "arraste o PDF ou clique" ficava morto, sem erro
+                // nenhum no console. Religar toda vez que a aba abre é seguro (onclick/
+                // ondrop apenas substituem o handler anterior, não duplicam).
+                this.miaSetupDropZone();
             },
 
             miaGetLabInfo(lab) {
@@ -35221,11 +35227,11 @@ window.ImportadorReceituario = ImportadorReceituario;
             if (/receituario (de|do|da)|receita (de|do|da)/.test(n)) return this._verReceituario(t);
             if (/preco|custo|margem|markup|quanto cobrar/.test(n)) return this._precificar(t);
             if (/resumo|faturamento|vendas|vendi/.test(n)) return this._resumoVendas();
-            if (/estoque|armac|produto|lente|oculos|óculos|reposi|acabando/.test(n)) {
+            if (/estoque|armac|produto|lente|oculos|óculos|reposi|acabando|c[oó]digo|\bcod\b/.test(n)) {
                 const baixo = /baix|reposi|acabando|minimo/.test(n);
-                const q = n.replace(/\b(estoque|produtos?|armacoes?|lentes?|oculos|tem|ai|tenho|vende|vendemos|consultar|consulta|ver|mostrar|mostra|de|do|da|no|na|em|algum|alguma)\b/g, ' ')
+                const q = n.replace(/\b(estoque|produtos?|armacoes?|lentes?|oculos|codigo|cod|tem|ai|tenho|vende|vendemos|consultar|consulta|ver|mostrar|mostra|qual|quais|de|do|da|no|na|em|algum|alguma)\b/g, ' ')
                     .replace(/\b(baixo|reposicao|acabando|minimo)\b/g, ' ').replace(/\s+/g, ' ').trim();
-                return this._lista('📦 Estoque', VisionDB.tools.consultar_estoque({ q, somente_baixo: String(baixo) }), i => `${esc(i.nome)} — <b>${i.qtd}</b> un. (mín. ${i.minimo}) · ${brl(i.preco)}`);
+                return this._lista('📦 Estoque', VisionDB.tools.consultar_estoque({ q, somente_baixo: String(baixo) }), i => this._formatarItemEstoque(i));
             }
             if (/despesa|gasto|a pagar|pagar/.test(n)) { const r = VisionDB.tools.listar_despesas({}); return this._lista('💸 Despesas do mês', r, d => `${esc(d.data)} · ${esc(d.descricao)} — ${brl(d.valor)} (${esc(d.status || '—')})`, `Total: <b>${brl(r.total_valor)}</b>`); }
             if (/entrega|pendente|atrasad|prazo/.test(n)) return this._lista('📦 Vendas pendentes', VisionDB.tools.listar_vendas({ pendentes: 'true', limite: '10' }), s => `OS ${esc(s.numero)} · ${esc(s.cliente || '—')} — ${brl(s.total)}${s.previsao_entrega ? ' · entrega ' + esc(s.previsao_entrega) : ''}`);
@@ -35233,7 +35239,34 @@ window.ImportadorReceituario = ImportadorReceituario;
             if (/cliente|telefone|whatsapp|zap|cpf|buscar|busca|procura|localizar|achar|encontrar|contato/.test(n)) return this._buscarCliente(t);
             if (/receit|grau|dioptria|longe|perto|multifocal|bifocal|simples/.test(n))
                 return 'Para analisar, envie o grau assim: <i>analisar receita -2.00 -0.50 180 / -1.75 -0.25 175</i> (OD / OE; use o 4º número como adição).';
-            return 'Posso: <b>analisar receita</b>, sugerir <b>preço</b>, <b>buscar cliente</b>, <b>receituário de</b> um cliente, <b>resumo de vendas</b>, <b>estoque</b>, <b>despesas</b>, <b>entregas pendentes</b> ou <b>fornecedores</b>.';
+            // ✅ FIX BUSCA-PRODUTO-SEM-GATILHO: antes, só achava produto se a frase
+            // tivesse uma palavra-chave ("estoque", "produto" etc.). Quem só cola o
+            // código ("27120") ou só o nome da lente ("transitions cinza 1.50"), sem
+            // nenhuma dessas palavras, caía direto na mensagem genérica de baixo sem
+            // nem tentar buscar. Último recurso antes de desistir: tenta achar produto
+            // pelo texto inteiro — só quando parece mesmo um código/nome curto (para
+            // não disparar em frases soltas sem relação com produto).
+            const pareceCodigoOuNome = /\b\d{3,6}\b/.test(t) || n.split(' ').filter(Boolean).length <= 4;
+            if (pareceCodigoOuNome) {
+                const porCodigoOuNome = VisionDB.tools.consultar_estoque({ q: t, limite: '8' });
+                if (porCodigoOuNome.total) return this._lista('📦 Produto encontrado', porCodigoOuNome, i => this._formatarItemEstoque(i));
+            }
+            return 'Posso: <b>analisar receita</b>, sugerir <b>preço</b>, <b>buscar cliente</b>, <b>receituário de</b> um cliente, <b>resumo de vendas</b>, <b>estoque/produto por nome ou código</b>, <b>despesas</b>, <b>entregas pendentes</b> ou <b>fornecedores</b>.';
+        },
+
+        // Preço sugerido (markup da loja) a partir do custo cadastrado do produto —
+        // mesmo cálculo usado no Markup IA (Products.miaCalcular), pra não duplicar
+        // a fórmula nem divergir do resto do sistema.
+        _formatarItemEstoque(i) {
+            let linha = `${esc(i.nome)} — <b>${i.qtd}</b> un. (mín. ${i.minimo})`;
+            linha += i.preco ? ` · Preço: ${brl(i.preco)}` : ' · Preço: não cadastrado';
+            if (i.custo > 0) {
+                try {
+                    const calc = Products.miaCalcular(i.custo, 'generico', i.categoria || 'generico');
+                    linha += ` · Sugerido: <b>${brl(calc.precoVenda)}</b> (margem ${calc.margem.toFixed(0)}%)`;
+                } catch (e) { /* mantém a linha sem sugestão se o cálculo falhar */ }
+            }
+            return linha;
         },
 
         _precificar(t) {
