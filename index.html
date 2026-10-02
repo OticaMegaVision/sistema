@@ -9134,18 +9134,18 @@ body.dark-mode,
                     <h3>💰 Configuração de Despesas (independente do módulo Despesas do sistema)</h3>
                     <h4>Despesas Fixas Mensais</h4>
                     <div class="mia-form-grid">
-                        <div class="mia-form-group"><label>🏠 Aluguel</label><input type="number" id="mia-aluguel" step="0.01"></div>
-                        <div class="mia-form-group"><label>👤 Funcionário</label><input type="number" id="mia-funcionario" step="0.01"></div>
-                        <div class="mia-form-group"><label>💡 Luz</label><input type="number" id="mia-luz" step="0.01"></div>
-                        <div class="mia-form-group"><label>💧 Água</label><input type="number" id="mia-agua" step="0.01"></div>
-                        <div class="mia-form-group"><label>🚚 Transporte/Logística</label><input type="number" id="mia-transporte" step="0.01"></div>
-                        <div class="mia-form-group"><label>📊 Vendas Estimadas/Mês</label><input type="number" id="mia-vendasmensais" step="1"></div>
+                        <div class="mia-form-group"><label>🏠 Aluguel (R$)</label><input type="text" inputmode="numeric" id="mia-aluguel" placeholder="0,00" oninput="Utils.maskMoney(this)"></div>
+                        <div class="mia-form-group"><label>👤 Funcionário (R$)</label><input type="text" inputmode="numeric" id="mia-funcionario" placeholder="0,00" oninput="Utils.maskMoney(this)"></div>
+                        <div class="mia-form-group"><label>💡 Luz (R$)</label><input type="text" inputmode="numeric" id="mia-luz" placeholder="0,00" oninput="Utils.maskMoney(this)"></div>
+                        <div class="mia-form-group"><label>💧 Água (R$)</label><input type="text" inputmode="numeric" id="mia-agua" placeholder="0,00" oninput="Utils.maskMoney(this)"></div>
+                        <div class="mia-form-group"><label>🚚 Transporte/Logística (R$)</label><input type="text" inputmode="numeric" id="mia-transporte" placeholder="0,00" oninput="Utils.maskMoney(this)"></div>
+                        <div class="mia-form-group"><label>📊 Vendas Estimadas/Mês</label><input type="number" id="mia-vendasmensais" step="1" min="0"></div>
                     </div>
                     <h4>Despesas Variáveis por Unidade</h4>
                     <div class="mia-form-grid">
-                        <div class="mia-form-group"><label>🛍️ Sacola</label><input type="number" id="mia-sacola" step="0.01"></div>
-                        <div class="mia-form-group"><label>👓 Estojo</label><input type="number" id="mia-estojo" step="0.01"></div>
-                        <div class="mia-form-group"><label>🔧 Montagem</label><input type="number" id="mia-montagem" step="0.01"></div>
+                        <div class="mia-form-group"><label>🛍️ Sacola (R$)</label><input type="text" inputmode="numeric" id="mia-sacola" placeholder="0,00" oninput="Utils.maskMoney(this)"></div>
+                        <div class="mia-form-group"><label>👓 Estojo (R$)</label><input type="text" inputmode="numeric" id="mia-estojo" placeholder="0,00" oninput="Utils.maskMoney(this)"></div>
+                        <div class="mia-form-group"><label>🔧 Montagem (R$)</label><input type="text" inputmode="numeric" id="mia-montagem" placeholder="0,00" oninput="Utils.maskMoney(this)"></div>
                     </div>
                     <div class="btn-group" style="margin-top:14px;">
                         <button class="btn btn-primary" onclick="Products.miaSalvarDespesas()">💾 Salvar Despesas</button>
@@ -24023,15 +24023,16 @@ tbody tr td{border:1.5px solid #000;padding:2mm;text-align:center;font-weight:70
 
             miaInit() {
                 const c = this.miaCfg();
-                document.getElementById('mia-aluguel').value = c.despesasFixas.aluguel;
-                document.getElementById('mia-funcionario').value = c.despesasFixas.funcionario;
-                document.getElementById('mia-luz').value = c.despesasFixas.luz;
-                document.getElementById('mia-agua').value = c.despesasFixas.agua;
-                document.getElementById('mia-transporte').value = c.despesasFixas.transporte;
+                const setMoney = (id, v) => { const el = document.getElementById(id); if (el) el.value = fmtMask(v); };
+                setMoney('mia-aluguel', c.despesasFixas.aluguel);
+                setMoney('mia-funcionario', c.despesasFixas.funcionario);
+                setMoney('mia-luz', c.despesasFixas.luz);
+                setMoney('mia-agua', c.despesasFixas.agua);
+                setMoney('mia-transporte', c.despesasFixas.transporte);
                 document.getElementById('mia-vendasmensais').value = c.vendasMensais;
-                document.getElementById('mia-sacola').value = c.despesasVariaveis.sacola;
-                document.getElementById('mia-estojo').value = c.despesasVariaveis.estojo;
-                document.getElementById('mia-montagem').value = c.despesasVariaveis.montagem;
+                setMoney('mia-sacola', c.despesasVariaveis.sacola);
+                setMoney('mia-estojo', c.despesasVariaveis.estojo);
+                setMoney('mia-montagem', c.despesasVariaveis.montagem);
                 this.miaRenderMarkupConfig();
                 this.miaRenderHistorico();
                 this.miaUpdateStats();
@@ -24388,11 +24389,26 @@ tbody tr td{border:1.5px solid #000;padding:2mm;text-align:center;font-weight:70
 
             miaParseGenerico(texto) {
                 const produtos = [];
+                // ✅ FIX PARSER-GENÉRICO (achado testando com PDF real de tabela "C.O."):
+                // 1) a descrição do produto quase sempre COMEÇA com o índice numérico
+                //    da lente (ex.: "1.50 CR Transitions GenS Cinza"), não com letra —
+                //    o padrão antigo exigia começar com [A-Z] e por isso nunca batia,
+                //    extraindo ZERO produtos desse tipo de tabela.
+                // 2) o "R$" deixou de ser opcional: como símbolo opcional, o padrão
+                //    antigo também batia com lixo sem preço nenhum.
+                // 3) usamos 'g' e iteramos a linha inteira: quando o PDF tem duas
+                //    tabelas lado a lado (mesma altura/linha), a extração de texto
+                //    por posição Y junta os dois produtos numa linha só — pegar só o
+                //    1º match (como antes) descartava silenciosamente o 2º produto.
+                const pat = /(\d{3,6})\s+([A-Za-zÀ-ÿ0-9][A-Za-zÀ-ÿ0-9\s\.,\-\(\)\/]*?)\s+R\$\s*([\d.,]+)\b/g;
                 texto.split('\n').forEach(linha => {
-                    const match = linha.match(/(\d{3,6})\s+([A-Z][A-Z0-9\s\.\-\(\)\/]+?)\s+R?\$?\s*([\d.,]+)/);
-                    if (match) {
-                        const codigo = match[1], nome = match[2].trim().substring(0, 100), custo = this.miaParseNumero(match[3]);
-                        if (custo > 0 && custo < 50000 && !produtos.find(p => p.codigo === codigo)) {
+                    pat.lastIndex = 0;
+                    let match;
+                    while ((match = pat.exec(linha)) !== null) {
+                        const codigo = match[1];
+                        const nome = this._miaLimparNome(match[2]).substring(0, 100);
+                        const custo = this.miaParseNumero(match[3]);
+                        if (nome && custo > 0 && custo < 50000 && !produtos.find(p => p.codigo === codigo)) {
                             produtos.push({ codigo, nome, categoria: 'Lentes', custo, laboratorio: 'generico' });
                         }
                     }
@@ -24567,18 +24583,19 @@ tbody tr td{border:1.5px solid #000;padding:2mm;text-align:center;font-weight:70
 
             miaSalvarDespesas() {
                 const c = this.miaCfg();
+                const money = id => Utils.parseMoney(document.getElementById(id).value);
                 c.despesasFixas = {
                     ...c.despesasFixas, // preserva internet/outrasFixas do Vision IA
-                    aluguel: parseFloat(document.getElementById('mia-aluguel').value) || 0,
-                    funcionario: parseFloat(document.getElementById('mia-funcionario').value) || 0,
-                    luz: parseFloat(document.getElementById('mia-luz').value) || 0,
-                    agua: parseFloat(document.getElementById('mia-agua').value) || 0,
-                    transporte: parseFloat(document.getElementById('mia-transporte').value) || 0
+                    aluguel: money('mia-aluguel'),
+                    funcionario: money('mia-funcionario'),
+                    luz: money('mia-luz'),
+                    agua: money('mia-agua'),
+                    transporte: money('mia-transporte')
                 };
                 c.despesasVariaveis = {
-                    sacola: parseFloat(document.getElementById('mia-sacola').value) || 0,
-                    estojo: parseFloat(document.getElementById('mia-estojo').value) || 0,
-                    montagem: parseFloat(document.getElementById('mia-montagem').value) || 0
+                    sacola: money('mia-sacola'),
+                    estojo: money('mia-estojo'),
+                    montagem: money('mia-montagem')
                 };
                 c.vendasMensais = parseFloat(document.getElementById('mia-vendasmensais').value) || 100;
                 App.saveData();
@@ -34694,10 +34711,21 @@ window.ImportadorReceituario = ImportadorReceituario;
         _nome(id) { const c = this._all('clients').find(x => x.id === id); return c ? c.name : ''; },
         _cpf(v) { const d = String(v || '').replace(/\D/g, ''); return d.length === 11 ? '***.***.***-' + d.slice(9) : ''; },
         _pend(s) { return !/entreg|cancel/.test(norm(s.status)); },
+        // Casa por PALAVRAS (não por frase inteira): cada token da busca precisa aparecer
+        // em algum lugar do texto-alvo, em qualquer ordem. Muito mais tolerante a frases
+        // soltas como "cliente da Maria" ou "tem lente transitions aí" do que um
+        // includes() de string única, que falha com qualquer palavra fora de ordem.
+        _tokens(q) { return norm(q).split(/\s+/).filter(w => w.length >= 2); },
+        _matchTokens(texto, tokens) {
+            if (!tokens.length) return false;
+            const alvo = norm(texto);
+            return tokens.every(tk => alvo.includes(tk));
+        },
         _achar(q) {
             const n = norm(q), d = n.replace(/\D/g, '');
             if (!n) return [];
-            return this._all('clients').filter(c => norm(c.name).includes(n) || (d.length >= 4 && String(c.phone || c.whatsapp || c.cpf || '').replace(/\D/g, '').includes(d)));
+            const toks = this._tokens(q);
+            return this._all('clients').filter(c => this._matchTokens(c.name, toks) || (d.length >= 4 && String(c.phone || c.whatsapp || c.cpf || '').replace(/\D/g, '').includes(d)));
         },
         tools: {
             buscar_clientes(a) {
@@ -34712,7 +34740,8 @@ window.ImportadorReceituario = ImportadorReceituario;
             },
             consultar_estoque(a) {
                 const n = norm(a.q), baixo = String(a.somente_baixo) === 'true';
-                const r = VisionDB._all('products').filter(p => (!n || norm(p.name + ' ' + (p.category || '') + ' ' + (p.code || '')).includes(n)) && (!baixo || (p.minQty > 0 && (p.qty || 0) <= p.minQty)));
+                const toks = VisionDB._tokens(a.q);
+                const r = VisionDB._all('products').filter(p => (!n || VisionDB._matchTokens(p.name + ' ' + (p.category || '') + ' ' + (p.code || ''), toks)) && (!baixo || (p.minQty > 0 && (p.qty || 0) <= p.minQty)));
                 return { total: r.length, itens: r.slice(0, Number(a.limite) || 15).map(p => ({ nome: p.name, categoria: p.category || '', qtd: p.qty || 0, minimo: p.minQty || 0, preco: p.price || 0, custo: p.costPrice || 0 })) };
             },
             listar_vendas(a) {
@@ -34814,16 +34843,38 @@ window.ImportadorReceituario = ImportadorReceituario;
         },
 
         // Busca lentes reais cadastradas cujo nome cita o índice
+        _ehLente(p) {
+            const nome = norm(p.name);
+            return /lente/.test(norm(p.category)) || /lente|1\.\d\d/.test(nome);
+        },
         produtosReais(indice, tipo) {
             const alvo = [indice, indice.replace('.', '')];
-            return (VisionDB.D.products || []).filter(p => {
+            const tp = tipo.toLowerCase();
+            const porTipo = nome => {
+                if (/multifocal|progress/.test(tp)) return /multi|progress|digital|free/.test(nome);
+                if (/bifocal/.test(tp)) return /bifocal/.test(nome);
+                return !/multi|progress|bifocal/.test(nome); // "Visão simples": exclui multifocal/bifocal
+            };
+            let r = (VisionDB.D.products || []).filter(p => {
+                if (!this._ehLente(p)) return false;
                 const nome = norm(p.name);
-                const ehLente = /lente/.test(norm(p.category)) || /lente|1\.\d\d/.test(nome);
-                if (!ehLente || !alvo.some(a => nome.includes(a))) return false;
-                if (/multifocal|progress/.test(tipo.toLowerCase())) return /multi|progress|digital|free/.test(nome);
-                if (/bifocal/.test(tipo.toLowerCase())) return /bifocal/.test(nome);
-                return !/multi|progress|bifocal/.test(nome) || true;
-            }).slice(0, 3);
+                return alvo.some(a => nome.includes(a)) && porTipo(nome);
+            });
+            // Fallback: nenhuma lente cadastrada com esse índice exato — mostra lentes do mesmo tipo
+            // (mais próximas em estoque) em vez de não sugerir nenhum produto real.
+            let aproximado = false;
+            if (!r.length) {
+                r = (VisionDB.D.products || []).filter(p => this._ehLente(p) && porTipo(norm(p.name)));
+                aproximado = r.length > 0;
+            }
+            // Último fallback: qualquer lente cadastrada, mesmo sem bater o tipo.
+            if (!r.length) {
+                r = (VisionDB.D.products || []).filter(p => this._ehLente(p));
+                aproximado = r.length > 0;
+            }
+            r = r.slice(0, 3);
+            r.aproximado = aproximado;
+            return r;
         },
 
         recomendar(receita, contexto) {
@@ -34836,13 +34887,22 @@ window.ImportadorReceituario = ImportadorReceituario;
                 const trat = this.tratamentos(idx, ctx);
                 const reais = this.produtosReais(idx, tipo);
                 const precos = reais.map(p => Number(p.price) || 0).filter(Boolean);
+                const custos = reais.map(p => Number(p.costPrice) || 0).filter(Boolean);
                 let motivo = `Maior grau: ${base.sph.toFixed(2)} esf / ${base.cyl.toFixed(2)} cil (equivalente ${base.eq.toFixed(2)}). `;
                 motivo += i === 0 ? 'Opção mais acessível que ainda atende o grau.' : 'Lente mais fina e estética, melhor para o grau.';
                 if (base.eq > 3.5) motivo += ' Índice mínimo 1.61 pela espessura.';
+                // Preço sugerido automático: usa o custo real do(s) produto(s) cadastrado(s)
+                // (ou, na falta dele, o preço de venda cadastrado como estimativa de custo) e
+                // aplica o benchmark de markup da loja/SP, para já sugerir um preço de venda.
+                let precoSugerido = null;
+                const custoBase = custos.length ? (custos.reduce((a, c) => a + c, 0) / custos.length) : 0;
+                if (custoBase > 0 && typeof VisionPricing !== 'undefined') {
+                    try { precoSugerido = VisionPricing.sugerirPreco(custoBase, `${tipo} ${idx}`, 'generico'); } catch (e) { precoSugerido = null; }
+                }
                 return {
                     titulo: `${nomes[i]} — ${tipo} ${idx}`, indice: idx, tipo, material, tratamentos: trat, motivo,
                     faixaPreco: precos.length ? `${brl(Math.min(...precos))} – ${brl(Math.max(...precos))}` : 'sem lente cadastrada com esse índice',
-                    produtosReais: reais
+                    produtosReais: reais, produtosAproximados: !!reais.aproximado, precoSugerido
                 };
             });
             return res;
@@ -34855,10 +34915,20 @@ window.ImportadorReceituario = ImportadorReceituario;
                 h += `<b>${esc(r.titulo)}</b><br>• Material: ${esc(r.material)}<br>`;
                 h += `• Tratamentos: ${r.tratamentos.length ? esc(r.tratamentos.join(', ')) : 'nenhum obrigatório'}<br>`;
                 h += `• ${esc(r.motivo)}<br>• Preço cadastrado: ${esc(r.faixaPreco)}<br>`;
-                if (r.produtosReais.length) h += `• Produtos: ${r.produtosReais.map(p => esc(p.name)).join('; ')}<br>`;
+                if (r.produtosReais.length) {
+                    h += `• Produtos${r.produtosAproximados ? ' (mais próximos em estoque, sem o índice exato)' : ''}: ${r.produtosReais.map(p => esc(p.name)).join('; ')}<br>`;
+                } else {
+                    h += '• Produtos: nenhuma lente cadastrada no estoque ainda.<br>';
+                }
+                if (r.precoSugerido) {
+                    const p = r.precoSugerido;
+                    h += `• Preço sugerido: <b>${brl(p.precoIdeal)}</b> (entre ${brl(p.precoMin)} e ${brl(p.precoMax)}, margem ~${p.margemResultante.toFixed(0)}%)<br>`;
+                } else {
+                    h += '• Preço sugerido: cadastre o custo do produto ou diga <i>preço lente ' + esc(r.indice) + ' custo 80</i> para eu calcular.<br>';
+                }
                 h += '<br>';
             });
-            return h + 'Quer o preço ideal? Diga: <i>preço lente 1.61 custo 80</i>.';
+            return h + 'Quer recalcular o preço com outro custo? Diga: <i>preço lente 1.61 custo 80</i>.';
         }
     };
 
@@ -35151,15 +35221,16 @@ window.ImportadorReceituario = ImportadorReceituario;
             if (/receituario (de|do|da)|receita (de|do|da)/.test(n)) return this._verReceituario(t);
             if (/preco|custo|margem|markup|quanto cobrar/.test(n)) return this._precificar(t);
             if (/resumo|faturamento|vendas|vendi/.test(n)) return this._resumoVendas();
-            if (/estoque|armac|produto|reposi|acabando/.test(n)) {
+            if (/estoque|armac|produto|lente|oculos|óculos|reposi|acabando/.test(n)) {
                 const baixo = /baix|reposi|acabando|minimo/.test(n);
-                const q = n.replace(/.*\b(estoque|produtos?|armacao|armacoes)\b( de| do| da)?/, '').replace(/\b(baixo|reposicao|acabando|minimo)\b/g, '').trim();
+                const q = n.replace(/\b(estoque|produtos?|armacoes?|lentes?|oculos|tem|ai|tenho|vende|vendemos|consultar|consulta|ver|mostrar|mostra|de|do|da|no|na|em|algum|alguma)\b/g, ' ')
+                    .replace(/\b(baixo|reposicao|acabando|minimo)\b/g, ' ').replace(/\s+/g, ' ').trim();
                 return this._lista('📦 Estoque', VisionDB.tools.consultar_estoque({ q, somente_baixo: String(baixo) }), i => `${esc(i.nome)} — <b>${i.qtd}</b> un. (mín. ${i.minimo}) · ${brl(i.preco)}`);
             }
             if (/despesa|gasto|a pagar|pagar/.test(n)) { const r = VisionDB.tools.listar_despesas({}); return this._lista('💸 Despesas do mês', r, d => `${esc(d.data)} · ${esc(d.descricao)} — ${brl(d.valor)} (${esc(d.status || '—')})`, `Total: <b>${brl(r.total_valor)}</b>`); }
             if (/entrega|pendente|atrasad|prazo/.test(n)) return this._lista('📦 Vendas pendentes', VisionDB.tools.listar_vendas({ pendentes: 'true', limite: '10' }), s => `OS ${esc(s.numero)} · ${esc(s.cliente || '—')} — ${brl(s.total)}${s.previsao_entrega ? ' · entrega ' + esc(s.previsao_entrega) : ''}`);
             if (/fornecedor/.test(n)) return this._lista('🏭 Fornecedores', VisionDB.tools.listar_fornecedores({ q: n.replace(/.*fornecedores?( de| do| da)?/, '') }), f => `${esc(f.nome)}${f.telefone ? ' — ' + esc(f.telefone) : ''}`);
-            if (/cliente|telefone|whatsapp|cpf|buscar/.test(n)) return this._buscarCliente(t);
+            if (/cliente|telefone|whatsapp|zap|cpf|buscar|busca|procura|localizar|achar|encontrar|contato/.test(n)) return this._buscarCliente(t);
             if (/receit|grau|dioptria|longe|perto|multifocal|bifocal|simples/.test(n))
                 return 'Para analisar, envie o grau assim: <i>analisar receita -2.00 -0.50 180 / -1.75 -0.25 175</i> (OD / OE; use o 4º número como adição).';
             return 'Posso: <b>analisar receita</b>, sugerir <b>preço</b>, <b>buscar cliente</b>, <b>receituário de</b> um cliente, <b>resumo de vendas</b>, <b>estoque</b>, <b>despesas</b>, <b>entregas pendentes</b> ou <b>fornecedores</b>.';
@@ -35179,11 +35250,19 @@ window.ImportadorReceituario = ImportadorReceituario;
         },
 
         _achaClientes(t) {
-            // normaliza antes de remover as palavras-comando (evita problema com acentos)
-            const q = norm(t).replace(/\b(buscar|cliente|ver|receituario|receita|telefone|whatsapp|cpf|de|do|da)\b/g, ' ').replace(/\s+/g, ' ').trim();
+            // normaliza antes de remover as palavras de comando/encaixe (evita problema com acentos).
+            // Lista ampla porque o funcionário digita em linguagem natural ("qual o telefone da dona Maria",
+            // "me acha o cliente Silva", "procurar contato do João") — se sobrar palavra de encaixe na busca,
+            // o nome do cliente deixa de bater.
+            const q = norm(t).replace(/\b(buscar|busca|procurar|procura|localizar|achar|encontrar|ver|mostrar|mostra|cliente|clientes|contato|receituario|receita|telefone|whatsapp|whats|zap|numero|cpf|dados|do|da|de|dos|das|o|a|os|as|um|uma|me|meu|minha|qual|quais|quem|e|eh|tem|sobre|desse|dessa|deste|desta)\b/g, ' ').replace(/\s+/g, ' ').trim();
             if (!q) return [];
             const dig = q.replace(/\D/g, '');
-            return (VisionDB.D.clients || []).filter(c => norm(c.name).includes(q) || (dig.length >= 4 && String(c.phone || c.whatsapp || c.cpf || '').replace(/\D/g, '').includes(dig))).slice(0, 5);
+            const toks = q.split(' ').filter(w => w.length >= 2);
+            let r = (VisionDB.D.clients || []).filter(c => VisionDB._matchTokens(c.name, toks) || (dig.length >= 4 && String(c.phone || c.whatsapp || c.cpf || '').replace(/\D/g, '').includes(dig)));
+            // Se nada bateu com todas as palavras, tenta só a primeira (nome digitado fora de ordem
+            // ou com algum apelido/sobrenome que não está cadastrado).
+            if (!r.length && toks.length > 1) r = (VisionDB.D.clients || []).filter(c => norm(c.name).includes(toks[0]));
+            return r.slice(0, 5);
         },
         _buscarCliente(t) {
             const achados = this._achaClientes(t);
@@ -35262,18 +35341,23 @@ window.ImportadorReceituario = ImportadorReceituario;
 
         // ══════════ Visual ══════════
         _avatar(size) {
+            const u = size;
             return `<svg viewBox="0 0 64 64" width="${size}" height="${size}" aria-hidden="true" class="vz-robot">
-              <defs><linearGradient id="vzg${size}" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#ff6b00"/><stop offset="1" stop-color="#ffb300"/></linearGradient></defs>
-              <line x1="32" y1="4" x2="32" y2="12" stroke="#c75300" stroke-width="2.5" stroke-linecap="round"/>
+              <defs><linearGradient id="vzg${u}" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#ff9a3c"/><stop offset="1" stop-color="#ff5a00"/></linearGradient>
+              <linearGradient id="vzv${u}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#16293b"/><stop offset="1" stop-color="#0a1420"/></linearGradient></defs>
+              <line x1="32" y1="4" x2="32" y2="11" stroke="#9aa7b4" stroke-width="2.4" stroke-linecap="round"/>
               <circle class="vz-led" cx="32" cy="4" r="3" fill="#00e5ff"/>
-              <rect x="10" y="12" width="44" height="40" rx="18" fill="url(#vzg${size})" stroke="#c75300" stroke-width="1.5"/>
-              <rect x="14" y="16" width="36" height="10" rx="5" fill="#fff" opacity=".18"/>
-              <circle cx="22" cy="34" r="6" fill="#1b2a38"/><circle cx="42" cy="34" r="6" fill="#1b2a38"/>
-              <circle class="vz-eye" cx="22" cy="34" r="3" fill="#00e5ff"/><circle class="vz-eye" cx="42" cy="34" r="3" fill="#00e5ff"/>
-              <path d="M13 34h-3M54 34h-3" stroke="#fff" stroke-width="2.5" stroke-linecap="round"/>
-              <path d="M14 29.5h16l-1.5 11a5 5 0 0 1-5 4.5h-3a5 5 0 0 1-5-4.5z M34 29.5h16l-1.5 11a5 5 0 0 1-5 4.5h-3a5 5 0 0 1-5-4.5z" fill="none" stroke="#fff" stroke-width="2.2" stroke-linejoin="round"/>
-              <path d="M30 33q2-2 4 0" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round"/>
-              <path d="M26 47q6 4 12 0" fill="none" stroke="#7a2e00" stroke-width="2" stroke-linecap="round"/>
+              <rect x="3" y="27" width="7" height="14" rx="3.5" fill="#37495c"/><rect x="54" y="27" width="7" height="14" rx="3.5" fill="#37495c"/>
+              <rect x="4.6" y="31" width="3.8" height="6" rx="1.9" fill="#00e5ff" opacity=".9"/><rect x="55.6" y="31" width="3.8" height="6" rx="1.9" fill="#00e5ff" opacity=".9"/>
+              <path d="M19 11h26l9 9v24l-9 9H19l-9-9V20z" fill="url(#vzg${u})" stroke="#b83f00" stroke-width="1.4"/>
+              <path d="M21 14h22l5 5H16z" fill="#fff" opacity=".22"/>
+              <rect x="15" y="23" width="34" height="19" rx="9.5" fill="url(#vzv${u})" stroke="#1f3347" stroke-width="1.2"/>
+              <circle class="vz-eye" cx="24.5" cy="32.5" r="3" fill="#00e5ff"/><circle class="vz-eye" cx="39.5" cy="32.5" r="3" fill="#00e5ff"/>
+              <circle cx="24.5" cy="32.5" r="6.6" fill="#00e5ff" fill-opacity=".12" stroke="#fff" stroke-width="2"/><circle cx="39.5" cy="32.5" r="6.6" fill="#00e5ff" fill-opacity=".12" stroke="#fff" stroke-width="2"/>
+              <path d="M31.1 31.5q.9-1.4 1.8 0M17.9 31H15M46.1 31H49" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round"/>
+              <path d="M20.8 29.4a5 5 0 0 1 2.8-1.9" fill="none" stroke="#fff" stroke-width="1.4" stroke-linecap="round" opacity=".75"/>
+              <path d="M26 48h12" stroke="#7a2e00" stroke-width="2" stroke-linecap="round" stroke-dasharray="2.5 2.5"/>
+              <rect x="27" y="53" width="10" height="5" rx="2" fill="#37495c"/>
             </svg>`;
         },
         _html() {
