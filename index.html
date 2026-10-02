@@ -4,6 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.5, user-scalable=yes">
     <title>ÓticaMegaVision Pro - Sistema Profissional</title>
+    <!-- Módulo Markup IA: extração de texto de PDFs de tabela de laboratório -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
     <!-- ===== PWA META TAGS ===== -->
     <meta name="application-name" content="ÓticaMegaVision Pro">
     <meta name="description" content="Sistema Profissional de Gestão para Óticas">
@@ -8914,6 +8916,7 @@ body.dark-mode,
                 <div class="section-subtabs">
                     <div class="section-subtab active" data-subtab="products-cadastro" onclick="Products.setSubTab('products-cadastro')"><i class="fas fa-box-open"></i><span>Cadastro</span></div>
                     <div class="section-subtab" data-subtab="products-historico" onclick="Products.setSubTab('products-historico')"><i class="fas fa-clock-rotate-left"></i><span>Histórico</span><span class="section-subtab-badge" id="productsSubtabBadge">0</span></div>
+                    <div class="section-subtab" data-subtab="products-markupia" onclick="Products.setSubTab('products-markupia')"><i class="fas fa-robot"></i><span>Markup IA</span></div>
                 </div>
 
                 <div class="section-subpanel active" data-subpanel="products-cadastro">
@@ -9071,6 +9074,109 @@ body.dark-mode,
                     </table>
                 </div>
                 </div><!-- /section-subpanel products-historico -->
+
+                <div class="section-subpanel" data-subpanel="products-markupia">
+                <style>
+                    .mia-card{background:#fff;border-radius:12px;padding:20px;margin-bottom:16px;box-shadow:0 2px 4px rgba(0,0,0,.05);}
+                    .mia-card h3{font-size:1.05rem;margin-bottom:14px;color:#111827;border-bottom:2px solid #f3f4f6;padding-bottom:8px;}
+                    .mia-card h4{font-size:0.9rem;margin:12px 0 8px;color:#1f2937;}
+                    .mia-drop{border:3px dashed #d1d5db;border-radius:12px;padding:32px 16px;text-align:center;cursor:pointer;transition:all .2s;background:#f9fafb;}
+                    .mia-drop:hover,.mia-drop.dragover{border-color:#2563eb;background:#eff6ff;}
+                    .mia-badges{display:flex;gap:6px;flex-wrap:wrap;margin-top:12px;justify-content:center;}
+                    .mia-badge{display:inline-flex;align-items:center;gap:4px;padding:4px 10px;border-radius:16px;font-size:0.75rem;font-weight:600;}
+                    .mia-b-tech{background:#dbeafe;color:#1e40af;} .mia-b-bras{background:#fee2e2;color:#991b1b;}
+                    .mia-b-sygma{background:#d1fae5;color:#065f46;} .mia-b-visco{background:#ede9fe;color:#5b21b6;}
+                    .mia-form-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;}
+                    .mia-form-group label{font-size:0.78rem;font-weight:600;color:#374151;display:block;margin-bottom:4px;}
+                    .mia-form-group input{width:100%;padding:8px;border:2px solid #e5e7eb;border-radius:8px;font-size:0.88rem;box-sizing:border-box;}
+                    .mia-info{background:#eff6ff;border-left:4px solid #2563eb;padding:10px 14px;border-radius:6px;margin-bottom:14px;font-size:0.85rem;}
+                    .mia-success{background:#d1fae5;border-left:4px solid #10b981;padding:10px 14px;border-radius:6px;margin:12px 0;font-size:0.85rem;}
+                    .mia-warning{background:#fef3c7;border-left:4px solid #f59e0b;padding:10px 14px;border-radius:6px;margin:12px 0;font-size:0.85rem;}
+                    .mia-table-wrap{overflow-x:auto;margin-top:12px;}
+                    .mia-table{width:100%;border-collapse:collapse;font-size:0.82rem;}
+                    .mia-table th{background:#f3f4f6;padding:8px;text-align:left;font-weight:600;color:#374151;font-size:0.7rem;text-transform:uppercase;}
+                    .mia-table td{padding:8px;border-top:1px solid #e5e7eb;}
+                    .mia-table tr.mia-novo{background:#d1fae5;} .mia-table tr.mia-atualizado{background:#fef3c7;}
+                    .mia-result-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:10px;margin-bottom:16px;}
+                    .mia-result-card{padding:14px;border-radius:10px;text-align:center;}
+                    .mia-result-card .num{font-size:1.5rem;font-weight:700;} .mia-result-card .label{font-size:0.75rem;margin-top:2px;}
+                    .mia-res-novos{background:#d1fae5;color:#065f46;} .mia-res-atualizados{background:#fef3c7;color:#92400e;}
+                    .mia-res-iguais{background:#e5e7eb;color:#374151;}
+                    .mia-progress{width:100%;height:8px;background:#e5e7eb;border-radius:4px;overflow:hidden;margin:8px 0;}
+                    .mia-progress-fill{height:100%;background:linear-gradient(135deg,#667eea,#764ba2);transition:width .3s;}
+                    .mia-markup-row{display:grid;grid-template-columns:1fr 90px;gap:8px;align-items:center;margin-bottom:5px;padding:6px 8px;background:#f9fafb;border-radius:6px;}
+                    .mia-markup-row input{width:100%;padding:5px;border:2px solid #e5e7eb;border-radius:6px;font-size:0.82rem;box-sizing:border-box;}
+                    .mia-hist-item{padding:10px 12px;background:#f9fafb;border-radius:8px;margin-bottom:6px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;font-size:0.85rem;}
+                </style>
+
+                <div class="mia-info" style="margin-bottom:16px;">
+                    🤖 <strong>Markup IA</strong> — envie o PDF de tabela de um laboratório, o sistema identifica o laboratório, extrai os produtos e calcula o preço de venda automaticamente pelo markup configurado abaixo. Produtos com o mesmo <strong>código</strong> já cadastrado são atualizados; os demais são cadastrados como novos. Nada é aplicado sem sua confirmação na prévia.
+                </div>
+
+                <div class="mia-card">
+                    <h3>📤 Upload de PDF do Laboratório</h3>
+                    <div class="mia-drop" id="miaDropZone">
+                        <div style="font-size:2.6rem;margin-bottom:8px;">📄</div>
+                        <h4 style="margin:0 0 6px;">Arraste o PDF aqui ou clique para selecionar</h4>
+                        <p style="color:#4b5563;font-size:0.85rem;">Laboratórios suportados:</p>
+                        <div class="mia-badges">
+                            <span class="mia-badge mia-b-tech">🔵 Tech Vantagens</span>
+                            <span class="mia-badge mia-b-bras">🔴 Braspreços</span>
+                            <span class="mia-badge mia-b-sygma">🟢 Sygma</span>
+                            <span class="mia-badge mia-b-visco">🟣 Visco</span>
+                        </div>
+                        <input type="file" id="miaFileInput" accept=".pdf" style="display:none;">
+                    </div>
+                    <div id="miaUploadStatus"></div>
+                </div>
+
+                <div class="mia-card">
+                    <h3>💰 Configuração de Despesas (independente do módulo Despesas do sistema)</h3>
+                    <h4>Despesas Fixas Mensais</h4>
+                    <div class="mia-form-grid">
+                        <div class="mia-form-group"><label>🏠 Aluguel</label><input type="number" id="mia-aluguel" step="0.01"></div>
+                        <div class="mia-form-group"><label>👤 Funcionário</label><input type="number" id="mia-funcionario" step="0.01"></div>
+                        <div class="mia-form-group"><label>💡 Luz</label><input type="number" id="mia-luz" step="0.01"></div>
+                        <div class="mia-form-group"><label>💧 Água</label><input type="number" id="mia-agua" step="0.01"></div>
+                        <div class="mia-form-group"><label>🚚 Transporte/Logística</label><input type="number" id="mia-transporte" step="0.01"></div>
+                        <div class="mia-form-group"><label>📊 Vendas Estimadas/Mês</label><input type="number" id="mia-vendasmensais" step="1"></div>
+                    </div>
+                    <h4>Despesas Variáveis por Unidade</h4>
+                    <div class="mia-form-grid">
+                        <div class="mia-form-group"><label>🛍️ Sacola</label><input type="number" id="mia-sacola" step="0.01"></div>
+                        <div class="mia-form-group"><label>👓 Estojo</label><input type="number" id="mia-estojo" step="0.01"></div>
+                        <div class="mia-form-group"><label>🔧 Montagem</label><input type="number" id="mia-montagem" step="0.01"></div>
+                    </div>
+                    <div class="btn-group" style="margin-top:14px;">
+                        <button class="btn btn-primary" onclick="Products.miaSalvarDespesas()">💾 Salvar Despesas</button>
+                    </div>
+                    <div class="mia-info" style="margin-top:12px;margin-bottom:0;" id="miaStatsBox"></div>
+                </div>
+
+                <div class="mia-card">
+                    <h3>📊 Markup por Categoria e Laboratório</h3>
+                    <div class="mia-info">Fórmula: Preço Venda = (Custo Produto + Despesas Variáveis + Rateio Fixo) × Markup</div>
+                    <div id="miaMarkupConfigContainer"></div>
+                    <div class="btn-group" style="margin-top:10px;">
+                        <button class="btn btn-primary" onclick="Products.miaSalvarMarkupConfig()">💾 Salvar Markup</button>
+                    </div>
+                </div>
+
+                <div class="mia-card" id="miaCardPreview" style="display:none;">
+                    <h3>📋 Prévia da Importação</h3>
+                    <div id="miaPreviewContent"></div>
+                    <div class="btn-group" style="margin-top:10px;">
+                        <button class="btn btn-success" onclick="Products.miaAplicarAtualizacao()">✅ Confirmar e Aplicar</button>
+                        <button class="btn btn-danger" onclick="Products.miaCancelarPreview()">❌ Cancelar</button>
+                    </div>
+                </div>
+
+                <div class="mia-card">
+                    <h3>📜 Histórico de Importações</h3>
+                    <div id="miaHistorico"></div>
+                </div>
+
+                </div><!-- /section-subpanel products-markupia -->
             </section>
 
 
@@ -9745,7 +9851,7 @@ body.dark-mode,
                                 <div class="bkp-status-ic" style="background:#f3f0ff;color:#7c3aed;"><i class="fas fa-code-branch"></i></div>
                                 <div class="txt">
                                     <b>Versão do sistema</b>
-                                    <span>versão <strong>270920260654</strong></span>
+                                    <span>versão <strong>021020261020</strong></span>
                                 </div>
                             </div>
                         </div>
@@ -12297,6 +12403,8 @@ body.dark-mode,
                     state.lastOsCounter = {};
                     state.notificacoes  = {};
                     state.backupConfig  = {};
+                    state.markupIAConfig = {};
+                    state.markupIAHistorico = [];
                 }
                 try {
                     // FIX #5: removida query inútil 'ALL_PLACEHOLDER' que nunca retornava nada.
@@ -12366,6 +12474,7 @@ body.dark-mode,
                             if (emp.company)       Object.assign(state.company       || (state.company       = {}), emp.company);
                             if (emp.notificacoes)  Object.assign(state.notificacoes  || (state.notificacoes  = {}), emp.notificacoes);
                             if (emp.backupConfig)  Object.assign(state.backupConfig  || (state.backupConfig  = {}), emp.backupConfig);
+                            if (emp.markupIAConfig) Object.assign(state.markupIAConfig || (state.markupIAConfig = {}), emp.markupIAConfig);
                             if (emp.lastOsCounter) state.lastOsCounter = { ...(state.lastOsCounter || {}), ...emp.lastOsCounter };
                             // ✅ FIX BUG WHATSAPP: restaura também a partir do doc 'empresa'
                             if (emp.wppMensagens)  Object.assign(state.wppMensagens  || (state.wppMensagens  = {}), emp.wppMensagens);
@@ -12635,6 +12744,7 @@ body.dark-mode,
                         company:        state.company || {},
                         notificacoes:   state.notificacoes || {},
                         backupConfig:   state.backupConfig || {},
+                        markupIAConfig: state.markupIAConfig || {},
                         lastOsCounter:  state.lastOsCounter || {},
                         // ✅ FIX BUG WHATSAPP: garante persistência também no doc 'empresa'
                         wppMensagens:   state.wppMensagens || {},
@@ -13720,6 +13830,8 @@ body.dark-mode,
                     // configuração editável sincronize entre dispositivos.
                     notificacoes:       state.notificacoes       || {},
                     backupConfig:       state.backupConfig       || {},
+                    markupIAConfig:     state.markupIAConfig     || {},
+                    markupIAHistorico:  state.markupIAHistorico  || [],
                     contasFinanceiras:  contasFinanceiras,
                     tombstones:         tombstones,   // ← deleções propagadas para outros navegadores
                     // ✅ FIX SYNC USUÁRIOS: usuários de login + suas deleções
@@ -14126,6 +14238,12 @@ body.dark-mode,
                     }
                     if (remote.backupConfig && typeof remote.backupConfig === 'object') {
                         state.backupConfig = Object.assign(state.backupConfig || {}, remote.backupConfig);
+                    }
+                    if (remote.markupIAConfig && typeof remote.markupIAConfig === 'object') {
+                        state.markupIAConfig = Object.assign(state.markupIAConfig || {}, remote.markupIAConfig);
+                    }
+                    if (Array.isArray(remote.markupIAHistorico)) {
+                        state.markupIAHistorico = remote.markupIAHistorico;
                     }
                 } else {
                     console.log('[CloudSync] wppMensagens/notificacoes/backupConfig: edição local recente (' + storeId + ') é mais nova que o snapshot remoto — mantendo valores locais.');
@@ -18535,6 +18653,41 @@ body.dark-mode,
                 lastAutoBackup: null,
                 nextAutoBackup: null
             },
+            // Módulo Markup IA: importação de tabela de laboratório (PDF) com
+            // recálculo automático de preço de venda por markup. Números de
+            // despesas/markup digitados aqui são independentes do resto do sistema
+            // (não puxam do módulo Despesas real), a pedido do usuário.
+            markupIAConfig: {
+                despesasFixas: { aluguel: 1700, funcionario: 1700, luz: 120, agua: 80, transporte: 2000 },
+                despesasVariaveis: { sacola: 5, estojo: 4, montagem: 30 },
+                vendasMensais: 100,
+                markup: {
+                    'tech-vantagens': {
+                        'Lentes Prontas Kodak': 2.20, 'Lentes Prontas Essilor': 2.50, 'Lentes Prontas Pro Design': 2.30,
+                        'Surf Visão Simples': 2.50, 'Surf Progressivo': 3.00, 'Technopark': 2.40,
+                        'Technopark Fotocromático': 2.60, 'Progressivas Pro Design Elite': 3.00, 'Multifocais Kodak UHD': 3.20
+                    },
+                    'brasprecios': {
+                        'Lentes Acabadas': 2.20, 'Lentes C.O.': 2.20, 'Visão Simples Surf': 2.50,
+                        'Multifocais Digitais': 2.80, 'Multifocais C.O. Pro': 2.50, 'Multifocais C.O. Pro HD': 2.80, 'Multifocais C.O. Select': 2.50
+                    },
+                    'sygma': {
+                        'Visão Simples Tradicional': 2.20, 'Visão Simples Bluecut': 2.30, 'Visão Simples Policarbonato': 2.30,
+                        'Visão Simples Alto Índice': 2.50, 'Visão Simples Solar': 2.00, 'Multifocais Prontos': 2.30,
+                        'Multifocais Tradicionais Surf': 2.50, 'Bifocais Tradicionais': 2.20, 'Sygma Prime': 2.80,
+                        'Sygma Advanced': 3.00, 'Linha Tradicional': 2.20, 'Tratamentos': 2.50, 'Serviços': 1.80, 'Coloração': 2.00
+                    },
+                    'visco': {
+                        'Lentes Prontas VS 1.49': 2.00, 'Lentes Prontas VS 1.56': 2.20, 'Lentes Prontas VS 1.59': 2.30,
+                        'Lentes Prontas VS 1.61': 2.50, 'Lentes Prontas VS 1.67': 2.80, 'Lentes Prontas VS 1.74': 3.00,
+                        'Multifocais Prontos 1.56': 2.30, 'Blocos VS': 2.20, 'Progressivas Freeform 1.50': 2.50,
+                        'Progressivas Freeform 1.56': 2.70, 'Progressivas Freeform 1.59': 2.80, 'Progressivas Freeform 1.61': 3.00,
+                        'Progressivas Freeform 1.67': 3.20, 'Progressivas Freeform 1.74': 3.50, 'Progressivas Transitions': 3.20,
+                        'Ocupacionais': 2.80, 'Esportivas': 3.00, 'Visão Simples Freeform': 2.80, 'Serviços Visco': 1.80
+                    }
+                }
+            },
+            markupIAHistorico: [],
             wppMensagens: {
                 aniversario: "🎂 *Feliz Aniversário, {{NOME}}!* 🎉\n\nHoje, *{{DATA}}*, é um dia muito especial e nós da *{{EMPRESA}}* queremos celebrar junto com você! 🥳\n\nQue este novo ano seja repleto de muita saúde, alegria e visão nítida! 👁️✨\n\nTemos um desconto especial esperando por você — venha nos visitar! 🎁\n\n━━━━━━━━━━━━━━━━━━━━\n*{{EMPRESA}}*\n📍 {{ENDERECO}}\n📞 {{TELEFONE}}",
                 oculosVencido: "Olá *{{NOME}}*! 👋\n\nPassando para dar um recado importante! 😊\n\nVerificamos que faz aproximadamente *{{MESES}} meses* que você adquiriu seus óculos conosco (OS {{OS}} — {{DATA_VENDA}}).\n\n👓 Especialistas recomendam *revisão anual* da receita para garantir a saúde dos seus olhos e o conforto visual!\n\nQue tal agendar uma consulta de revisão? Temos condições especiais para clientes recorrentes! 🎁\n\n━━━━━━━━━━━━━━━━━━━━\n*{{EMPRESA}}*\n📍 {{ENDERECO}}\n📞 {{TELEFONE}}",
@@ -23803,6 +23956,662 @@ tbody tr td{border:1.5px solid #000;padding:2mm;text-align:center;font-weight:70
         const Products = {
             setSubTab(subtab) {
                 SectionSubTabs_set(document.getElementById('products'), subtab);
+                if (subtab === 'products-markupia') this.miaInit();
+            },
+
+            // ══════════════════════════════════════════════════════════════
+            // MÓDULO MARKUP IA — importar tabela de laboratório (PDF), casar
+            // por código com produtos já cadastrados, recalcular preço de
+            // venda pelo markup e atualizar/cadastrar automaticamente.
+            // ══════════════════════════════════════════════════════════════
+            _miaInited: false,
+            _miaProdutosProcessados: [],
+            _miaLabDetectado: '',
+
+            miaCfg() {
+                if (!state.markupIAConfig) state.markupIAConfig = {};
+                const c = state.markupIAConfig;
+                if (!c.despesasFixas) c.despesasFixas = { aluguel: 1700, funcionario: 1700, luz: 120, agua: 80, transporte: 2000 };
+                if (!c.despesasVariaveis) c.despesasVariaveis = { sacola: 5, estojo: 4, montagem: 30 };
+                if (!c.vendasMensais) c.vendasMensais = 100;
+                if (!c.markup) c.markup = {};
+                return c;
+            },
+
+            miaInit() {
+                const c = this.miaCfg();
+                document.getElementById('mia-aluguel').value = c.despesasFixas.aluguel;
+                document.getElementById('mia-funcionario').value = c.despesasFixas.funcionario;
+                document.getElementById('mia-luz').value = c.despesasFixas.luz;
+                document.getElementById('mia-agua').value = c.despesasFixas.agua;
+                document.getElementById('mia-transporte').value = c.despesasFixas.transporte;
+                document.getElementById('mia-vendasmensais').value = c.vendasMensais;
+                document.getElementById('mia-sacola').value = c.despesasVariaveis.sacola;
+                document.getElementById('mia-estojo').value = c.despesasVariaveis.estojo;
+                document.getElementById('mia-montagem').value = c.despesasVariaveis.montagem;
+                this.miaRenderMarkupConfig();
+                this.miaRenderHistorico();
+                this.miaUpdateStats();
+                if (!this._miaInited) { this.miaSetupDropZone(); this._miaInited = true; }
+            },
+
+            miaGetLabInfo(lab) {
+                const labs = {
+                    'tech-vantagens': { nome: 'Tech Vantagens / LabTechnopark', icone: '🔵', cls: 'mia-b-tech' },
+                    'brasprecios':    { nome: 'Braspreços / BrasLab Optical',   icone: '🔴', cls: 'mia-b-bras' },
+                    'sygma':          { nome: 'Sygma Lentes',                   icone: '🟢', cls: 'mia-b-sygma' },
+                    'visco':          { nome: 'Visco / Grupo Visco',            icone: '🟣', cls: 'mia-b-visco' },
+                    'generico':       { nome: 'Não Identificado',               icone: '⚪', cls: '' }
+                };
+                return labs[lab] || labs['generico'];
+            },
+
+            miaParseNumero(str) {
+                if (!str) return 0;
+                return parseFloat(str.toString().replace(/\./g, '').replace(',', '.').replace(/[^\d.-]/g, '')) || 0;
+            },
+            miaFormatMoney(v) { return Number(v || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }); },
+
+            async miaExtrairTextoPDF(file) {
+                const arrayBuffer = await file.arrayBuffer();
+                const pdf = await pdfjsLib.getDocument(arrayBuffer).promise;
+                let texto = '';
+                // ✅ FIX VISCO-LENTES-PRONTAS (achado testando com o PDF real): esse
+                // layout específico (códigos CH1/CH2/CH3) é tão visualmente
+                // espalhado que reorganizar por posição Y na verdade EMBARALHA a
+                // ordem código→preço. Testei e a ordem NATURAL dos itens do PDF
+                // (sem reordenar) já casa código com preço corretamente — por isso
+                // guardamos também essa versão "crua", por página, só pra esse caso.
+                this._miaPaginasNatural = [];
+                for (let i = 1; i <= pdf.numPages; i++) {
+                    const page = await pdf.getPage(i);
+                    const content = await page.getTextContent();
+                    const itemsBrutos = (content.items || []).filter(it => it.str && it.str.trim());
+                    this._miaPaginasNatural.push(itemsBrutos.map(it => it.str).join(' '));
+
+                    // ✅ FIX EXTRACAO-PDF-LINHA-ÚNICA (achado testando com PDFs reais
+                    // de laboratório): antes, TODOS os itens de texto da página
+                    // viravam uma ÚNICA linha gigante (só um '\n' no fim da página
+                    // inteira). Isso quebrava todo parser: um .match() sem 'g' só
+                    // pega 1 resultado por página, então praticamente só 1 produto
+                    // saía por página, e o resto virava lixo/nome repetido. Agora
+                    // agrupamos os itens pela posição vertical (mesma linha visual
+                    // no PDF) e ordenamos da esquerda pra direita, reconstruindo
+                    // quebras de linha reais. (Usado por todo mundo, menos o caso
+                    // Visco Lentes Prontas acima.)
+                    const items = itemsBrutos.slice();
+                    items.sort((a, b) => {
+                        const dy = b.transform[5] - a.transform[5];
+                        if (Math.abs(dy) > 2) return dy;
+                        return a.transform[4] - b.transform[4];
+                    });
+                    let lastY = null, linhaAtual = [];
+                    const linhas = [];
+                    items.forEach(it => {
+                        const y = it.transform[5];
+                        if (lastY !== null && Math.abs(y - lastY) > 2) {
+                            linhas.push(linhaAtual.join(' '));
+                            linhaAtual = [];
+                        }
+                        linhaAtual.push(it.str);
+                        lastY = y;
+                    });
+                    if (linhaAtual.length) linhas.push(linhaAtual.join(' '));
+                    texto += linhas.join('\n') + '\n';
+                }
+                return texto;
+            },
+
+            // Remove o trecho de dioptria/grade que às vezes fica grudado no
+            // nome do produto (ex: "LP PRO DESIGN 1.50 CLEAR - 6.00 a + 6.00
+            // Cil. - 2.00" → "LP PRO DESIGN 1.50 CLEAR").
+            _miaLimparNome(nome) {
+                return (nome || '')
+                    .replace(/\s*[-+]?\s*\d+[.,]\d+\s*a\s*[-+]?\s*\d+[.,]\d+.*$/i, '')
+                    .replace(/\s*Esf\.?.*$/i, '')
+                    .replace(/\s*[-–]\s*$/, '')
+                    .trim();
+            },
+
+            miaDetectarLaboratorio(texto) {
+                const t = texto.toLowerCase();
+                if (t.includes('tech vantagens') || t.includes('labtechnopark')) return 'tech-vantagens';
+                if (t.includes('brasprecos') || t.includes('braslab')) return 'brasprecios';
+                if (t.includes('sygma')) return 'sygma';
+                if (t.includes('visco') || t.includes('grupovisco') || t.includes('soluções ópticas')) return 'visco';
+                // ✅ FIX DETECÇÃO-BRASPREÇOS (achado testando com o PDF real): o
+                // logo "BRASPREÇOS" e o rodapé (telefone/site/Instagram) são
+                // IMAGEM no PDF, não texto — então "brasprecos"/"braslab" nunca
+                // aparecem de verdade no texto extraído, e esse laboratório
+                // sempre caía no genérico. Detecta agora por frases que são
+                // texto de verdade e são específicas dessa tabela.
+                if (t.includes('valores em pares e reais') || t.includes('incluir o antirreflexo no ato do pedido') || t.includes('c.o. a.r.')) return 'brasprecios';
+                return 'generico';
+            },
+
+            miaParseTechVantagens(texto) {
+                const produtos = [];
+                const linhas = texto.split('\n');
+                let categoria = 'Lentes';
+                // ✅ FIX PARSER-TECH-VANTAGENS (validado contra tabela real): aqui o
+                // padrão real é "código nome... valor" com o nome às vezes contendo
+                // a dioptria grudada (limpa com _miaLimparNome). O PDF real tem
+                // tabelas lado a lado (2 colunas) em algumas páginas — quando isso
+                // acontece, essa linha pode conter 2 produtos diferentes; pegamos
+                // sempre o primeiro (mais à esquerda), que é o mais confiável.
+                const linhaPat = /^\s*(\d{3,5}(?:\s*\/\s*\d{3,5})?)\s+([A-Za-zÀ-ú].*?)\s+(\d{1,4}[.,]\d{2})\b/;
+                linhas.forEach(linha => {
+                    const l = linha.trim();
+                    if (l.includes('LENTES PRONTAS KODAK')) categoria = 'Lentes Prontas Kodak';
+                    else if (l.includes('LENTES PRONTAS ESSILOR')) categoria = 'Lentes Prontas Essilor';
+                    else if (l.includes('LENTES PRONTAS PRO DESIGN') || l.includes('LENTES PRONTAS A partir') || l.includes('LP PRO DESIGN')) categoria = 'Lentes Prontas Pro Design';
+                    else if (l.includes('COMBO LENTES SURF. VS') || l.includes('COMBO LENTES SURF. VISÃO SIMPLES') || l.includes('COMBO LENTES SURF. PROGRESSIVO')) categoria = 'Surf Progressivo';
+                    else if (l.includes('PRO DESIGN PLATINUM')) categoria = 'Progressivas Pro Design Elite';
+                    else if (l.includes('PRO DESIGN ELITE')) categoria = 'Progressivas Pro Design Elite';
+                    else if (l.includes('PRO DESIGN WISE')) categoria = 'Technopark';
+                    else if (l.includes('PRO DESIGN ADAPT')) categoria = 'Technopark';
+                    else if (l.includes('TECHNOPARK') && l.includes('TRANSITIONS')) categoria = 'Technopark Fotocromático';
+                    else if (l.includes('TECHNOPARK')) categoria = 'Technopark';
+                    else if (l.includes('KODAK PRECISE') || l.includes('KODAK') && l.includes('MULTIFOCAIS')) categoria = 'Multifocais Kodak UHD';
+
+                    if (!/\d[.,]\d{2}/.test(l)) return;
+                    const m = linhaPat.exec(l);
+                    if (!m) return;
+                    const codigo = m[1].split('/')[0].trim();
+                    const nome = this._miaLimparNome(m[2]).substring(0, 100);
+                    const custo = this.miaParseNumero(m[3]);
+                    if (custo > 0 && custo < 50000 && nome && !produtos.find(p => p.codigo === codigo)) {
+                        produtos.push({ codigo, nome, categoria, custo, laboratorio: 'tech-vantagens' });
+                    }
+                });
+                return produtos;
+            },
+
+            miaParseBrasprecios(texto) {
+                const produtos = [];
+                let linhas = texto.split('\n');
+                // ✅ FIX PARSER-BRASPREÇOS (validado contra tabela real): nessa
+                // tabela o código+preço às vezes ficam numa linha e o NOME do
+                // produto numa linha adjacente (o texto "quebra" no PDF). Antes de
+                // tentar casar cada linha temos que juntar essas linhas "órfãs".
+                const codigoSoRegex = /^(\d{3,6})\s*(?:R\$.*|-.*)?$/;
+                const nomeSoRegex = /^[A-Za-zÀ-ú]/;
+                const linhasUnidas = [];
+                for (let i = 0; i < linhas.length; i++) {
+                    const l = linhas[i].trim();
+                    const codigoSo = codigoSoRegex.test(l) && !/[A-Za-zÀ-ú]{3,}/.test(l);
+                    if (codigoSo && linhas[i + 1]) {
+                        const prox = linhas[i + 1].trim();
+                        if (nomeSoRegex.test(prox) && !/\d{3,}/.test(prox) && !prox.includes('R$')) {
+                            linhasUnidas.push(l + ' ' + prox);
+                            i++;
+                            continue;
+                        }
+                    }
+                    linhasUnidas.push(l);
+                }
+                linhas = linhasUnidas;
+
+                let categoria = 'Lentes Acabadas';
+                linhas.forEach(linha => {
+                    const l = linha.trim();
+                    if (l.includes('LENTES ACABADAS')) categoria = 'Lentes Acabadas';
+                    else if (l.includes('VISÃO SIMPLES SURFAÇADAS') || l.includes('VISAO SIMPLES SURFACADAS')) categoria = 'Visão Simples Surf';
+                    else if (l.includes('MULTIFOCAIS DIGITAIS')) categoria = 'Multifocais Digitais';
+
+                    if (!l.includes('R$')) return;
+                    // código no início da linha, resto é nome + um ou mais "R$ valor"
+                    const m = /^(\d{3,6})\b(.*)$/.exec(l);
+                    if (!m) return;
+                    const codigo = m[1];
+                    const resto = m[2];
+                    const precos = (resto.match(/R\$\s*([\d.,]+)/g) || []).map(p => this.miaParseNumero(p));
+                    if (!precos.length) return;
+                    // usa o PRIMEIRO valor numérico presente (a tabela tem colunas
+                    // tipo "Sem A.R." / "Com A.R." ou "Sem/Com AR/Hiperclean" —
+                    // normalmente só uma delas vem preenchida por produto).
+                    const custo = precos[0];
+                    const nome = resto.replace(/R\$\s*[\d.,]+/g, '').replace(/[-\s]+/g, ' ').replace(/Novidade|Imperdível|IMPERDÍVEL/gi, '').trim().substring(0, 100);
+                    if (custo > 0 && custo < 50000 && nome && !produtos.find(p => p.codigo === codigo)) {
+                        produtos.push({ codigo, nome, categoria, custo, laboratorio: 'brasprecios' });
+                    }
+                });
+                return produtos;
+            },
+
+            miaParseSygma(texto) {
+                const produtos = [];
+                const linhas = texto.split('\n');
+                let categoria = 'Visão Simples Tradicional';
+                // ✅ FIX PARSER-SYGMA (validado contra tabela real): nessa tabela o
+                // código vem DEPOIS do nome, ex: "LT CR 1.49 Incolor 0001 R$ 12,00
+                // Esf. -6,00 a +6,00 ...". Usamos um padrão "guloso" que captura
+                // tudo até o ÚLTIMO "código + R$ valor" da linha — isso funciona
+                // mesmo quando o nome tem números dentro (ex: "1.56").
+                const linhaPat = /^(.*?)\s*(\d{3,5})\s+R\$\s*([\d.,]+)/;
+                linhas.forEach(linha => {
+                    const l = linha.trim();
+                    if (l.includes('VISÃO SIMPLES BLUECUT') || l.includes('Bluecut') || l.includes('BLUECUT')) categoria = 'Visão Simples Bluecut';
+                    else if (l.includes('VISÃO SIMPLES POLICARBONATO') || l.includes('Policarbonato')) categoria = 'Visão Simples Policarbonato';
+                    else if (l.includes('VISÃO SIMPLES 1.61') || l.includes('VISÃO SIMPLES 1.67') || l.includes('VISÃO SIMPLES 1.70') || l.includes('VISÃO SIMPLES 1.74')) categoria = 'Visão Simples Alto Índice';
+                    else if (l.includes('VISÃO SIMPLES SOLARES')) categoria = 'Visão Simples Solar';
+                    else if (l.includes('VISÃO SIMPLES CR')) categoria = 'Visão Simples Tradicional';
+                    else if (l.includes('LENTE PRONTA MULTIFOCAL')) categoria = 'Multifocais Prontos';
+                    else if (l.includes('MULTIFOCAIS TRADICIONAIS')) categoria = 'Multifocais Tradicionais Surf';
+                    else if (l.includes('BIFOCAIS TRADICIONAIS')) categoria = 'Bifocais Tradicionais';
+                    else if (l.includes('SYGMA PRIME') || l.includes('Sygma PRIME')) categoria = 'Sygma Prime';
+                    else if (l.includes('SYGMA ADVANCED') || l.includes('Sygma ADVANCED')) categoria = 'Sygma Advanced';
+                    else if (l.includes('LINHA TRADICIONAL')) categoria = 'Linha Tradicional';
+                    else if (l.includes('TRATAMENTOS')) categoria = 'Tratamentos';
+                    else if (l.includes('Coloração') && l.includes('Valor')) categoria = 'Coloração';
+                    else if (l.includes('SERVIÇOS')) categoria = 'Serviços';
+
+                    if (!l.includes('R$')) return;
+                    const m = linhaPat.exec(l);
+                    if (!m) return;
+                    const nome = this._miaLimparNome(m[1]).substring(0, 100);
+                    const codigo = m[2];
+                    const custo = this.miaParseNumero(m[3]);
+                    if (custo > 0 && custo < 50000 && !produtos.find(p => p.codigo === codigo)) {
+                        produtos.push({ codigo, nome: nome || ('Sygma ' + codigo), categoria, custo, laboratorio: 'sygma' });
+                    }
+                });
+                return produtos;
+            },
+
+            miaParseVisco(texto) {
+                const produtos = [];
+                const linhas = texto.split('\n');
+                let categoria = 'Lentes Prontas VS 1.56';
+                let modo = (texto.includes('FREEFORM') || texto.includes('Progressivas Freeform')) ? 'freeform' : 'prontas';
+
+                // ✅ FIX NOME-INCOMPLETO (pedido do usuário): "Incolor" sozinho não
+                // identifica o produto. O nome da marca/linha (ex: "HANDOK MULTI",
+                // "OPTRA HARMONY") é um LOGO/imagem no PDF — não existe como texto
+                // extraível. A única forma de recuperar isso é pela ORDEM fixa em
+                // que as seções aparecem no PDF da Visco Freeform (validada contra
+                // o arquivo real enviado). Se a Visco mudar essa ordem num PDF
+                // futuro, a marca atribuída aqui pode sair errada — vale conferir
+                // na prévia antes de aplicar.
+                const marcasProgressivas = ['HANDOK MULTI', 'OPTRA HARMONY', 'OPTRA ELITE', 'OPTRA LUMINOUS', 'OPTRA EVOLUTION 2.0'];
+                let marcaProgressivaCount = 0;
+                let marcaAtual = '';
+                let indiceAtual = '';
+
+                linhas.forEach(linha => {
+                    const l = linha.trim();
+                    if (l.includes('INCOLOR TINTÁVEL 1.49') || l.includes('1.49 ANTIRRISCO')) categoria = 'Lentes Prontas VS 1.49';
+                    else if (l.includes('1.56') && l.includes('ANTIRRISCO') && !l.includes('1.59')) categoria = 'Lentes Prontas VS 1.56';
+                    else if (l.includes('1.59') && l.includes('ANTIRRISCO')) categoria = 'Lentes Prontas VS 1.59';
+                    else if (l.includes('1.61') && l.includes('ANTIRRISCO')) categoria = 'Lentes Prontas VS 1.61';
+                    else if (l.includes('1.67') && l.includes('ANTIRRISCO')) categoria = 'Lentes Prontas VS 1.67';
+                    else if (l.includes('1.74') && l.includes('ANTIRRISCO')) categoria = 'Lentes Prontas VS 1.74';
+                    else if (l.includes('Lentes Prontas Multifocais') || l.includes('Multifocal 1.56')) categoria = 'Multifocais Prontos 1.56';
+                    else if (l.includes('Blocos Visão Simples')) categoria = 'Blocos VS';
+
+                    if (modo === 'freeform') {
+                        // Marca/linha: só muda ao cruzar um cabeçalho de seção —
+                        // "Progressivas Freeform" se repete 1x por marca na ordem
+                        // acima; as demais seções são únicas e têm marca própria.
+                        if (/^Progressivas Freeform$/.test(l)) {
+                            marcaAtual = marcasProgressivas[marcaProgressivaCount] || ('Progressivas Freeform ' + (marcaProgressivaCount + 1));
+                            marcaProgressivaCount++;
+                            categoria = 'Progressivas Freeform';
+                        } else if (l.includes('Ocupacionais')) { marcaAtual = 'OPTRA OFFICE'; categoria = 'Ocupacionais'; }
+                        else if (l.includes('Esportivas')) { marcaAtual = 'OPTRA OUTHOME DRIVE & SPORT'; categoria = 'Esportivas'; }
+                        else if (l.includes('Visão Simples Antifadiga')) { marcaAtual = 'OPTRA POWER'; categoria = 'Visão Simples Antifadiga'; }
+                        else if (l.includes('Visão Simples Freeform')) { marcaAtual = 'OPTRA ONLY'; categoria = 'Visão Simples Freeform'; }
+                        else if (/^Visão Simples$/.test(l)) { marcaAtual = 'OPTRA CONCEPT'; categoria = 'Visão Simples'; }
+                        else if (l.includes('Transitions')) categoria = (categoria || '') + ' Transitions';
+                        else if (l.includes('Serviços')) categoria = 'Serviços Visco';
+
+                        // Índice (1.50/1.56/1.59/1.61/1.67/1.74) no início da linha
+                        // — carrega pra frente até mudar, já que nem toda linha de
+                        // produto repete o índice.
+                        const mIndice = /^(1[.,]\d{2})\b/.exec(l);
+                        if (mIndice) indiceAtual = mIndice[1].replace(',', '.');
+                    }
+
+                    // ✅ FIX PARSER-VISCO-FREEFORM (validado contra o PDF real):
+                    // entre o código S#### e o "R$" às vezes vem a dioptria (ex:
+                    // "S1217 Blue -6.00 R$ 199,00 R$ 267,00 R$ 287,00") — o nome
+                    // captura só letras/espaços e pulamos qualquer coisa até o
+                    // primeiro "R$"; o valor usado é o primeiro preço da linha
+                    // (coluna "Antirrisco", a base antes do AR extra).
+                    if (linha.includes('R$')) {
+                        const freeformPat = /(S\d{3,5})\s+([^\dR]+?)\s+.*?R\$\s*([\d.,]+)/g;
+                        let fm;
+                        while ((fm = freeformPat.exec(linha)) !== null) {
+                            const cod = fm[1];
+                            const descricao = this._miaLimparNome(fm[2]).substring(0, 100);
+                            const custo = this.miaParseNumero(fm[3]);
+                            // Nome completo = marca/linha + índice + descrição, ex:
+                            // "HANDOK MULTI 1.50 Incolor" — pedido do usuário pra não
+                            // ficar só "Incolor".
+                            const nome = [marcaAtual, indiceAtual, descricao].filter(Boolean).join(' ').substring(0, 100);
+                            if (custo > 0 && custo < 50000 && !produtos.find(p => p.codigo === cod)) {
+                                produtos.push({ codigo: cod, nome: nome || ('Freeform ' + cod), categoria, custo, laboratorio: 'visco' });
+                            }
+                        }
+                    }
+                    const matchBloco = linha.match(/\b(2\d{3})\b.*?(?:75mm|70mm|65mm)/);
+                    if (matchBloco) {
+                        const cod = matchBloco[1], nomeLinha = linha.substring(0, 80).trim();
+                        if (!produtos.find(p => p.codigo === cod)) produtos.push({ codigo: cod, nome: nomeLinha, categoria: 'Blocos VS', custo: 0, laboratorio: 'visco' });
+                    }
+                    const matchMulti = linha.match(/\b(120[0-9])\b/);
+                    if (matchMulti && (linha.includes('MULTIFOCAL') || linha.includes('Multifocal') || linha.includes('ADIÇÃO'))) {
+                        const cod = matchMulti[1];
+                        if (!produtos.find(p => p.codigo === cod)) produtos.push({ codigo: cod, nome: 'Multifocal Pronto ' + cod, categoria: 'Multifocais Prontos 1.56', custo: 0, laboratorio: 'visco' });
+                    }
+                });
+
+                // ✅ FIX VISCO-LENTES-PRONTAS (CH1/CH2/CH3): a extração por linha
+                // (acima) nunca funcionou pra esse formato — o layout é espalhado
+                // demais e reorganizar por linha embaralha código e preço. Testado
+                // e validado contra o PDF real: usando a ordem NATURAL do texto de
+                // cada página (sem reorganizar), os códigos CH1/CH2/CH3 e os
+                // valores "R$" aparecem na MESMA ordem relativa — então casar o
+                // 1º código com o 1º preço, o 2º com o 2º etc. funciona certinho.
+                if (modo === 'prontas' && Array.isArray(this._miaPaginasNatural)) {
+                    this._miaPaginasNatural.forEach(paginaTexto => {
+                        const nomesPos = [];
+                        const nomeRegex = /(LENTE PRONTA|BLOCO \d)/g;
+                        let nm;
+                        while ((nm = nomeRegex.exec(paginaTexto)) !== null) {
+                            nomesPos.push({ pos: nm.index, nome: paginaTexto.substring(nm.index, nm.index + 70).trim() });
+                        }
+                        const codesPos = [];
+                        const codeRegex = /CH[123]\s+(\w{3,6})\b/g;
+                        let cm;
+                        while ((cm = codeRegex.exec(paginaTexto)) !== null) {
+                            codesPos.push({ pos: cm.index, codigo: cm[1] });
+                        }
+                        const precos = (paginaTexto.match(/R\$\s*([\d.,]+)/g) || []).map(p => this.miaParseNumero(p));
+                        codesPos.forEach((c, idx) => {
+                            if (produtos.find(p => p.codigo === c.codigo)) return;
+                            const custo = precos[idx];
+                            if (!(custo > 0 && custo < 50000)) return;
+                            let nome = '';
+                            for (const n of nomesPos) { if (n.pos <= c.pos) nome = n.nome; else break; }
+                            nome = this._miaLimparNome(nome).substring(0, 100);
+                            produtos.push({ codigo: c.codigo, nome: nome || ('Lente Pronta ' + c.codigo), categoria, custo, laboratorio: 'visco' });
+                        });
+                    });
+                }
+
+                return produtos.filter(p => p.custo > 0);
+            },
+
+            miaParseGenerico(texto) {
+                const produtos = [];
+                texto.split('\n').forEach(linha => {
+                    const match = linha.match(/(\d{3,6})\s+([A-Z][A-Z0-9\s\.\-\(\)\/]+?)\s+R?\$?\s*([\d.,]+)/);
+                    if (match) {
+                        const codigo = match[1], nome = match[2].trim().substring(0, 100), custo = this.miaParseNumero(match[3]);
+                        if (custo > 0 && custo < 50000 && !produtos.find(p => p.codigo === codigo)) {
+                            produtos.push({ codigo, nome, categoria: 'Lentes', custo, laboratorio: 'generico' });
+                        }
+                    }
+                });
+                return produtos;
+            },
+
+            miaCalcular(custoProduto, laboratorio, categoria) {
+                const c = this.miaCfg();
+                const markup = (c.markup[laboratorio] && c.markup[laboratorio][categoria]) ? c.markup[laboratorio][categoria] : 2.50;
+                const totalVariavel = Object.values(c.despesasVariaveis).reduce((a, b) => a + b, 0);
+                const totalFixo = Object.values(c.despesasFixas).reduce((a, b) => a + b, 0);
+                const rateioFixo = totalFixo / (c.vendasMensais || 1);
+                const custoTotal = custoProduto + totalVariavel + rateioFixo;
+                const precoVenda = custoTotal * markup;
+                const lucro = precoVenda - custoTotal;
+                const margem = precoVenda > 0 ? (lucro / precoVenda) * 100 : 0;
+                return { custoTotal, markup, precoVenda, lucro, margem, rateioFixo };
+            },
+
+            // Casa pelo código (mesma normalização tolerante usada na busca de
+            // produtos) contra a base REAL de produtos do sistema — não mantém
+            // uma lista paralela como a ferramenta de referência.
+            miaCompararComBase(produtos) {
+                const novos = [], atualizados = [], iguais = [];
+                produtos.forEach(p => {
+                    const codNorm = this._normalizeSearch(p.codigo);
+                    const existente = (state.products || []).find(pr => this._normalizeSearch(pr.code) === codNorm && codNorm);
+                    if (!existente) novos.push(p);
+                    else if (Math.abs((existente.costPrice || 0) - p.custo) > 0.009) atualizados.push({ ...p, custoAnterior: existente.costPrice || 0, produtoExistente: existente });
+                    else iguais.push(p);
+                });
+                return { novos, atualizados, iguais };
+            },
+
+            async miaProcessarPDF(file) {
+                const status = document.getElementById('miaUploadStatus');
+                status.innerHTML = `<div class="mia-info"><div style="display:flex;align-items:center;gap:10px;">
+                    <div class="mia-progress" style="flex:1;"><div class="mia-progress-fill" id="miaProgressBar" style="width:0%"></div></div>
+                    <span id="miaProgressText">Iniciando...</span></div></div>`;
+                const setProgress = (pct, txt) => {
+                    const bar = document.getElementById('miaProgressBar'), t = document.getElementById('miaProgressText');
+                    if (bar) bar.style.width = pct + '%';
+                    if (t) t.textContent = txt;
+                };
+                try {
+                    setProgress(10, 'Extraindo texto do PDF...');
+                    const texto = await this.miaExtrairTextoPDF(file);
+                    setProgress(40, 'Detectando laboratório...');
+                    this._miaLabDetectado = this.miaDetectarLaboratorio(texto);
+                    const labInfo = this.miaGetLabInfo(this._miaLabDetectado);
+                    setProgress(60, 'Extraindo produtos...');
+                    let produtos = [];
+                    if (this._miaLabDetectado === 'tech-vantagens') produtos = this.miaParseTechVantagens(texto);
+                    else if (this._miaLabDetectado === 'brasprecios') produtos = this.miaParseBrasprecios(texto);
+                    else if (this._miaLabDetectado === 'sygma') produtos = this.miaParseSygma(texto);
+                    else if (this._miaLabDetectado === 'visco') produtos = this.miaParseVisco(texto);
+                    else produtos = this.miaParseGenerico(texto);
+                    setProgress(80, 'Comparando com o cadastro atual...');
+                    this._miaProdutosProcessados = produtos;
+                    const comp = this.miaCompararComBase(produtos);
+                    setProgress(100, 'Concluído!');
+                    setTimeout(() => {
+                        if (produtos.length === 0) {
+                            status.innerHTML = `<div class="mia-warning">⚠️ Nenhum produto reconhecido nesse PDF. Laboratório detectado: <span class="mia-badge ${labInfo.cls}">${labInfo.icone} ${labInfo.nome}</span>. Se o padrão desse PDF for diferente do esperado, me avise pra eu ajustar a leitura.</div>`;
+                            return;
+                        }
+                        status.innerHTML = `<div class="mia-success">✅ <strong>PDF processado!</strong><br>Laboratório: <span class="mia-badge ${labInfo.cls}">${labInfo.icone} ${labInfo.nome}</span><br>Produtos encontrados: <strong>${produtos.length}</strong></div>`;
+                        this.miaMostrarPreview(comp, this._miaLabDetectado);
+                    }, 300);
+                } catch (error) {
+                    console.error(error);
+                    status.innerHTML = `<div class="mia-warning">❌ Erro ao processar PDF: ${error.message}</div>`;
+                }
+            },
+
+            miaMostrarPreview(comp, lab) {
+                const card = document.getElementById('miaCardPreview');
+                const content = document.getElementById('miaPreviewContent');
+                const labInfo = this.miaGetLabInfo(lab);
+                let html = `<div class="mia-result-grid">
+                    <div class="mia-result-card mia-res-novos"><div class="num">${comp.novos.length}</div><div class="label">✨ Novos</div></div>
+                    <div class="mia-result-card mia-res-atualizados"><div class="num">${comp.atualizados.length}</div><div class="label">🔄 Atualizados</div></div>
+                    <div class="mia-result-card mia-res-iguais"><div class="num">${comp.iguais.length}</div><div class="label">✓ Sem Alteração</div></div>
+                </div>
+                <h4>${labInfo.icone} ${labInfo.nome}</h4>
+                <div class="mia-table-wrap"><table class="mia-table"><thead><tr>
+                    <th>Status</th><th>Código</th><th>Produto</th><th>Categoria</th>
+                    <th>Custo Anterior</th><th>Custo Novo</th><th>Preço Venda</th><th>Margem</th>
+                </tr></thead><tbody>`;
+                const todos = [...comp.novos.map(p => ({ ...p, status: 'novo' })), ...comp.atualizados.map(p => ({ ...p, status: 'atualizado' }))].slice(0, 200);
+                todos.forEach(p => {
+                    const calc = this.miaCalcular(p.custo, p.laboratorio, p.categoria);
+                    const custoAnt = p.custoAnterior !== undefined ? this.miaFormatMoney(p.custoAnterior) : '-';
+                    const rowClass = p.status === 'novo' ? 'mia-novo' : 'mia-atualizado';
+                    const statusLabel = p.status === 'novo' ? '✨ Novo' : '🔄 Atualizado';
+                    html += `<tr class="${rowClass}">
+                        <td>${statusLabel}</td><td><strong>${p.codigo}</strong></td><td>${p.nome}</td>
+                        <td><span class="mia-badge ${labInfo.cls}">${p.categoria}</span></td>
+                        <td>${custoAnt}</td><td><strong>${this.miaFormatMoney(p.custo)}</strong></td>
+                        <td style="color:#10b981;font-weight:700;">${this.miaFormatMoney(calc.precoVenda)}</td>
+                        <td>${calc.margem.toFixed(1)}%</td></tr>`;
+                });
+                html += '</tbody></table></div>';
+                const totalCount = comp.novos.length + comp.atualizados.length;
+                if (totalCount > 200) html += `<p style="text-align:center;margin-top:8px;color:#4b5563;font-size:0.82rem;">Mostrando 200 de ${totalCount} produtos — todos serão aplicados ao confirmar.</p>`;
+                content.innerHTML = html;
+                card.style.display = 'block';
+                card.scrollIntoView({ behavior: 'smooth' });
+            },
+
+            miaAplicarAtualizacao() {
+                const comp = this.miaCompararComBase(this._miaProdutosProcessados);
+                const total = comp.novos.length + comp.atualizados.length;
+                if (total === 0) { Toast.show('Nada para aplicar', 'warning'); return; }
+                if (!confirm(`Aplicar ${total} produtos (${comp.novos.length} novos, ${comp.atualizados.length} atualizados)?`)) return;
+
+                let novosCount = 0, atualizadosCount = 0;
+                const agora = new Date().toISOString();
+
+                comp.atualizados.forEach(p => {
+                    const prod = p.produtoExistente;
+                    const calc = this.miaCalcular(p.custo, p.laboratorio, p.categoria);
+                    prod.costPrice = p.custo;
+                    prod.price = parseFloat(calc.precoVenda.toFixed(2));
+                    prod.updated_at = agora;
+                    SupaSync.upsertProduto(prod);
+                    atualizadosCount++;
+                });
+
+                comp.novos.forEach(p => {
+                    const calc = this.miaCalcular(p.custo, p.laboratorio, p.categoria);
+                    const novoProduto = {
+                        id: Utils.generateId('PROD'),
+                        code: p.codigo,
+                        category: p.categoria,
+                        name: p.nome,
+                        costPrice: p.custo,
+                        price: parseFloat(calc.precoVenda.toFixed(2)),
+                        qty: 0,
+                        minQty: 5,
+                        color: '',
+                        frameType: '',
+                        image: null,
+                        updated_at: agora
+                    };
+                    state.products.push(novoProduto);
+                    SupaSync.upsertProduto(novoProduto);
+                    novosCount++;
+                });
+
+                App.saveData();
+
+                if (!state.markupIAHistorico) state.markupIAHistorico = [];
+                state.markupIAHistorico.unshift({ data: agora, laboratorio: this._miaLabDetectado, total, novos: novosCount, atualizados: atualizadosCount });
+                state.markupIAHistorico = state.markupIAHistorico.slice(0, 50);
+
+                Toast.show(`✅ ${novosCount} novos, ${atualizadosCount} atualizados!`, 'success');
+                document.getElementById('miaCardPreview').style.display = 'none';
+                this._miaProdutosProcessados = [];
+                this.renderTable();
+                this.miaRenderHistorico();
+                this.miaUpdateStats();
+            },
+
+            miaCancelarPreview() {
+                if (confirm('Cancelar a importação? Os dados não serão aplicados.')) {
+                    document.getElementById('miaCardPreview').style.display = 'none';
+                    this._miaProdutosProcessados = [];
+                }
+            },
+
+            miaSalvarDespesas() {
+                const c = this.miaCfg();
+                c.despesasFixas = {
+                    aluguel: parseFloat(document.getElementById('mia-aluguel').value) || 0,
+                    funcionario: parseFloat(document.getElementById('mia-funcionario').value) || 0,
+                    luz: parseFloat(document.getElementById('mia-luz').value) || 0,
+                    agua: parseFloat(document.getElementById('mia-agua').value) || 0,
+                    transporte: parseFloat(document.getElementById('mia-transporte').value) || 0
+                };
+                c.despesasVariaveis = {
+                    sacola: parseFloat(document.getElementById('mia-sacola').value) || 0,
+                    estojo: parseFloat(document.getElementById('mia-estojo').value) || 0,
+                    montagem: parseFloat(document.getElementById('mia-montagem').value) || 0
+                };
+                c.vendasMensais = parseFloat(document.getElementById('mia-vendasmensais').value) || 100;
+                App.saveData();
+                this.miaUpdateStats();
+                this.miaRenderMarkupConfig();
+                Toast.show('💾 Despesas do Markup IA salvas!', 'success');
+            },
+
+            miaRenderMarkupConfig() {
+                const c = this.miaCfg();
+                const container = document.getElementById('miaMarkupConfigContainer');
+                let html = '';
+                Object.keys(c.markup).forEach(lab => {
+                    const labInfo = this.miaGetLabInfo(lab);
+                    html += `<h4>${labInfo.icone} ${labInfo.nome}</h4>`;
+                    const cats = c.markup[lab];
+                    Object.keys(cats).forEach(cat => {
+                        html += `<div class="mia-markup-row">
+                            <div style="font-size:0.82rem;">${cat}</div>
+                            <div style="display:flex;align-items:center;gap:4px;">
+                                <input type="number" step="0.01" min="1" value="${cats[cat]}" data-lab="${lab}" data-cat="${cat}" class="mia-markup-input">
+                                <span style="font-size:0.76rem;color:#4b5563;">x</span>
+                            </div></div>`;
+                    });
+                });
+                container.innerHTML = html;
+            },
+
+            miaSalvarMarkupConfig() {
+                const c = this.miaCfg();
+                document.querySelectorAll('.mia-markup-input').forEach(input => {
+                    const lab = input.dataset.lab, cat = input.dataset.cat, value = parseFloat(input.value);
+                    if (value && value > 0) c.markup[lab][cat] = value;
+                });
+                App.saveData();
+                Toast.show('💾 Markup atualizado!', 'success');
+            },
+
+            miaRenderHistorico() {
+                const hist = state.markupIAHistorico || [];
+                const container = document.getElementById('miaHistorico');
+                if (hist.length === 0) { container.innerHTML = '<p style="color:#4b5563;text-align:center;padding:16px;font-size:0.85rem;">Nenhuma importação registrada ainda.</p>'; return; }
+                container.innerHTML = hist.slice(0, 20).map(h => {
+                    const labInfo = this.miaGetLabInfo(h.laboratorio);
+                    const data = new Date(h.data).toLocaleString('pt-BR');
+                    return `<div class="mia-hist-item">
+                        <div><strong>${labInfo.icone} ${labInfo.nome}</strong><br><small style="color:#6b7280;">${data}</small></div>
+                        <div style="display:flex;gap:10px;">
+                            <span>✨ <strong>${h.novos}</strong> novos</span>
+                            <span>🔄 <strong>${h.atualizados}</strong> atualizados</span>
+                        </div></div>`;
+                }).join('');
+            },
+
+            miaUpdateStats() {
+                const c = this.miaCfg();
+                const totalFixo = Object.values(c.despesasFixas).reduce((a, b) => a + b, 0);
+                const rateio = totalFixo / (c.vendasMensais || 1);
+                const box = document.getElementById('miaStatsBox');
+                if (box) box.innerHTML = `💰 Total fixo: <strong>${this.miaFormatMoney(totalFixo)}</strong>/mês &nbsp;•&nbsp; 📊 Rateio por venda: <strong>${this.miaFormatMoney(rateio)}</strong>`;
+            },
+
+            miaSetupDropZone() {
+                const zone = document.getElementById('miaDropZone');
+                const input = document.getElementById('miaFileInput');
+                if (!zone || !input) return;
+                zone.onclick = () => input.click();
+                zone.ondragover = (e) => { e.preventDefault(); zone.classList.add('dragover'); };
+                zone.ondragleave = () => zone.classList.remove('dragover');
+                zone.ondrop = (e) => {
+                    e.preventDefault();
+                    zone.classList.remove('dragover');
+                    const file = e.dataTransfer.files[0];
+                    if (file && file.type === 'application/pdf') this.miaProcessarPDF(file);
+                    else Toast.show('Envie um arquivo PDF', 'warning');
+                };
+                input.onchange = (e) => { const file = e.target.files[0]; if (file) this.miaProcessarPDF(file); };
             },
 
             // ✅ FIX FILTRO-PRODUTO-TOLERANTE: ignora acentos, espaços extras e
@@ -34712,5 +35521,438 @@ window.StoreManager = StoreManager;
   });
 })();
 </script>
+
+<!-- ═══════════════════════════════════════════════════════════════
+     VISION — ASSISTENTE DE IA (motor determinístico, 100% offline)
+     Tudo prefixado com "vision" / "v-" para não colidir com o sistema.
+     ═══════════════════════════════════════════════════════════════ -->
+<style id="visionStyles">
+/* ── Botão flutuante ── */
+#visionFab{position:fixed;bottom:84px;right:18px;width:74px;height:74px;border:0;padding:0;background:none;cursor:pointer;z-index:9000;display:none;animation:vFloat 3s ease-in-out infinite;filter:drop-shadow(0 6px 10px rgba(229,90,0,.35))}
+#visionFab .v-ring{position:absolute;inset:-4px;border-radius:50%;border:3px solid rgba(255,107,0,.55);animation:vPulse 2s ease-out infinite;pointer-events:none}
+@keyframes vFloat{0%,100%{transform:translateY(-7px)}50%{transform:translateY(7px)}}
+@keyframes vPulse{0%{transform:scale(.9);opacity:.9}100%{transform:scale(1.35);opacity:0}}
+/* ── Painel de chat ── */
+#visionPanel{position:fixed;bottom:84px;right:18px;width:410px;height:580px;max-height:calc(100vh - 100px);display:none;flex-direction:column;background:#f6f7f9;color:#212529;border-radius:18px;box-shadow:0 12px 40px rgba(0,0,0,.28);overflow:hidden;z-index:9001}
+#visionPanel.open{display:flex}
+#visionPanel .v-head{background:linear-gradient(135deg,#ff6b00,#e55a00);color:#fff;padding:10px 12px;display:flex;align-items:center;gap:10px}
+#visionPanel .v-head-t{flex:1;line-height:1.2}
+#visionPanel .v-head-t b{font-size:1.05rem;display:block}
+#visionPanel .v-head-t small{font-size:.74rem;opacity:.92}
+#visionPanel .v-hbtn{width:32px;height:32px;border:0;border-radius:50%;background:rgba(255,255,255,.2);color:#fff;cursor:pointer;font-size:15px}
+#visionPanel .v-hbtn:hover{background:rgba(255,255,255,.35)}
+#visionMsgs{flex:1;overflow-y:auto;padding:14px}
+.v-msg{max-width:88%;padding:9px 12px;border-radius:14px;font-size:.88rem;line-height:1.45;margin-bottom:10px;word-wrap:break-word;overflow-wrap:anywhere}
+.v-msg.v-user{background:#ff6b00;color:#fff;margin-left:auto;border-bottom-right-radius:4px}
+.v-msg.v-bot{background:#fff;color:#212529;border:1px solid #e9ecef;border-bottom-left-radius:4px;box-shadow:0 1px 3px rgba(0,0,0,.06)}
+.v-msg.v-wide{max-width:97%}
+.v-msg code{background:rgba(255,107,0,.12);padding:1px 5px;border-radius:5px;font-size:.84rem}
+.v-typing span{display:inline-block;width:7px;height:7px;margin:0 2px;border-radius:50%;background:#ff6b00;animation:vBlink 1s infinite}
+.v-typing span:nth-child(2){animation-delay:.2s}.v-typing span:nth-child(3){animation-delay:.4s}
+@keyframes vBlink{0%,80%,100%{opacity:.2}40%{opacity:1}}
+#visionPanel .v-input{display:flex;gap:8px;align-items:flex-end;padding:10px;background:#fff;border-top:1px solid #e9ecef}
+#visionInput{flex:1;resize:none;border:1px solid #ced4da;border-radius:14px;padding:9px 12px;font:inherit;font-size:.9rem;max-height:110px;height:38px;outline:none;background:#fff;color:#212529}
+#visionInput:focus{border-color:#ff6b00}
+#visionPanel .v-send{width:40px;height:40px;border:0;border-radius:50%;background:#ff6b00;color:#fff;cursor:pointer;font-size:16px;flex-shrink:0}
+/* ── Cards e tabelas de preço ── */
+.v-card{border-left:4px solid #ff6b00;background:#fff8f2;border-radius:8px;padding:8px 10px;margin:6px 0;font-size:.82rem;color:#212529}
+.v-card h4{margin:0 0 4px;color:#e55a00;font-size:.86rem}
+.v-price .v-row{display:flex;justify-content:space-between;gap:10px;padding:3px 0;border-bottom:1px dashed rgba(0,0,0,.12)}
+.v-price .v-row span{opacity:.85}
+.v-price .v-total{font-weight:700;color:#e55a00;border-bottom:0;font-size:.92rem}
+.v-tag{display:inline-block;background:#ffe4cf;color:#b34700;border-radius:20px;padding:1px 8px;margin:1px 2px 1px 0;font-size:.74rem;font-weight:600}
+/* ── Modais (config / produtos) ── */
+#visionModalWrap{position:fixed;inset:0;background:rgba(0,0,0,.55);display:none;align-items:center;justify-content:center;z-index:9100;padding:10px}
+#visionModalWrap.open{display:flex}
+.v-modal-box{background:#fff;color:#212529;width:min(540px,100%);max-height:92vh;overflow:auto;border-radius:16px;padding:16px;box-shadow:0 14px 44px rgba(0,0,0,.35)}
+.v-modal-box h3{margin:0 0 10px;color:#e55a00;font-size:1.05rem;display:flex;justify-content:space-between;align-items:center}
+.v-modal-box h5{margin:12px 0 6px;font-size:.85rem;color:#e55a00}
+.v-grid2{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.v-lb{display:block;font-size:.76rem;font-weight:600}
+.v-in{width:100%;padding:7px 9px;border:1px solid #ced4da;border-radius:8px;font:inherit;font-size:.86rem;box-sizing:border-box;background:#fff;color:#212529}
+.v-in:focus{border-color:#ff6b00;outline:none}
+.v-btn{border:0;border-radius:9px;padding:8px 13px;background:#ff6b00;color:#fff;font-weight:600;cursor:pointer;font-size:.84rem}
+.v-btn.sec{background:#e9ecef;color:#212529}.v-btn.red{background:#dc3545}
+.v-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
+.v-plist{margin-top:8px;max-height:300px;overflow:auto;border:1px solid #e9ecef;border-radius:10px}
+.v-pitem{display:flex;gap:8px;align-items:center;padding:7px 10px;border-bottom:1px solid #f0f0f0;font-size:.8rem}
+.v-pitem:last-child{border-bottom:0}.v-pitem .v-pi{flex:1;min-width:0}.v-pitem small{opacity:.7;display:block}
+.v-x{border:0;background:none;color:#dc3545;cursor:pointer;font-size:15px}
+/* ── Dark mode (usa a classe .dark-mode do body existente) ── */
+.dark-mode #visionPanel{background:#161616;color:#e0e0e0}
+.dark-mode #visionPanel .v-bot{background:#2a2a2a;color:#e8e8e8;border-color:#3a3a3a}
+.dark-mode #visionPanel .v-input{background:#1f1f1f;border-color:#333}
+.dark-mode #visionInput,.dark-mode .v-in{background:#2a2a2a;color:#eee;border-color:#444}
+.dark-mode .v-card{background:#33291f;color:#eee}
+.dark-mode .v-price .v-row{border-color:rgba(255,255,255,.15)}
+.dark-mode .v-modal-box{background:#1f1f1f;color:#e8e8e8}
+.dark-mode .v-plist,.dark-mode .v-pitem{border-color:#333}
+.dark-mode .v-btn.sec{background:#3a3a3a;color:#eee}
+.dark-mode .v-tag{background:#4a2c14;color:#ffb066}
+/* ── Mobile: painel ocupa quase a tela toda ── */
+@media (max-width:520px){#visionPanel{left:8px;right:8px;top:8px;bottom:8px;width:auto;height:auto;max-height:none}.v-grid2{grid-template-columns:1fr}}
+</style>
+
+<button id="visionFab" type="button" aria-label="Abrir assistente Vision" title="Vision — Assistente de IA"><span class="v-ring"></span></button>
+<div id="visionPanel" role="dialog" aria-label="Vision">
+  <div class="v-head">
+    <span id="visionHeadAvatar" style="width:40px;height:40px;display:inline-block"></span>
+    <div class="v-head-t"><b>Vision</b><small>Assistente de IA · pronto para ajudar</small></div>
+    <button class="v-hbtn" type="button" title="Configurações" onclick="Vision.openConfig()">⚙</button>
+    <button class="v-hbtn" type="button" title="Produtos" onclick="Vision.openProducts()">📦</button>
+    <button class="v-hbtn" type="button" title="Fechar" onclick="Vision.toggle(false)">✕</button>
+  </div>
+  <div id="visionMsgs"></div>
+  <div class="v-input">
+    <textarea id="visionInput" rows="1" placeholder="Digite a dioptria, 'preço ...' ou 'ajuda'"></textarea>
+    <button class="v-send" type="button" title="Enviar" onclick="Vision.send()">➤</button>
+  </div>
+</div>
+<div id="visionModalWrap"><div class="v-modal-box" id="visionModalBox"></div></div>
+
+<script id="visionScript">
+(function () {
+  'use strict';
+
+  /* ── Estado e padrões ── */
+  var CFG_DEF = { rent:0, staff:0, water:0, power:0, internet:0, logistics:0, other:0,
+                  packaging:0, assembly:0, volume:100, mkLente:3, mkArmacao:2.5, mkServico:2 };
+  var FIXED = [['rent','Aluguel'],['staff','Funcionários'],['water','Água'],['power','Luz'],
+               ['internet','Internet'],['logistics','Logística'],['other','Outras']];
+  var CATS = { lente:'Lente', armacao:'Armação', servico:'Serviço', tratamento:'Tratamento' };
+  // Faixas do equivalente esférico → índice (editável aqui)
+  var INDEX_TABLE = [[2,'1.56'],[4,'1.60'],[6,'1.67']], INDEX_MAX = '1.74';
+  var V = { cfg: Object.assign({}, CFG_DEF), items: [], store: null, booted: false, welcomed: false };
+
+  /* ── Utilitários ── */
+  var $ = function (id) { return document.getElementById(id); };
+  var money = function (v) { return (typeof Utils !== 'undefined' && Utils.formatCurrency) ? Utils.formatCurrency(v) : 'R$ ' + (+v || 0).toFixed(2); };
+  var toast = function (m, t) { if (typeof Toast !== 'undefined') Toast.show(m, t || 'success'); };
+  var storeId = function () { return window._currentStore || 'barueri'; };
+  var norm = function (s) { return String(s == null ? '' : s).toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, ''); };
+  var esc = function (s) { return String(s == null ? '' : s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); };
+  var md = function (s) { return esc(s).replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>').replace(/`(.+?)`/g,'<code>$1</code>').replace(/\n/g,'<br>'); };
+  var fmt = function (n) { return (n > 0 ? '+' : '') + (+n).toFixed(2); };
+  function parseNum(v) { // aceita 1.234,56 | 180,50 | 180.50 | número
+    if (typeof v === 'number') return v;
+    var s = String(v).replace(/[^\d.,-]/g, ''); if (!s) return NaN;
+    var lc = s.lastIndexOf(','), ld = s.lastIndexOf('.');
+    if (lc > -1 && ld > -1) s = lc > ld ? s.replace(/\./g,'').replace(',','.') : s.replace(/,/g,'');
+    else if (lc > -1) s = s.replace(/,/g,'.');
+    else if ((s.match(/\./g) || []).length > 1) s = s.replace(/\./g,'');
+    return parseFloat(s);
+  }
+
+  /* ── Avatar SVG (robô com óculos) ── */
+  function avatar(id) {
+    return '<svg viewBox="0 0 100 100" width="100%" height="100%" xmlns="http://www.w3.org/2000/svg">' +
+      '<defs><linearGradient id="vg' + id + '" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ffb066"/><stop offset="1" stop-color="#e55a00"/></linearGradient></defs>' +
+      '<line x1="50" y1="22" x2="50" y2="11" stroke="#b34700" stroke-width="3" stroke-linecap="round"/><circle cx="50" cy="8" r="5.5" fill="#ffd43b" stroke="#e0a800" stroke-width="1.5"/>' +
+      '<rect x="6" y="44" width="9" height="20" rx="4" fill="#e55a00"/><rect x="85" y="44" width="9" height="20" rx="4" fill="#e55a00"/>' +
+      '<rect x="12" y="22" width="76" height="66" rx="26" fill="url(#vg' + id + ')"/>' +
+      '<circle cx="35" cy="47" r="14" fill="#fff" stroke="#212529" stroke-width="3"/><circle cx="65" cy="47" r="14" fill="#fff" stroke="#212529" stroke-width="3"/>' +
+      '<path d="M49 46 Q50 43 51 46" stroke="#212529" stroke-width="3" fill="none"/><line x1="21" y1="46" x2="12" y2="44" stroke="#212529" stroke-width="3"/><line x1="79" y1="46" x2="88" y2="44" stroke="#212529" stroke-width="3"/>' +
+      '<circle cx="36" cy="48" r="6" fill="#111"/><circle cx="66" cy="48" r="6" fill="#111"/>' +
+      '<circle cx="38.5" cy="45.5" r="2" fill="#fff"/><circle cx="68.5" cy="45.5" r="2" fill="#fff"/><circle cx="34" cy="50.5" r="1" fill="#fff"/><circle cx="64" cy="50.5" r="1" fill="#fff"/>' +
+      '<path d="M37 68 Q50 79 63 68" stroke="#7a2e00" stroke-width="3.2" fill="none" stroke-linecap="round"/>' +
+      '<circle cx="39" cy="82" r="2.3" fill="#4cd964"/><circle cx="50" cy="82" r="2.3" fill="#ffd43b"/><circle cx="61" cy="82" r="2.3" fill="#ff3b30"/></svg>';
+  }
+
+  /* ═══ PERSISTÊNCIA (IndexedDB via sbGetDoc/sbUpsertDoc) ═══ */
+  async function loadData() {
+    var sid = storeId(); V.store = sid;
+    try {
+      var c = await sbGetDoc(sid, 'config', 'vision_config');
+      V.cfg = Object.assign({}, CFG_DEF, (c && c.data) || {});
+      var p = await sbGetDoc(sid, 'config', 'vision_products');
+      V.items = (p && Array.isArray(p.items)) ? p.items : [];
+    } catch (e) { console.warn('[Vision] falha ao carregar', e); V.cfg = Object.assign({}, CFG_DEF); V.items = []; }
+  }
+  async function ensureStore() { if (V.store !== storeId()) await loadData(); }
+  function sync() { try { if (window.LocalFirst && LocalFirst._scheduleCloudSync) LocalFirst._scheduleCloudSync(); } catch (e) {} }
+  async function saveCfg() { await sbUpsertDoc(storeId(), 'config', 'vision_config', { data: V.cfg, _updatedAt: new Date().toISOString() }); sync(); }
+  async function saveItems() { await sbUpsertDoc(storeId(), 'config', 'vision_products', { items: V.items, _updatedAt: new Date().toISOString() }); sync(); }
+
+  /* ═══ CÁLCULO DE PREÇO ═══ */
+  function opPar(c) {
+    var fixed = FIXED.reduce(function (s, f) { return s + (+c[f[0]] || 0); }, 0);
+    var rateio = +c.volume > 0 ? fixed / +c.volume : 0, emb = +c.packaging || 0, mont = +c.assembly || 0;
+    return { fixed: fixed, rateio: rateio, emb: emb, mont: mont, op: rateio + emb + mont };
+  }
+  function calc(cost, cat, c) {
+    c = c || V.cfg; var o = opPar(c);
+    var mk = cat === 'armacao' ? +c.mkArmacao : cat === 'servico' ? +c.mkServico : +c.mkLente; // tratamento usa markup de lentes
+    var total = cost + o.op, price = total * mk;
+    return { cost: cost, o: o, total: total, mk: mk, price: price, round: Math.ceil(price / 10 - 1e-9) * 10 };
+  }
+  function priceTable(r) {
+    var row = function (a, b, c) { return '<div class="v-row' + (c ? ' v-total' : '') + '"><span>' + a + '</span><b>' + b + '</b></div>'; };
+    return '<div class="v-price">' + row('Custo do produto', money(r.cost)) + row('Rateio despesas fixas', money(r.o.rateio)) +
+      row('Embalagem', money(r.o.emb)) + row('Montagem', money(r.o.mont)) + row('Custo total', money(r.total)) +
+      row('Markup', r.mk + '×') + row('Preço sugerido', money(r.price), 1) + row('Arredondado (múltiplo de R$10)', money(r.round), 1) + '</div>';
+  }
+  var notConfigured = function () { return opPar(V.cfg).op === 0 ? '<br><small>⚠ Custos operacionais ainda zerados — use ⚙ para configurar.</small>' : ''; };
+  function priceCard(title, cost, cat) { return '<div class="v-card"><h4>' + esc(title) + ' · ' + CATS[cat] + '</h4>' + priceTable(calc(cost, cat)) + '</div>' + notConfigured(); }
+
+  /* ═══ ANÁLISE DE RECEITUÁRIO ═══ */
+  function parseEye(s) {
+    var N = '([+-]?\\d+(?:\\.\\d+)?)', o = { esf: null, cil: null, eixo: null, add: null, dnp: null };
+    function take(re, k) { var m = s.match(new RegExp('(?:' + re + ')\\s*[:=]?\\s*' + N)); if (m) { o[k] = parseFloat(m[1]); s = s.replace(m[0], ' '); } }
+    take('ADICAO|ADIC|ADD', 'add'); take('DNP|DP', 'dnp'); take('EIXO|EIX|EI', 'eixo'); take('CILINDRICO|CILINDRO|CIL', 'cil'); take('ESFERICO|ESFERA|ESF', 'esf');
+    var nums = (s.match(/[+-]?\d+(?:\.\d+)?/g) || []).map(parseFloat);
+    var seq = ['esf', 'cil', 'eixo'].filter(function (k) { return o[k] === null; });
+    if (seq.length === 3 && nums.length === 2 && Number.isInteger(nums[1]) && Math.abs(nums[1]) >= 10) { o.cil = 0; seq = ['esf', 'eixo']; } // "-2.00 180"
+    seq.forEach(function (k, i) { if (nums[i] !== undefined) o[k] = nums[i]; });
+    o.esf = o.esf || 0; o.cil = o.cil || 0;
+    return o;
+  }
+  function parseRx(raw) {
+    var t = norm(raw).toUpperCase().replace(/(\d),(\d)/g, '$1.$2'), re = /\bO\.?([DE])\b/g, m, marks = [], eyes = {};
+    while ((m = re.exec(t))) marks.push({ eye: m[1] === 'D' ? 'OD' : 'OE', i: m.index, e: re.lastIndex });
+    if (marks.length) marks.forEach(function (k, j) { eyes[k.eye] = parseEye(t.slice(k.e, j + 1 < marks.length ? marks[j + 1].i : t.length)); });
+    else if (/ESF|CIL|ADD|EIXO/.test(t) || (/^\s*[+-]?\d/.test(t) && (t.match(/\d/g) || []).length >= 2)) eyes.OD = parseEye(t);
+    return eyes;
+  }
+  var eq = function (e) { return Math.abs(e.esf) + Math.abs(e.cil) * 0.5; };
+  function profile(e) {
+    var p = [], q = eq(e);
+    if (e.esf <= -0.25) p.push(q >= 6 ? 'Alta miopia' : q >= 3 ? 'Miopia moderada' : 'Miopia leve');
+    if (e.esf >= 0.25) p.push('Hipermetropia');
+    if (Math.abs(e.cil) >= 0.25) p.push('Astigmatismo');
+    if (e.add > 0) p.push('Presbiopia');
+    return p.length ? p : ['Sem alteração relevante'];
+  }
+  function analyseRx(raw) {
+    var eyes = parseRx(raw), keys = Object.keys(eyes);
+    if (!keys.length) return null;
+    var html = '', maxEq = 0, add = 0, astig = false;
+    keys.forEach(function (k) {
+      var e = eyes[k], q = eq(e); maxEq = Math.max(maxEq, q); add = Math.max(add, e.add || 0); if (Math.abs(e.cil) >= 0.25) astig = true;
+      html += '<div class="v-card"><h4>' + k + ' — Esf ' + fmt(e.esf) + ' · Cil ' + fmt(e.cil) + (e.eixo != null ? ' · Eixo ' + e.eixo + '°' : '') +
+        (e.add ? ' · ADD ' + fmt(e.add) : '') + (e.dnp ? ' · DNP ' + e.dnp : '') + '</h4>' +
+        profile(e).map(function (x) { return '<span class="v-tag">' + x + '</span>'; }).join('') + '<br><small>Equivalente esférico: <b>' + q.toFixed(2) + '</b></small></div>';
+    });
+    var idx = INDEX_MAX, lim = null;
+    for (var i = 0; i < INDEX_TABLE.length; i++) if (maxEq <= INDEX_TABLE[i][0]) { idx = INDEX_TABLE[i][1]; lim = INDEX_TABLE[i][0]; break; }
+    var borda = (lim !== null && maxEq > lim - 0.25 && i < INDEX_TABLE.length) ? '<br><small>⚠ No limite da faixa — considere o próximo índice se a armação for fina/grande.</small>' : '';
+    var tipo = add >= 0.75 ? 'Multifocal (Progressiva)' : add > 0 ? 'Bifocal (ADD baixa)' : 'Visão Simples';
+    var tr = [['Endurecida (INC)', 'proteção básica contra riscos'], ['Antirreflexo (AR)', 'mais nitidez e conforto visual, menos reflexos']];
+    if (maxEq >= 3 || astig) tr.push(['Anti-risco reforçado', maxEq >= 3 ? 'grau alto: lente mais exposta a desgaste' : 'astigmatismo presente']);
+    tr.push(['Fotocromático (Transitions)', 'para quem tem exposição solar frequente'], ['Blue Cut', 'para uso prolongado de telas']);
+    html += '<div class="v-card"><h4>Recomendação</h4><div class="v-price">' +
+      '<div class="v-row"><span>Índice ideal</span><b>' + idx + '</b></div><div class="v-row"><span>Tipo de lente</span><b>' + tipo + '</b></div></div>' + borda +
+      '<h4 style="margin-top:8px">Tratamentos</h4>' + tr.map(function (t) { return '<div class="v-row" style="display:block;padding:2px 0"><b>' + t[0] + '</b> — <small>' + t[1] + '</small></div>'; }).join('') + '</div>';
+    return html;
+  }
+
+  /* ═══ BUSCA DE PRODUTOS E COMANDOS ═══ */
+  function findProducts(q) {
+    var toks = norm(q).split(/\s+/).filter(Boolean);
+    return V.items.filter(function (p) { var h = norm(p.code + ' ' + p.name + ' ' + p.lab); return toks.every(function (t) { return h.indexOf(t) > -1; }); });
+  }
+  function helpText() {
+    return '**Posso ajudar com:**\n👓 **Receituário** — ex: `OD -2.00 -0.50 180 / OE -1.75 -0.25 175 ADD 2.00`\n💰 **Preço** — `preço Transitions`, `custo 180 lente`, `custo 300 armacao`\n📦 **produtos** — banco dos laboratórios (importar Excel/CSV)\n⚙ **config** — despesas, custos por par e markups\n📊 **custos** — resumo dos custos operacionais';
+  }
+  function costsSummary() {
+    var c = V.cfg, o = opPar(c);
+    return '<div class="v-card"><h4>Custos operacionais — loja ' + esc(storeId()) + '</h4><div class="v-price">' +
+      '<div class="v-row"><span>Despesas mensais</span><b>' + money(o.fixed) + '</b></div><div class="v-row"><span>Volume mensal</span><b>' + (+c.volume || 0) + ' óculos</b></div>' +
+      '<div class="v-row"><span>Rateio por par</span><b>' + money(o.rateio) + '</b></div><div class="v-row"><span>Embalagem + montagem</span><b>' + money(o.emb + o.mont) + '</b></div>' +
+      '<div class="v-row v-total"><span>Custo operacional/par</span><b>' + money(o.op) + '</b></div>' +
+      '<div class="v-row"><span>Markups (lente/armação/serviço)</span><b>' + c.mkLente + '× / ' + c.mkArmacao + '× / ' + c.mkServico + '×</b></div></div></div>' + notConfigured();
+  }
+  function catFrom(s) { s = norm(s); return /arm/.test(s) ? 'armacao' : /serv/.test(s) ? 'servico' : /trat/.test(s) ? 'tratamento' : 'lente'; }
+
+  async function handle(text) {
+    await ensureStore();
+    var t = norm(text).trim(), m;
+    if (/^(ajuda|help|\?)$/.test(t)) return { t: helpText() };
+    if (/^(config|configurar|configuracao|configuracoes|ajustes)/.test(t)) { setTimeout(openConfig, 450); return { t: 'Abrindo as **configurações de custos** ⚙' }; }
+    if (/^(produtos|banco|laboratorios?|importar)/.test(t)) { setTimeout(openProducts, 450); return { t: 'Abrindo o **banco de produtos** 📦' }; }
+    if (/^custos$/.test(t)) return { h: costsSummary() };
+    if ((m = t.match(/^custo\s+(?:r\$\s*)?(\d[\d.,]*)\s*(.*)$/))) {
+      var c = parseNum(m[1]); if (isNaN(c)) return { t: 'Não entendi o valor. Exemplo: `custo 180 lente`' };
+      return { h: priceCard('Custo informado', c, catFrom(m[2])) };
+    }
+    if ((m = t.match(/^(?:preco|quanto custa|quanto e|valor|custa)\s+(?:o |a |os |as |do |da |de )?(.+)$/))) {
+      var r = findProducts(m[1]);
+      if (!r.length) return { t: 'Não achei **"' + m[1] + '"** no banco. Cadastre em 📦 ou use `custo 180 lente`.' };
+      if (r.length === 1) return { h: priceCard(r[0].name + (r[0].lab ? ' (' + r[0].lab + ')' : ''), +r[0].cost, r[0].category) };
+      return { h: '<div class="v-card"><h4>' + r.length + ' produtos encontrados</h4>' + r.slice(0, 8).map(function (p) {
+        var x = calc(+p.cost, p.category);
+        return '<div class="v-price"><div class="v-row"><span>' + esc(p.name) + ' <small>(' + esc(p.lab || '—') + ')</small></span><b>' + money(x.round) + '</b></div></div>';
+      }).join('') + (r.length > 8 ? '<small>…refine a busca para ver os demais.</small>' : '<small>Valores já arredondados. Digite o nome completo para o detalhamento.</small>') + '</div>' };
+    }
+    var rx = analyseRx(text);
+    if (rx) return { h: rx };
+    if (/^(oi|ola|bom dia|boa tarde|boa noite|e ai)\b/.test(t)) return { t: 'Olá! 👋 Sou o **Vision**. Digite uma dioptria, peça um preço ou digite `ajuda`.' };
+    return { t: 'Hmm, não entendi essa 🤔. Tente uma dioptria (`OD -2.00 -0.50 180 / OE -1.75 -0.25 175`), `preço <produto>` ou `ajuda`.' };
+  }
+
+  /* ═══ CHAT (UI) ═══ */
+  function addMsg(content, who, isHtml, wide) {
+    var d = document.createElement('div'); d.className = 'v-msg ' + (who === 'u' ? 'v-user' : 'v-bot') + (wide ? ' v-wide' : '');
+    d.innerHTML = isHtml ? content : md(content); var box = $('visionMsgs'); box.appendChild(d); box.scrollTop = box.scrollHeight; return d;
+  }
+  function reply(res) { // indicador "digitando" por ~380ms
+    var ty = addMsg('<span class="v-typing"><span></span><span></span><span></span></span>', 'b', true);
+    setTimeout(function () { ty.remove(); if (res.h) addMsg(res.h, 'b', true, true); else addMsg(res.t, 'b'); }, 380);
+  }
+  async function send() {
+    var inp = $('visionInput'), txt = inp.value.trim(); if (!txt) return;
+    inp.value = ''; inp.style.height = '38px'; addMsg(txt, 'u');
+    try { reply(await handle(txt)); } catch (e) { console.error(e); reply({ t: 'Ops, algo deu errado ao processar. Tente novamente.' }); }
+  }
+  async function toggle(open) {
+    var p = $('visionPanel'); open = open === undefined ? !p.classList.contains('open') : open;
+    p.classList.toggle('open', open); $('visionFab').style.display = open ? 'none' : 'block';
+    if (open) {
+      await ensureStore();
+      if (!V.welcomed) { V.welcomed = true; addMsg('Oi! Eu sou o **Vision** 👓🤖\nLoja ativa: **' + storeId() + '**. Digite uma dioptria, peça um preço ou escreva `ajuda`.', 'b'); }
+      setTimeout(function () { $('visionInput').focus(); }, 50);
+    }
+  }
+
+  /* ═══ MODAIS ═══ */
+  function openModal(html) { $('visionModalBox').innerHTML = html; $('visionModalWrap').classList.add('open'); }
+  function closeModal() { $('visionModalWrap').classList.remove('open'); }
+
+  /* ── Modal de configuração de custos ── */
+  async function openConfig() {
+    await ensureStore();
+    var inp = function (k, l, st) { return '<label class="v-lb">' + l + '<input class="v-in" id="vc_' + k + '" type="number" min="0" step="' + (st || '0.01') + '" value="' + (+V.cfg[k] || 0) + '" oninput="Vision.prev()"></label>'; };
+    openModal('<h3>⚙ Custos — loja ' + esc(storeId()) + '<button class="v-x" onclick="Vision.closeModal()">✕</button></h3>' +
+      '<h5>Despesas mensais (R$)</h5><div class="v-grid2">' + FIXED.map(function (f) { return inp(f[0], f[1]); }).join('') + '</div>' +
+      '<h5>Custos por par (R$)</h5><div class="v-grid2">' + inp('packaging', 'Embalagem/sacola/estojo') + inp('assembly', 'Montagem') + '</div>' +
+      '<h5>Volume</h5>' + inp('volume', 'Óculos vendidos/mês (média)', '1') +
+      '<h5>Markups</h5><div class="v-grid2">' + inp('mkLente', 'Lentes (×)', '0.1') + inp('mkArmacao', 'Armações (×)', '0.1') + inp('mkServico', 'Serviços (×)', '0.1') + '</div>' +
+      '<h5>Prévia em tempo real</h5><div class="v-card" id="vcPrev"></div>' +
+      '<div class="v-actions"><button class="v-btn" onclick="Vision.saveConfig()">Salvar</button><button class="v-btn sec" onclick="Vision.closeModal()">Cancelar</button></div>');
+    prev();
+  }
+  function readCfg() {
+    var c = Object.assign({}, V.cfg);
+    Object.keys(CFG_DEF).forEach(function (k) { var el = $('vc_' + k); if (el) c[k] = parseFloat(el.value) || 0; });
+    return c;
+  }
+  function prev() {
+    var c = readCfg(), o = opPar(c), r = calc(200, 'lente', c), row = function (a, b, t) { return '<div class="v-row' + (t ? ' v-total' : '') + '"><span>' + a + '</span><b>' + b + '</b></div>'; };
+    $('vcPrev').innerHTML = '<div class="v-price">' + row('Total mensal', money(o.fixed)) + row('Rateio por par', money(o.rateio)) + row('Embalagem + montagem', money(o.emb + o.mont)) +
+      row('Custo operacional por par', money(o.op), 1) + row('Ex.: lente custo R$ 200 → preço sugerido', money(r.price) + ' (≈ ' + money(r.round) + ')', 1) + '</div>';
+  }
+  async function saveConfig() {
+    V.cfg = readCfg();
+    try { await saveCfg(); toast('Configurações do Vision salvas'); closeModal(); if ($('visionPanel').classList.contains('open')) reply({ h: costsSummary() }); }
+    catch (e) { console.error(e); toast('Erro ao salvar configurações', 'error'); }
+  }
+
+  /* ── Modal de produtos ── */
+  async function openProducts() {
+    await ensureStore();
+    openModal('<h3>📦 Produtos dos laboratórios — ' + esc(storeId()) + '<button class="v-x" onclick="Vision.closeModal()">✕</button></h3>' +
+      '<input class="v-in" id="vpSearch" placeholder="Buscar por código, nome ou laboratório…" oninput="Vision.renderList()">' +
+      '<div class="v-actions"><button class="v-btn" onclick="document.getElementById(\'vpFile\').click()">📥 Importar Excel/CSV</button>' +
+      '<button class="v-btn sec" onclick="Vision.addManual()">➕ Cadastrar</button><button class="v-btn red" onclick="Vision.clearAll()">Apagar todos</button></div>' +
+      '<input type="file" id="vpFile" accept=".xlsx,.xls,.csv" style="display:none" onchange="Vision.importFile(this.files[0]);this.value=\'\'">' +
+      '<small style="display:block;margin-top:6px;opacity:.75">Colunas reconhecidas: Código, Nome, Laboratório, Categoria, Custo (CSV com , ou ;).</small><div class="v-plist" id="vpList"></div>');
+    renderList();
+  }
+  function renderList() {
+    var q = norm(($('vpSearch') || {}).value || ''), box = $('vpList'); if (!box) return;
+    var rows = []; V.items.forEach(function (p, i) { if (!q || norm(p.code + ' ' + p.name + ' ' + p.lab).indexOf(q) > -1) rows.push([p, i]); });
+    if (!rows.length) { box.innerHTML = '<div class="v-pitem">Nenhum produto ' + (V.items.length ? 'encontrado.' : 'cadastrado ainda.') + '</div>'; return; }
+    box.innerHTML = rows.slice(0, 200).map(function (r) {
+      var p = r[0]; return '<div class="v-pitem"><div class="v-pi"><b>' + esc(p.name) + '</b><small>' + esc(p.code || 's/ código') + ' · ' + esc(p.lab || '—') + ' · ' + (CATS[p.category] || p.category) + '</small></div><b>' + money(p.cost) + '</b><button class="v-x" title="Remover" onclick="Vision.removeItem(' + r[1] + ')">🗑</button></div>';
+    }).join('') + (rows.length > 200 ? '<div class="v-pitem">Mostrando 200 de ' + rows.length + ' — refine a busca.</div>' : '');
+  }
+  async function removeItem(i) { V.items.splice(i, 1); await saveItems(); renderList(); toast('Produto removido'); }
+  async function clearAll() { if (!V.items.length || !confirm('Apagar TODOS os ' + V.items.length + ' produtos do Vision desta loja?')) return; V.items = []; await saveItems(); renderList(); toast('Banco de produtos apagado', 'warning'); }
+  async function addManual() {
+    var code = prompt('Código do produto:'); if (code === null) return;
+    var name = prompt('Nome do produto:'); if (!name) return;
+    var lab = prompt('Laboratório:'); if (lab === null) return;
+    var cat = prompt('Categoria (lente, armacao, servico, tratamento):', 'lente'); if (cat === null) return;
+    var cost = parseNum(prompt('Custo (R$):') || ''); if (isNaN(cost)) { toast('Custo inválido', 'error'); return; }
+    upsertItems([{ code: code.trim(), name: name.trim(), lab: lab.trim(), category: catKey(cat), cost: cost }]);
+    await saveItems(); renderList(); toast('Produto cadastrado');
+  }
+  function catKey(s) { s = norm(s); return /arm/.test(s) ? 'armacao' : /serv/.test(s) ? 'servico' : /trat/.test(s) ? 'tratamento' : 'lente'; }
+  function upsertItems(list) { // atualiza por código (ou nome+lab) e adiciona os novos
+    var key = function (p) { return p.code ? 'c:' + norm(p.code) : 'n:' + norm(p.name) + '|' + norm(p.lab); }, map = {};
+    V.items.forEach(function (p, i) { map[key(p)] = i; });
+    list.forEach(function (p) { var k = key(p); if (map[k] !== undefined) V.items[map[k]] = p; else { map[k] = V.items.length; V.items.push(p); } });
+  }
+
+  /* ── Importação CSV / Excel com detecção automática de colunas ── */
+  function parseCSV(txt) {
+    var first = txt.split(/\r?\n/)[0] || '', sep = first.split(';').length > first.split(',').length ? ';' : ',';
+    var rows = [], row = [], cur = '', q = false;
+    for (var i = 0; i < txt.length; i++) {
+      var c = txt[i];
+      if (q) { if (c === '"') { if (txt[i + 1] === '"') { cur += '"'; i++; } else q = false; } else cur += c; }
+      else if (c === '"') q = true;
+      else if (c === sep) { row.push(cur); cur = ''; }
+      else if (c === '\n' || c === '\r') { if (c === '\r' && txt[i + 1] === '\n') i++; row.push(cur); rows.push(row); row = []; cur = ''; }
+      else cur += c;
+    }
+    if (cur !== '' || row.length) { row.push(cur); rows.push(row); }
+    return rows.filter(function (r) { return r.some(function (x) { return String(x).trim() !== ''; }); });
+  }
+  function rowsToItems(rows) {
+    if (!rows.length) return [];
+    var h = rows[0].map(norm), find = function (re) { for (var i = 0; i < h.length; i++) if (re.test(h[i])) return i; return -1; };
+    var col = { code: find(/cod|sku|ref/), name: find(/nome|desc|produto|item/), lab: find(/lab|fornec|fabric/), cat: find(/cat|tipo|grupo/), cost: find(/custo|cost|valor|preco/) }, start = 1;
+    if (col.name < 0 || col.cost < 0) { col = { code: 0, name: 1, lab: 2, cat: 3, cost: 4 }; start = 0; } // sem cabeçalho: ordem padrão
+    var out = [];
+    rows.slice(start).forEach(function (r) {
+      var name = String(r[col.name] == null ? '' : r[col.name]).trim(), cost = parseNum(r[col.cost] == null ? '' : r[col.cost]);
+      if (!name || isNaN(cost)) return;
+      out.push({ code: col.code > -1 ? String(r[col.code] || '').trim() : '', name: name, lab: col.lab > -1 ? String(r[col.lab] || '').trim() : '', category: catKey(col.cat > -1 ? r[col.cat] : ''), cost: cost });
+    });
+    return out;
+  }
+  function importFile(file) {
+    if (!file) return;
+    var done = async function (rows) {
+      var list = rowsToItems(rows); if (!list.length) { toast('Nenhum produto válido encontrado no arquivo', 'warning'); return; }
+      upsertItems(list); await saveItems(); renderList(); toast(list.length + ' produtos importados');
+    }, rd = new FileReader();
+    if (/\.csv$/i.test(file.name)) { rd.onload = function () { done(parseCSV(String(rd.result).replace(/^\uFEFF/, ''))); }; rd.readAsText(file); }
+    else {
+      rd.onload = function () {
+        var run = function () { try { var wb = XLSX.read(rd.result, { type: 'array' }); done(XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { header: 1, defval: '' })); } catch (e) { console.error(e); toast('Erro ao ler a planilha', 'error'); } };
+        if (window._ensureXLSX) window._ensureXLSX(run); else run();
+      };
+      rd.readAsArrayBuffer(file);
+    }
+  }
+
+  /* ═══ INICIALIZAÇÃO ═══ */
+  async function boot() {
+    if (V.booted) return; V.booted = true;
+    $('visionFab').insertAdjacentHTML('afterbegin', avatar('f')); $('visionHeadAvatar').innerHTML = avatar('h');
+    $('visionFab').addEventListener('click', function () { toggle(true); });
+    var inp = $('visionInput');
+    inp.addEventListener('keydown', function (e) { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); } });
+    inp.addEventListener('input', function () { this.style.height = '38px'; this.style.height = Math.min(this.scrollHeight, 110) + 'px'; });
+    $('visionModalWrap').addEventListener('click', function (e) { if (e.target === this) closeModal(); });
+    await loadData();
+    // Vigia: mostra o botão só com usuário logado e recarrega dados ao trocar de loja
+    setInterval(function () {
+      var logged = !!window._authUser, open = $('visionPanel').classList.contains('open');
+      $('visionFab').style.display = (logged && !open) ? 'block' : 'none';
+      if (!logged && open) toggle(false);
+      if (logged && V.store !== storeId()) { loadData(); V.welcomed = false; $('visionMsgs').innerHTML = ''; }
+    }, 1500);
+  }
+  function waitAuth() { var iv = setInterval(function () { if (window._authUser) { clearInterval(iv); boot(); } }, 700); }
+  if (document.readyState === 'complete') waitAuth(); else window.addEventListener('load', waitAuth);
+
+  /* API pública usada pelos botões inline */
+  window.Vision = { toggle: toggle, send: send, openConfig: openConfig, openProducts: openProducts, closeModal: closeModal, prev: prev, saveConfig: saveConfig,
+    renderList: renderList, removeItem: removeItem, clearAll: clearAll, addManual: addManual, importFile: importFile };
+})();
+</script>
+
 </body>
 </html>
