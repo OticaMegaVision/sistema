@@ -24136,8 +24136,9 @@ tbody tr td{border:1.5px solid #000;padding:2mm;text-align:center;font-weight:70
             _miaLimparNome(nome) {
                 return (nome || '')
                     .replace(/\s*[-+]?\s*\d+[.,]\d+\s*a\s*[-+]?\s*\d+[.,]\d+.*$/i, '')
+                    .replace(/\s*[-+]\s*\d+[.,]\d+\s*a\s*\+?\/?-?\s*\d+[.,]\d+.*$/i, '') // ex.: "- 0.25 a +/- 4.00 Cil. - 2.00"
                     .replace(/\s*Esf\.?.*$/i, '')
-                    .replace(/\s*[-–]\s*$/, '')
+                    .replace(/(\s*[-–])+\s*$/, '')
                     .trim();
             },
 
@@ -24168,7 +24169,11 @@ tbody tr td{border:1.5px solid #000;padding:2mm;text-align:center;font-weight:70
                 // tabelas lado a lado (2 colunas) em algumas páginas — quando isso
                 // acontece, essa linha pode conter 2 produtos diferentes; pegamos
                 // sempre o primeiro (mais à esquerda), que é o mais confiável.
-                const linhaPat = /^\s*(\d{3,5}(?:\s*\/\s*\d{3,5})?)\s+([A-Za-zÀ-ú].*?)\s+(\d{1,4}[.,]\d{2})\b/;
+                // ✅ FIX CUSTO-2703 (R$ 11,00 virava 150): o padrão antigo aceitava ponto OU vírgula
+                // e pegava o "1.50" do índice da lente ("LP PRO DESIGN 1.50 CLEAR") como preço
+                // (miaParseNumero("1.50") = 150). Preço da tabela é SEMPRE com vírgula
+                // (ex.: 11,00 / 1.021,90), então exigimos vírgula nos centavos.
+                const linhaPat = /^\s*(\d{3,5}(?:\s*\/\s*\d{3,5})?)\s+([A-Za-zÀ-ú].*?)\s+(\d{1,3}(?:\.\d{3})*,\d{2})(?!\d)/;
                 linhas.forEach(linha => {
                     const l = linha.trim();
                     if (l.includes('LENTES PRONTAS KODAK')) categoria = 'Lentes Prontas Kodak';
@@ -24183,7 +24188,7 @@ tbody tr td{border:1.5px solid #000;padding:2mm;text-align:center;font-weight:70
                     else if (l.includes('TECHNOPARK')) categoria = 'Technopark';
                     else if (l.includes('KODAK PRECISE') || l.includes('KODAK') && l.includes('MULTIFOCAIS')) categoria = 'Multifocais Kodak UHD';
 
-                    if (!/\d[.,]\d{2}/.test(l)) return;
+                    if (!/\d,\d{2}/.test(l)) return;
                     const m = linhaPat.exec(l);
                     if (!m) return;
                     const codigo = m[1].split('/')[0].trim();
@@ -24624,7 +24629,7 @@ tbody tr td{border:1.5px solid #000;padding:2mm;text-align:center;font-weight:70
                 if (total === 0) { Toast.show('Nada para aplicar', 'warning'); return; }
                 if (!confirm(`Aplicar ${total} produtos (${comp.novos.length} novos, ${comp.atualizados.length} atualizados)?`)) return;
 
-                let novosCount = 0, atualizadosCount = 0;
+                let novosCount = 0, atualizadosCount = 0, algumLogo = false;
                 const agora = new Date().toISOString();
 
                 comp.atualizados.forEach(p => {
@@ -24633,6 +24638,10 @@ tbody tr td{border:1.5px solid #000;padding:2mm;text-align:center;font-weight:70
                     prod.costPrice = p.custo;
                     prod.price = parseFloat(calc.precoVenda.toFixed(2));
                     prod.qty = this.MIA_ESTOQUE_PADRAO;
+                    // logo da marca: só preenche se não houver foto, ou se a imagem atual já é um logo de marca
+                    // (nunca sobrescreve uma foto real do produto)
+                    const logoUp = this.miaLogoParaProduto(p);
+                    if (logoUp && prod.image !== logoUp && (!prod.image || Object.values(this._LOGOS_MARCA).includes(prod.image))) { prod.image = logoUp; algumLogo = true; }
                     prod.updated_at = agora;
                     SupaSync.upsertProduto(prod);
                     atualizadosCount++;
@@ -24651,15 +24660,17 @@ tbody tr td{border:1.5px solid #000;padding:2mm;text-align:center;font-weight:70
                         minQty: 5,
                         color: '',
                         frameType: '',
-                        image: null,
+                        image: this.miaLogoParaProduto(p),
                         updated_at: agora
                     };
+                    if (novoProduto.image) algumLogo = true;
                     state.products.push(novoProduto);
                     SupaSync.upsertProduto(novoProduto);
                     novosCount++;
                 });
 
                 App.saveData();
+                if (algumLogo) { try { window.CloudSync?.pushMediaNow?.(); } catch (_e) {} } // envia os logos p/ os outros aparelhos
 
                 if (!state.markupIAHistorico) state.markupIAHistorico = [];
                 state.markupIAHistorico.unshift({ data: agora, laboratorio: this._miaLabDetectado, total, novos: novosCount, atualizados: atualizadosCount });
@@ -24884,6 +24895,15 @@ tbody tr td{border:1.5px solid #000;padding:2mm;text-align:center;font-weight:70
             _LAB_COLUNA_MARCA: {
                 'braslab': 'braslab',
                 'optra/ptra': 'visco'
+            },
+            // Logo de reserva por laboratório do Markup IA, quando o nome do produto não
+            // traz nenhuma palavra-chave de marca (ex.: "LT FOTOSSENSIVEL AR").
+            _MIA_LAB_LOGO: { 'tech-vantagens': 'technopark', 'brasprecios': 'braslab', 'visco': 'visco' },
+            miaLogoParaProduto(p) {
+                const l = this._escolherLogoMarca(p.nome, p.codigo, '');
+                if (l) return l;
+                const k = this._MIA_LAB_LOGO[p.laboratorio];
+                return k ? (this._LOGOS_MARCA[k] || null) : null;
             },
             _escolherLogoMarca(nome, codigo, laboratorio) {
                 const n = ' ' + (nome || '').toUpperCase() + ' ';
