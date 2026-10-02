@@ -34671,6 +34671,94 @@ window.ImportadorReceituario = ImportadorReceituario;
     // ══════════════════════════════════════════════════════════════
     //  VisionRecommender — regras ópticas para sugerir lentes
     // ══════════════════════════════════════════════════════════════
+    // ══════════════════════════════════════════════════════════════
+    //  VisionDB — acesso do agente ao banco (state + IndexedDB da loja)
+    // ══════════════════════════════════════════════════════════════
+    const VisionDB = {
+        COLS: ['clients', 'products', 'services', 'suppliers', 'sales', 'expenses', 'prescriptions', 'crmContatos', 'crmTarefas'],
+        D: {},
+        // Usa o state em memória; se a coleção estiver vazia, lê direto do IndexedDB da loja ativa
+        async load() {
+            const s = window.state || {};
+            for (const c of this.COLS) {
+                let a = Array.isArray(s[c]) ? s[c] : [];
+                if (!a.length && typeof sbGetCollection === 'function') {
+                    try { a = (await sbGetCollection(storeId(), c)) || []; } catch (e) { a = []; }
+                }
+                this.D[c] = a.filter(x => x && typeof x === 'object' && x.id !== '__temp__');
+            }
+            return this.D;
+        },
+        _all(c) { return this.D[c] || []; },
+        _mes(m) { return /^\d{4}-\d{2}$/.test(m || '') ? m : new Date().toISOString().slice(0, 7); },
+        _nome(id) { const c = this._all('clients').find(x => x.id === id); return c ? c.name : ''; },
+        _cpf(v) { const d = String(v || '').replace(/\D/g, ''); return d.length === 11 ? '***.***.***-' + d.slice(9) : ''; },
+        _pend(s) { return !/entreg|cancel/.test(norm(s.status)); },
+        _achar(q) {
+            const n = norm(q), d = n.replace(/\D/g, '');
+            if (!n) return [];
+            return this._all('clients').filter(c => norm(c.name).includes(n) || (d.length >= 4 && String(c.phone || c.whatsapp || c.cpf || '').replace(/\D/g, '').includes(d)));
+        },
+        tools: {
+            buscar_clientes(a) {
+                const r = VisionDB._achar(a.q);
+                return { total: r.length, clientes: r.slice(0, 8).map(c => ({ nome: c.name, telefone: c.phone || c.whatsapp || '', cpf: VisionDB._cpf(c.cpf), cidade: c.city || '', nascimento: c.birthDate || '' })) };
+            },
+            receituario_cliente(a) {
+                const c = VisionDB._achar(a.cliente)[0];
+                if (!c) return { erro: 'cliente não encontrado' };
+                const p = VisionDB._all('prescriptions').filter(x => x.clientId === c.id).sort((x, y) => String(y.date).localeCompare(String(x.date)))[0];
+                return p ? { cliente: c.name, data: p.date, od: p.od, oe: p.oe, dp: p.dp } : { cliente: c.name, erro: 'sem receituário cadastrado' };
+            },
+            consultar_estoque(a) {
+                const n = norm(a.q), baixo = String(a.somente_baixo) === 'true';
+                const r = VisionDB._all('products').filter(p => (!n || norm(p.name + ' ' + (p.category || '') + ' ' + (p.code || '')).includes(n)) && (!baixo || (p.minQty > 0 && (p.qty || 0) <= p.minQty)));
+                return { total: r.length, itens: r.slice(0, Number(a.limite) || 15).map(p => ({ nome: p.name, categoria: p.category || '', qtd: p.qty || 0, minimo: p.minQty || 0, preco: p.price || 0, custo: p.costPrice || 0 })) };
+            },
+            listar_vendas(a) {
+                const n = norm(a.cliente), st = norm(a.status), pend = String(a.pendentes) === 'true';
+                const r = VisionDB._all('sales').filter(s => (!n || norm(VisionDB._nome(s.clientId)).includes(n)) && (!st || norm(s.status).includes(st)) && (!a.mes || String(s.date || '').startsWith(a.mes)) && (!pend || VisionDB._pend(s)))
+                    .sort((x, y) => String(y.date).localeCompare(String(x.date)));
+                return { total: r.length, vendas: r.slice(0, Number(a.limite) || 12).map(s => ({ numero: s.number, data: s.date, cliente: VisionDB._nome(s.clientId), total: s.total || 0, status: s.status, vendedor: s.seller || '', previsao_entrega: s.deliveryForecast || '', itens: (s.items || []).map(i => i.name || i.desc || i.description).filter(Boolean).slice(0, 5) })) };
+            },
+            listar_despesas(a) {
+                const mes = VisionDB._mes(a.mes), st = norm(a.status);
+                const r = VisionDB._all('expenses').filter(e => String(e.date || '').startsWith(mes) && (!st || norm(e.status).includes(st)));
+                return { mes, total: r.length, total_valor: r.reduce((s, e) => s + (Number(e.value) || 0), 0), despesas: r.slice(0, Number(a.limite) || 15).map(e => ({ data: e.date, descricao: e.desc, categoria: e.category, valor: e.value || 0, status: e.status })) };
+            },
+            listar_fornecedores(a) {
+                const n = norm(a.q);
+                const r = VisionDB._all('suppliers').filter(f => !n || norm(f.name).includes(n));
+                return { total: r.length, fornecedores: r.slice(0, 15).map(f => ({ nome: f.name, telefone: f.phone || '', cidade: f.city || '', cnpj: f.cnpj || '' })) };
+            },
+            resumo_financeiro(a) {
+                const mes = VisionDB._mes(a.mes);
+                const v = VisionDB._all('sales').filter(s => String(s.date || '').startsWith(mes) && !/cancel/.test(norm(s.status)));
+                const fat = v.reduce((s, x) => s + (Number(x.total) || 0), 0), por = {};
+                v.forEach(x => { const k = x.seller || '—'; por[k] = (por[k] || 0) + (Number(x.total) || 0); });
+                const top = Object.entries(por).sort((x, y) => y[1] - x[1])[0];
+                const desp = VisionDB.tools.listar_despesas({ mes }).total_valor;
+                return { mes, vendas: v.length, faturamento: fat, ticket_medio: v.length ? fat / v.length : 0, despesas: desp, saldo: fat - desp, melhor_vendedor: top ? top[0] : '', estoque_baixo: VisionDB.tools.consultar_estoque({ somente_baixo: 'true' }).total, vendas_pendentes: VisionDB._all('sales').filter(VisionDB._pend).length };
+            }
+        },
+        // Descrição das ferramentas (formato OpenAI function calling)
+        schema: [
+            ['buscar_clientes', 'Busca clientes por nome, telefone ou CPF', { q: 'nome, telefone ou CPF' }],
+            ['receituario_cliente', 'Último receituário (grau) de um cliente', { cliente: 'nome do cliente' }],
+            ['consultar_estoque', 'Consulta produtos e estoque', { q: 'nome/categoria/código (opcional)', somente_baixo: '"true" para só estoque no mínimo', limite: 'máximo de itens' }],
+            ['listar_vendas', 'Lista vendas/OS', { cliente: 'nome', status: 'status', mes: 'AAAA-MM', pendentes: '"true" para não entregues', limite: 'máximo' }],
+            ['listar_despesas', 'Lista despesas do mês', { mes: 'AAAA-MM (padrão: atual)', status: 'status (ex.: pendente)' }],
+            ['listar_fornecedores', 'Lista fornecedores', { q: 'nome (opcional)' }],
+            ['resumo_financeiro', 'Faturamento, despesas, saldo e alertas do mês', { mes: 'AAAA-MM (padrão: atual)' }]
+        ].map(([name, description, p]) => ({ type: 'function', function: { name, description, parameters: { type: 'object', properties: Object.fromEntries(Object.entries(p).map(([k, d]) => [k, { type: 'string', description: d }])) } } })),
+        // Plano B para provedores sem suporte a ferramentas: resumo dos dados no contexto
+        digest(t) {
+            const T = this.tools, seen = {};
+            norm(t).split(/\s+/).filter(x => x.length > 3).forEach(w => this._achar(w).slice(0, 3).forEach(c => { seen[c.id] = c; }));
+            return { resumo: T.resumo_financeiro({}), estoque_baixo: T.consultar_estoque({ somente_baixo: 'true', limite: '10' }), vendas_recentes: T.listar_vendas({ limite: '8' }), despesas_mes: T.listar_despesas({}), clientes: Object.values(seen).slice(0, 6).map(c => ({ nome: c.name, telefone: c.phone || '' })) };
+        }
+    };
+
     const VisionRecommender = {
         // Lê "-2.00 -0.50 180 / -1.75 -0.25 175" (OD / OE). 4º número = adição.
         parseReceita(texto) {
@@ -34728,7 +34816,7 @@ window.ImportadorReceituario = ImportadorReceituario;
         // Busca lentes reais cadastradas cujo nome cita o índice
         produtosReais(indice, tipo) {
             const alvo = [indice, indice.replace('.', '')];
-            return (state.products || []).filter(p => {
+            return (VisionDB.D.products || []).filter(p => {
                 const nome = norm(p.name);
                 const ehLente = /lente/.test(norm(p.category)) || /lente|1\.\d\d/.test(nome);
                 if (!ehLente || !alvo.some(a => nome.includes(a))) return false;
@@ -34918,7 +35006,7 @@ window.ImportadorReceituario = ImportadorReceituario;
                 box.innerHTML = `<div class="vz-msg vz-bot"><div class="vz-bubble">${semChave
                     ? 'Olá! Sou o Vision 🤖👓. Para usar minha inteligência completa, configure em <b>Configurações → Vision IA</b>. Enquanto isso, funciono com regras locais! Experimente: <i>analisar receita -2.00 -0.50 180 / -1.75 -0.25 175</i>'
                     : 'Olá! Sou o Vision 🤖👓. Como posso ajudar?'}</div></div>
-                    <div class="vz-chips" id="visionChips">${['Analisar receituário', 'Preço ideal de lente', 'Buscar cliente', 'Ver receituário', 'Resumo de vendas']
+                    <div class="vz-chips" id="visionChips">${['Analisar receituário', 'Preço ideal de lente', 'Buscar cliente', 'Ver receituário', 'Resumo de vendas', 'Estoque baixo', 'Despesas do mês']
                         .map(c => `<button type="button" class="vz-chip" onclick="Vision._chip('${c}')">${c}</button>`).join('')}</div>`;
             } else {
                 box.innerHTML = this._msgs.map(m => this._bubbleHTML(m)).join('');
@@ -34931,7 +35019,9 @@ window.ImportadorReceituario = ImportadorReceituario;
                 'Preço ideal de lente': () => this._ask('Informe categoria e custo. Ex.: <i>preço lente 1.61 custo 80</i>'),
                 'Buscar cliente': () => this._ask('Diga o nome, telefone ou CPF. Ex.: <i>cliente Maria Silva</i>'),
                 'Ver receituário': () => this._ask('Diga de quem. Ex.: <i>receituário de Maria Silva</i>'),
-                'Resumo de vendas': () => this.send('resumo de vendas')
+                'Resumo de vendas': () => this.send('resumo de vendas'),
+                'Estoque baixo': () => this.send('estoque baixo'),
+                'Despesas do mês': () => this.send('despesas do mês')
             };
             (exemplos[c] || (() => {}))();
         },
@@ -34944,13 +35034,14 @@ window.ImportadorReceituario = ImportadorReceituario;
         },
 
         // ---- Dicas proativas contextuais ----
-        _renderProactiveHint() {
+        async _renderProactiveHint() {
             try {
+                await VisionDB.load();
                 const dicas = [];
-                const baixos = (state.products || []).filter(p => (p.qty || 0) <= (p.minQty || 0) && (p.minQty || 0) > 0).length;
+                const baixos = (VisionDB.D.products || []).filter(p => (p.qty || 0) <= (p.minQty || 0) && (p.minQty || 0) > 0).length;
                 if (baixos) dicas.push(`⚠️ ${baixos} produto(s) com estoque no mínimo ou abaixo. Vale repor.`);
                 const hoje = new Date().toISOString().slice(0, 10);
-                const prontas = (state.sales || []).filter(s => s.deliveryForecast && s.deliveryForecast <= hoje && !/entreg|cancel/.test(norm(s.status))).length;
+                const prontas = (VisionDB.D.sales || []).filter(s => s.deliveryForecast && s.deliveryForecast <= hoje && !/entreg|cancel/.test(norm(s.status))).length;
                 if (prontas) dicas.push(`📦 ${prontas} venda(s) com previsão de entrega vencida ou para hoje.`);
                 if (!(state.markupIAConfig || {}).visionDespesasOk) dicas.push('💡 Confirme as despesas da loja em Configurações → Vision IA para eu calcular preços melhores.');
                 if (!dicas.length) return;
@@ -34976,6 +35067,7 @@ window.ImportadorReceituario = ImportadorReceituario;
             document.getElementById('visionMsgs').scrollTop = 1e9;
             let resp;
             try {
+                await VisionDB.load();
                 if (this._online()) {
                     try { resp = await this._respostaOnline(t); }
                     catch (e) { resp = this._respostaOffline(t) + `<br><small>(IA online indisponível: ${esc(e.message)}. Usei regras locais.)</small>`; }
@@ -34988,27 +35080,55 @@ window.ImportadorReceituario = ImportadorReceituario;
 
         // ---- Modo online (OpenAI-compatível: OpenAI, Groq, OpenRouter...) ----
         _contexto() {
-            const c = Products.miaCfg();
-            return `Loja ativa: ${storeId()}. Clientes: ${(state.clients || []).length}. Produtos: ${(state.products || []).length}. Vendas: ${(state.sales || []).length}. ` +
-                `Despesas fixas/mês: ${brl(Object.values(c.despesasFixas).reduce((a, v) => a + v, 0))}; variáveis/venda: ${brl(Object.values(c.despesasVariaveis).reduce((a, v) => a + v, 0))}; vendas/mês: ${c.vendasMensais}.`;
+            const c = Products.miaCfg(), D = VisionDB.D, r = VisionDB.tools.resumo_financeiro({});
+            return `Loja ativa: ${storeId()}. Clientes: ${(D.clients || []).length}. Produtos: ${(D.products || []).length}. Vendas: ${(D.sales || []).length}. ` +
+                `Despesas fixas/mês: ${brl(Object.values(c.despesasFixas).reduce((a, v) => a + v, 0))}; variáveis/venda: ${brl(Object.values(c.despesasVariaveis).reduce((a, v) => a + v, 0))}; vendas/mês: ${c.vendasMensais}. ` +
+                `Mês ${r.mes}: ${r.vendas} vendas, faturamento ${brl(r.faturamento)}, despesas ${brl(r.despesas)}.`;
         },
-        async _chamarAPI(messages, maxTokens) {
+        async _chamarAPI(messages, maxTokens, tools) {
             const co = this._co();
             const url = co.visionApiUrl || 'https://api.openai.com/v1/chat/completions';
+            const body = { model: co.visionModel || 'gpt-4o-mini', messages, max_tokens: maxTokens || 600, temperature: 0.4 };
+            if (tools) { body.tools = tools; body.tool_choice = 'auto'; }
             const r = await fetch(url, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + this._apiKey() },
-                body: JSON.stringify({ model: co.visionModel || 'gpt-4o-mini', messages, max_tokens: maxTokens || 600, temperature: 0.4 })
+                body: JSON.stringify(body)
             });
             if (!r.ok) throw new Error('HTTP ' + r.status);
             const j = await r.json();
-            return (j.choices && j.choices[0] && j.choices[0].message && j.choices[0].message.content) || '';
+            const m = (j.choices && j.choices[0] && j.choices[0].message) || {};
+            return tools ? m : (m.content || '');
         },
+        // IA online com acesso ao banco: o modelo chama as ferramentas do VisionDB (até 4 rodadas)
         async _respostaOnline(t) {
-            const sys = 'Você é o Vision, assistente de uma ótica brasileira. Ajude o funcionário a interpretar receituários, sugerir lentes (material, índice, tratamento, tipo de visão) e preço de venda. Responda em português, de forma curta e prática. ' + this._contexto();
+            await VisionDB.load();
+            const sys = 'Você é o Vision, assistente de uma ótica brasileira. Ajude o funcionário a interpretar receituários, sugerir lentes (material, índice, tratamento, tipo de visão) e preço de venda. Você TEM acesso ao banco de dados da loja pelas ferramentas: consulte-as antes de responder sobre clientes, estoque, vendas, despesas ou receitas, e nunca invente dados. Responda em português, de forma curta e prática. ' + this._contexto();
             const hist = this._msgs.slice(-11, -1).map(m => ({ role: m.role === 'user' ? 'user' : 'assistant', content: String(m.content).replace(/<br>/g, '\n').replace(/<[^>]+>/g, '') }));
-            const out = await this._chamarAPI([{ role: 'system', content: sys }, ...hist, { role: 'user', content: t }]);
-            return esc(out).replace(/\n/g, '<br>');
+            const msgs = [{ role: 'system', content: sys }, ...hist, { role: 'user', content: t }];
+            try {
+                for (let i = 0; i < 4; i++) {
+                    const m = await this._chamarAPI(msgs, 700, VisionDB.schema);
+                    if (!m.tool_calls || !m.tool_calls.length) return esc(m.content || '').replace(/\n/g, '<br>');
+                    msgs.push(m);
+                    for (const tc of m.tool_calls) {
+                        let a = {}; try { a = JSON.parse(tc.function.arguments || '{}'); } catch (e) {}
+                        const fn = VisionDB.tools[tc.function.name];
+                        let res; try { res = fn ? fn(a) : { erro: 'ferramenta desconhecida' }; } catch (e) { res = { erro: e.message }; }
+                        msgs.push({ role: 'tool', tool_call_id: tc.id, content: JSON.stringify(res).slice(0, 6000) });
+                    }
+                }
+                return 'Não consegui concluir a consulta. Tente reformular a pergunta.';
+            } catch (e) {
+                if (!/^HTTP 4/.test(e.message) || msgs.length > hist.length + 2) throw e;
+                msgs[0].content += ' DADOS DA LOJA (JSON): ' + JSON.stringify(VisionDB.digest(t)).slice(0, 7000);
+                return esc(await this._chamarAPI(msgs, 700)).replace(/\n/g, '<br>');
+            }
+        },
+        _lista(titulo, r, fn, extra) {
+            const it = r.itens || r.vendas || r.despesas || r.fornecedores || [];
+            if (!it.length) return `<b>${titulo}</b><br>Nada encontrado.`;
+            return `<b>${titulo}</b> (${r.total})<br>` + it.map(x => '• ' + fn(x)).join('<br>') + (r.total > it.length ? `<br><small>…e mais ${r.total - it.length}.</small>` : '') + (extra ? '<br>' + extra : '');
         },
         async testarConexao() {
             const el = document.getElementById('vision-test-result');
@@ -35031,10 +35151,18 @@ window.ImportadorReceituario = ImportadorReceituario;
             if (/receituario (de|do|da)|receita (de|do|da)/.test(n)) return this._verReceituario(t);
             if (/preco|custo|margem|markup|quanto cobrar/.test(n)) return this._precificar(t);
             if (/resumo|faturamento|vendas|vendi/.test(n)) return this._resumoVendas();
+            if (/estoque|armac|produto|reposi|acabando/.test(n)) {
+                const baixo = /baix|reposi|acabando|minimo/.test(n);
+                const q = n.replace(/.*\b(estoque|produtos?|armacao|armacoes)\b( de| do| da)?/, '').replace(/\b(baixo|reposicao|acabando|minimo)\b/g, '').trim();
+                return this._lista('📦 Estoque', VisionDB.tools.consultar_estoque({ q, somente_baixo: String(baixo) }), i => `${esc(i.nome)} — <b>${i.qtd}</b> un. (mín. ${i.minimo}) · ${brl(i.preco)}`);
+            }
+            if (/despesa|gasto|a pagar|pagar/.test(n)) { const r = VisionDB.tools.listar_despesas({}); return this._lista('💸 Despesas do mês', r, d => `${esc(d.data)} · ${esc(d.descricao)} — ${brl(d.valor)} (${esc(d.status || '—')})`, `Total: <b>${brl(r.total_valor)}</b>`); }
+            if (/entrega|pendente|atrasad|prazo/.test(n)) return this._lista('📦 Vendas pendentes', VisionDB.tools.listar_vendas({ pendentes: 'true', limite: '10' }), s => `OS ${esc(s.numero)} · ${esc(s.cliente || '—')} — ${brl(s.total)}${s.previsao_entrega ? ' · entrega ' + esc(s.previsao_entrega) : ''}`);
+            if (/fornecedor/.test(n)) return this._lista('🏭 Fornecedores', VisionDB.tools.listar_fornecedores({ q: n.replace(/.*fornecedores?( de| do| da)?/, '') }), f => `${esc(f.nome)}${f.telefone ? ' — ' + esc(f.telefone) : ''}`);
             if (/cliente|telefone|whatsapp|cpf|buscar/.test(n)) return this._buscarCliente(t);
             if (/receit|grau|dioptria|longe|perto|multifocal|bifocal|simples/.test(n))
                 return 'Para analisar, envie o grau assim: <i>analisar receita -2.00 -0.50 180 / -1.75 -0.25 175</i> (OD / OE; use o 4º número como adição).';
-            return 'Posso: <b>analisar receita</b>, sugerir <b>preço</b>, <b>buscar cliente</b>, mostrar <b>receituário de</b> um cliente ou dar o <b>resumo de vendas</b>.';
+            return 'Posso: <b>analisar receita</b>, sugerir <b>preço</b>, <b>buscar cliente</b>, <b>receituário de</b> um cliente, <b>resumo de vendas</b>, <b>estoque</b>, <b>despesas</b>, <b>entregas pendentes</b> ou <b>fornecedores</b>.';
         },
 
         _precificar(t) {
@@ -35055,7 +35183,7 @@ window.ImportadorReceituario = ImportadorReceituario;
             const q = norm(t).replace(/\b(buscar|cliente|ver|receituario|receita|telefone|whatsapp|cpf|de|do|da)\b/g, ' ').replace(/\s+/g, ' ').trim();
             if (!q) return [];
             const dig = q.replace(/\D/g, '');
-            return (state.clients || []).filter(c => norm(c.name).includes(q) || (dig.length >= 4 && String(c.phone || c.whatsapp || c.cpf || '').replace(/\D/g, '').includes(dig))).slice(0, 5);
+            return (VisionDB.D.clients || []).filter(c => norm(c.name).includes(q) || (dig.length >= 4 && String(c.phone || c.whatsapp || c.cpf || '').replace(/\D/g, '').includes(dig))).slice(0, 5);
         },
         _buscarCliente(t) {
             const achados = this._achaClientes(t);
@@ -35065,13 +35193,13 @@ window.ImportadorReceituario = ImportadorReceituario;
         _verReceituario(t) {
             const c = this._achaClientes(t)[0];
             if (!c) return 'Não encontrei esse cliente. Diga o nome como está cadastrado.';
-            const p = (state.prescriptions || []).filter(x => x.clientId === c.id).sort((a, b) => String(b.date).localeCompare(String(a.date)))[0];
+            const p = (VisionDB.D.prescriptions || []).filter(x => x.clientId === c.id).sort((a, b) => String(b.date).localeCompare(String(a.date)))[0];
             if (!p) return `${esc(c.name)} não tem receituário cadastrado.`;
             const o = (x, n) => `${n}: esf ${esc(x.sph)} / cil ${esc(x.cyl)} × ${esc(x.axis)}°${num(x.add) ? ' / add ' + esc(x.add) : ''}`;
             return `<b>👓 Receituário de ${esc(c.name)}</b><br>Data: ${esc(p.date || '—')}<br>${o(p.od || {}, 'OD')}<br>${o(p.oe || {}, 'OE')}<br>DP: ${esc(p.dp || '—')}<br><br>Quer a sugestão de lentes para esse grau? Cole: <i>analisar receita ${esc(p.od.sph)} ${esc(p.od.cyl)} ${esc(p.od.axis)} ${esc(p.od.add || 0)} / ${esc(p.oe.sph)} ${esc(p.oe.cyl)} ${esc(p.oe.axis)} ${esc(p.oe.add || 0)}</i>`;
         },
         _resumoVendas() {
-            const vendas = state.sales || [];
+            const vendas = VisionDB.D.sales || [];
             if (!vendas.length) return 'Ainda não há vendas cadastradas nesta loja.';
             const mes = new Date().toISOString().slice(0, 7);
             const doMes = vendas.filter(s => String(s.date || '').startsWith(mes));
