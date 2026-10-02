@@ -24559,7 +24559,8 @@ tbody tr td{border:1.5px solid #000;padding:2mm;text-align:center;font-weight:70
                     const texto = await this.miaExtrairTextoPDF(file);
                     setProgress(40, 'Detectando laboratório...');
                     this._miaLabDetectado = this.miaDetectarLaboratorio(texto);
-                    const labInfo = this.miaGetLabInfo(this._miaLabDetectado);
+                    let labInfo = this.miaGetLabInfo(this._miaLabDetectado);
+                    this._miaLidoPorIA = false; this._miaMsgIA = '';
                     setProgress(60, 'Extraindo produtos...');
                     let produtos = [];
                     if (this._miaLabDetectado === 'tech-vantagens') produtos = this.miaParseTechVantagens(texto);
@@ -24570,22 +24571,135 @@ tbody tr td{border:1.5px solid #000;padding:2mm;text-align:center;font-weight:70
                     else if (this._miaLabDetectado === 'sygma') produtos = this.miaParseSygma(texto);
                     else if (this._miaLabDetectado === 'visco') produtos = this.miaParseVisco(texto);
                     else produtos = this.miaParseGenerico(texto);
+                    // ✅ PLANO B (IA com visão): só roda se o leitor de texto acima NÃO achou nenhum
+                    // produto (ex.: PDF cujo texto o pdf.js não consegue ler). Quando algum leitor
+                    // funciona, esse bloco é ignorado e nada muda no comportamento anterior.
+                    if (produtos.length === 0) {
+                        const ia = await this.miaLerComIA(file, setProgress);
+                        if (ia && ia.produtos.length) {
+                            produtos = ia.produtos;
+                            this._miaLabDetectado = ia.lab;
+                            labInfo = this.miaGetLabInfo(ia.lab);
+                            this._miaLidoPorIA = true;
+                        } else if (ia && ia.msg) this._miaMsgIA = ia.msg;
+                    }
                     setProgress(80, 'Comparando com o cadastro atual...');
                     this._miaProdutosProcessados = produtos;
                     const comp = this.miaCompararComBase(produtos);
                     setProgress(100, 'Concluído!');
                     setTimeout(() => {
+                        if (produtos.length === 0 && this._miaMsgIA) {
+                            status.innerHTML = `<div class="mia-warning">${this._miaMsgIA}</div>`;
+                            return;
+                        }
                         if (produtos.length === 0) {
                             status.innerHTML = `<div class="mia-warning">⚠️ Nenhum produto reconhecido nesse PDF. Laboratório detectado: <span class="mia-badge ${labInfo.cls}">${labInfo.icone} ${labInfo.nome}</span>. Se o padrão desse PDF for diferente do esperado, me avise pra eu ajustar a leitura.</div>`;
                             return;
                         }
                         status.innerHTML = `<div class="mia-success">✅ <strong>PDF processado!</strong><br>Laboratório: <span class="mia-badge ${labInfo.cls}">${labInfo.icone} ${labInfo.nome}</span><br>Produtos encontrados: <strong>${produtos.length}</strong></div>`;
+                        if (this._miaLidoPorIA) status.innerHTML += `<div class="mia-warning">🤖 Este PDF foi lido por <strong>IA (leitura por imagem)</strong>. Confira os códigos e preços na prévia antes de aplicar.</div>`;
                         this.miaMostrarPreview(comp, this._miaLabDetectado);
                     }, 300);
                 } catch (error) {
                     console.error(error);
                     status.innerHTML = `<div class="mia-warning">❌ Erro ao processar PDF: ${error.message}</div>`;
                 }
+            },
+
+            // ══════════ LEITURA POR IA (visão) — plano B para PDFs sem texto legível ══════════
+            // Reaproveita a mesma chave/URL/modelo da aba Configurações → Vision IA
+            // (API compatível com OpenAI; o modelo precisa aceitar imagens, ex.: gpt-4o-mini).
+            miaIACfg() {
+                const co = state.company || {};
+                let key = co.visionApiKey || '';
+                try { key = key || localStorage.getItem('vision_key_' + (window._currentStore || 'barueri')) || ''; } catch (_e) {}
+                return { key, url: co.visionApiUrl || 'https://api.openai.com/v1/chat/completions', model: co.visionModel || 'gpt-4o-mini' };
+            },
+
+            _miaNumeroIA(v) {
+                if (typeof v === 'number') return v;
+                const t = String(v == null ? '' : v).replace(/[^\d.,]/g, '');
+                if (/,\d{1,2}$/.test(t)) return this.miaParseNumero(t); // formato BR (1.021,90)
+                return parseFloat(t) || 0;                               // formato com ponto decimal (85.00)
+            },
+
+            _miaCategoriaIA(lab, nome) {
+                if (lab === 'brasprecios') {
+                    if (/MULTI\s*C\.?O\.?\s*PRO\s*HD/i.test(nome)) return 'Multifocais C.O. Pro HD';
+                    if (/MULTI\s*C\.?O\.?\s*PRO/i.test(nome)) return 'Multifocais C.O. Pro';
+                    if (/MULTI\s*C\.?O\.?\s*SELECT/i.test(nome)) return 'Multifocais C.O. Select';
+                    if (/^VS\b/i.test(nome)) return 'Visão Simples Surf';
+                    return 'Lentes Acabadas';
+                }
+                return 'Lentes';
+            },
+
+            async _miaPaginaParaImagem(pdf, n) {
+                const page = await pdf.getPage(n);
+                const v0 = page.getViewport({ scale: 1 });
+                const scale = Math.min(2.2, 1800 / Math.max(v0.width, v0.height));
+                const vp = page.getViewport({ scale });
+                const canvas = document.createElement('canvas');
+                canvas.width = Math.floor(vp.width); canvas.height = Math.floor(vp.height);
+                const ctx = canvas.getContext('2d');
+                ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, canvas.width, canvas.height);
+                await page.render({ canvasContext: ctx, viewport: vp }).promise;
+                const url = canvas.toDataURL('image/jpeg', 0.85);
+                canvas.width = 0; canvas.height = 0;
+                return url;
+            },
+
+            async miaLerComIA(file, setProgress) {
+                const cfg = this.miaIACfg();
+                if (!cfg.key) return { produtos: [], msg: '⚠️ Não consegui ler o texto desse PDF e a <strong>chave da IA não está configurada</strong>. Cadastre em Configurações → Vision IA (API Key) e envie o PDF de novo.' };
+                if (!confirm('Não consegui ler o texto desse PDF.\n\nPosso usar a IA para ler as páginas como imagem. As páginas serão enviadas ao provedor da IA configurada e há um pequeno custo por PDF.\n\nContinuar?'))
+                    return { produtos: [], msg: 'Leitura por IA cancelada. Nada foi alterado.' };
+                const PROMPT = 'Você lê tabelas de preços de laboratórios ópticos brasileiros. Extraia TODAS as linhas de produto da página. ' +
+                    'Responda SOMENTE com JSON, sem texto extra: {"laboratorio":"brasprecios|tech-vantagens|sygma|visco|generico","produtos":[{"codigo":"5431","nome":"MULTI C.O. PRO HD 1.50 CR","custo":85.00}]}. ' +
+                    'Regras: "codigo" = coluna Cód. Web (só o número; se houver dois separados por "/", use o primeiro). ' +
+                    '"nome" = descrição como impressa, sem selos como "Novidade" ou "imperdível". ' +
+                    '"custo" = o PRIMEIRO preço preenchido da linha, da esquerda para a direita (ex.: coluna "Sem A.R."; se vazia, a próxima coluna com valor), número com ponto decimal (ex.: 1021.90). ' +
+                    'Ignore linhas sem preço, textos promocionais, telefones, endereços e rodapés. Não invente produtos nem valores. ' +
+                    'Laboratório: brasprecios = Braspreços/Braslab (C.O.); tech-vantagens = Tech Vantagens/Technopark; sygma = Sygma; visco = Visco; senão generico.';
+                if (typeof pdfjsLib === 'undefined') return { produtos: [], msg: '❌ Biblioteca de PDF não carregou (verifique a internet e recarregue a página).' };
+                const pdf = await pdfjsLib.getDocument({ data: await file.arrayBuffer() }).promise;
+                const todos = [], votos = {}, erros = [];
+                for (let n = 1; n <= pdf.numPages; n++) {
+                    setProgress(45 + Math.round(30 * (n - 1) / pdf.numPages), `IA lendo página ${n} de ${pdf.numPages}...`);
+                    try {
+                        const img = await this._miaPaginaParaImagem(pdf, n);
+                        const r = await fetch(cfg.url, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + cfg.key },
+                            body: JSON.stringify({ model: cfg.model, temperature: 0, max_tokens: 4000, messages: [
+                                { role: 'system', content: PROMPT },
+                                { role: 'user', content: [
+                                    { type: 'text', text: `Extraia os produtos desta página (${n} de ${pdf.numPages}).` },
+                                    { type: 'image_url', image_url: { url: img, detail: 'high' } } ] } ] })
+                        });
+                        if (!r.ok) { let d = ''; try { d = (await r.text()).slice(0, 160); } catch (_e) {} throw new Error('HTTP ' + r.status + (d ? ' — ' + d : '')); }
+                        const j = await r.json();
+                        const txt = (((j.choices || [])[0] || {}).message || {}).content || '';
+                        const m = /\{[\s\S]*\}/.exec(txt.replace(/```json|```/g, ''));
+                        const dados = JSON.parse(m ? m[0] : '{}');
+                        if (dados.laboratorio) votos[dados.laboratorio] = (votos[dados.laboratorio] || 0) + 1;
+                        (dados.produtos || []).forEach(x => todos.push(x));
+                    } catch (e) { console.error('[MarkupIA] IA página ' + n, e); erros.push(`pág. ${n}: ${e.message}`); }
+                }
+                const validos = ['brasprecios', 'tech-vantagens', 'sygma', 'visco'];
+                let lab = Object.keys(votos).filter(k => validos.includes(k)).sort((a, b) => votos[b] - votos[a])[0] || '';
+                if (!lab) lab = todos.some(x => /C\.?O\./i.test(String(x.nome || ''))) ? 'brasprecios' : 'generico';
+                const produtos = [];
+                todos.forEach(x => {
+                    const codigo = String(x.codigo == null ? '' : x.codigo).split('/')[0].replace(/\D/g, '');
+                    const nome = String(x.nome || '').replace(/\b(novidade|imperd[ií]vel)\b/gi, '').replace(/\s+/g, ' ').trim().substring(0, 100);
+                    const custo = this._miaNumeroIA(x.custo);
+                    if (/^\d{3,6}$/.test(codigo) && nome && custo > 0 && custo < 50000 && !produtos.find(p => p.codigo === codigo))
+                        produtos.push({ codigo, nome, categoria: this._miaCategoriaIA(lab, nome), custo, laboratorio: lab });
+                });
+                if (!produtos.length) return { produtos: [], msg: '❌ A IA não retornou produtos válidos.' + (erros.length ? ' Detalhes: ' + erros.join(' | ') : '') + ' Confira a chave, a URL e se o modelo aceita imagens (Configurações → Vision IA).' };
+                if (erros.length) Toast.show('Algumas páginas falharam na IA: ' + erros.join(' | '), 'warning');
+                return { produtos, lab };
             },
 
             miaMostrarPreview(comp, lab) {
