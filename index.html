@@ -9139,6 +9139,8 @@ body.dark-mode,
                         <div class="mia-form-group"><label>💡 Luz (R$)</label><input type="text" inputmode="numeric" id="mia-luz" placeholder="0,00" oninput="Utils.maskMoney(this)"></div>
                         <div class="mia-form-group"><label>💧 Água (R$)</label><input type="text" inputmode="numeric" id="mia-agua" placeholder="0,00" oninput="Utils.maskMoney(this)"></div>
                         <div class="mia-form-group"><label>🚚 Transporte/Logística (R$)</label><input type="text" inputmode="numeric" id="mia-transporte" placeholder="0,00" oninput="Utils.maskMoney(this)"></div>
+                        <div class="mia-form-group"><label>🌐 Internet (R$)</label><input type="text" inputmode="numeric" id="mia-internet" placeholder="0,00" oninput="Utils.maskMoney(this)"></div>
+                        <div class="mia-form-group"><label>📦 Outras Fixas (R$)</label><input type="text" inputmode="numeric" id="mia-outras-fixas" placeholder="0,00" oninput="Utils.maskMoney(this)"></div>
                         <div class="mia-form-group"><label>📊 Vendas Estimadas/Mês</label><input type="number" id="mia-vendasmensais" step="1" min="0"></div>
                     </div>
                     <h4>Despesas Variáveis por Unidade</h4>
@@ -9854,7 +9856,7 @@ body.dark-mode,
                                 <div class="bkp-status-ic" style="background:#f3f0ff;color:#7c3aed;"><i class="fas fa-code-branch"></i></div>
                                 <div class="txt">
                                     <b>Versão do sistema</b>
-                                    <span>versão <strong>021020260645</strong></span>
+                                    <span>versão <strong>021020262037</strong></span>
                                 </div>
                             </div>
                         </div>
@@ -10557,26 +10559,9 @@ body.dark-mode,
                     </div>
                     <div class="form-container" style="margin-top:1rem;">
                         <h3 style="color:var(--primary);margin-bottom:.25rem;">📊 Despesas e Custo Mensal da Loja</h3>
-                        <p style="color:var(--gray);font-size:.85rem;margin-bottom:1rem;">Esses valores são salvos por loja e usados pelo Vision para calcular o preço ideal de venda. São os mesmos da aba Markup IA.</p>
-                        <h4 style="margin:.5rem 0;">Despesas fixas mensais</h4>
-                        <div class="vz-grid">
-                            <div class="form-group"><label for="vision-aluguel">🏠 Aluguel (R$)</label><input type="text" inputmode="numeric" id="vision-aluguel" class="form-control" placeholder="0,00" oninput="Utils.maskMoney(this); Vision.saveDespesasDebounced()" onblur="Vision.saveDespesas()"></div>
-                            <div class="form-group"><label for="vision-funcionario">👤 Funcionário (R$)</label><input type="text" inputmode="numeric" id="vision-funcionario" class="form-control" placeholder="0,00" oninput="Utils.maskMoney(this); Vision.saveDespesasDebounced()" onblur="Vision.saveDespesas()"></div>
-                            <div class="form-group"><label for="vision-luz">💡 Luz (R$)</label><input type="text" inputmode="numeric" id="vision-luz" class="form-control" placeholder="0,00" oninput="Utils.maskMoney(this); Vision.saveDespesasDebounced()" onblur="Vision.saveDespesas()"></div>
-                            <div class="form-group"><label for="vision-agua">💧 Água (R$)</label><input type="text" inputmode="numeric" id="vision-agua" class="form-control" placeholder="0,00" oninput="Utils.maskMoney(this); Vision.saveDespesasDebounced()" onblur="Vision.saveDespesas()"></div>
-                            <div class="form-group"><label for="vision-internet">🌐 Internet (R$)</label><input type="text" inputmode="numeric" id="vision-internet" class="form-control" placeholder="0,00" oninput="Utils.maskMoney(this); Vision.saveDespesasDebounced()" onblur="Vision.saveDespesas()"></div>
-                            <div class="form-group"><label for="vision-logistica">🚚 Logística (R$)</label><input type="text" inputmode="numeric" id="vision-logistica" class="form-control" placeholder="0,00" oninput="Utils.maskMoney(this); Vision.saveDespesasDebounced()" onblur="Vision.saveDespesas()"></div>
-                            <div class="form-group"><label for="vision-outras-fixas">📦 Outras Fixas (R$)</label><input type="text" inputmode="numeric" id="vision-outras-fixas" class="form-control" placeholder="0,00" oninput="Utils.maskMoney(this); Vision.saveDespesasDebounced()" onblur="Vision.saveDespesas()"></div>
-                        </div>
-                        <h4 style="margin:.75rem 0 .5rem;">Despesas variáveis por venda</h4>
-                        <div class="vz-grid">
-                            <div class="form-group"><label for="vision-sacola">🛍️ Sacola (R$)</label><input type="text" inputmode="numeric" id="vision-sacola" class="form-control" placeholder="0,00" oninput="Utils.maskMoney(this); Vision.saveDespesasDebounced()" onblur="Vision.saveDespesas()"></div>
-                            <div class="form-group"><label for="vision-estojo">👓 Estojo (R$)</label><input type="text" inputmode="numeric" id="vision-estojo" class="form-control" placeholder="0,00" oninput="Utils.maskMoney(this); Vision.saveDespesasDebounced()" onblur="Vision.saveDespesas()"></div>
-                            <div class="form-group"><label for="vision-montagem">🔧 Montagem (R$)</label><input type="text" inputmode="numeric" id="vision-montagem" class="form-control" placeholder="0,00" oninput="Utils.maskMoney(this); Vision.saveDespesasDebounced()" onblur="Vision.saveDespesas()"></div>
-                        </div>
-                        <h4 style="margin:.75rem 0 .5rem;">Volume de vendas</h4>
-                        <div class="form-group"><label for="vision-vendasmensais">📈 Qtd. Óculos Vendidos/Mês</label><input type="number" min="1" step="1" id="vision-vendasmensais" class="form-control" oninput="Vision.saveDespesasDebounced()" onblur="Vision.saveDespesas()"></div>
-                        <button type="button" class="btn btn-primary" onclick="Vision.saveDespesas(true)" style="margin-top:.5rem;font-weight:700;">💾 Salvar Despesas do Vision</button>
+                        <p style="color:var(--gray);font-size:.85rem;margin-bottom:.75rem;">O Vision usa as despesas cadastradas em <b>Produtos → Markup IA</b> para calcular o preço ideal. Elas são editadas só lá, para não haver dois lugares com os mesmos campos.</p>
+                        <div id="vision-despesas-resumo" style="background:var(--light,#f7f7f7);border-radius:10px;padding:.75rem 1rem;font-size:.9rem;line-height:1.7;"></div>
+                        <button type="button" class="btn btn-primary" onclick="Vision.irParaMarkupIA()" style="margin-top:.75rem;font-weight:700;">✏️ Editar despesas no Markup IA</button>
                     </div>
                 </div>
 
@@ -24038,6 +24023,8 @@ tbody tr td{border:1.5px solid #000;padding:2mm;text-align:center;font-weight:70
                 setMoney('mia-luz', c.despesasFixas.luz);
                 setMoney('mia-agua', c.despesasFixas.agua);
                 setMoney('mia-transporte', c.despesasFixas.transporte);
+                setMoney('mia-internet', c.despesasFixas.internet);
+                setMoney('mia-outras-fixas', c.despesasFixas.outrasFixas);
                 document.getElementById('mia-vendasmensais').value = c.vendasMensais;
                 setMoney('mia-sacola', c.despesasVariaveis.sacola);
                 setMoney('mia-estojo', c.despesasVariaveis.estojo);
@@ -24809,13 +24796,16 @@ tbody tr td{border:1.5px solid #000;padding:2mm;text-align:center;font-weight:70
                 const c = this.miaCfg();
                 const money = id => Utils.parseMoney(document.getElementById(id).value);
                 c.despesasFixas = {
-                    ...c.despesasFixas, // preserva internet/outrasFixas do Vision IA
+                    ...c.despesasFixas,
                     aluguel: money('mia-aluguel'),
                     funcionario: money('mia-funcionario'),
                     luz: money('mia-luz'),
                     agua: money('mia-agua'),
-                    transporte: money('mia-transporte')
+                    transporte: money('mia-transporte'),
+                    internet: money('mia-internet'),
+                    outrasFixas: money('mia-outras-fixas')
                 };
+                c.visionDespesasOk = true; // despesas confirmadas (o Vision usa este flag para parar de pedir)
                 c.despesasVariaveis = {
                     sacola: money('mia-sacola'),
                     estojo: money('mia-estojo'),
@@ -34928,6 +34918,8 @@ window.ImportadorReceituario = ImportadorReceituario;
     const VisionDB = {
         COLS: ['clients', 'products', 'services', 'suppliers', 'sales', 'expenses', 'prescriptions', 'crmContatos', 'crmTarefas'],
         D: {},
+        R: [],        // contas a receber (somente leitura), recalculadas a cada load()
+        _contas: [],  // contas manuais (ContasManager)
         // Usa o state em memória; se a coleção estiver vazia, lê direto do IndexedDB da loja ativa
         async load() {
             const s = window.state || {};
@@ -34938,7 +34930,87 @@ window.ImportadorReceituario = ImportadorReceituario;
                 }
                 this.D[c] = a.filter(x => x && typeof x === 'object' && x.id !== '__temp__');
             }
+            // Contas manuais (a receber lançadas à mão) — só leitura
+            try { this._contas = (typeof ContasManager !== 'undefined' && ContasManager.getAll) ? ((await ContasManager.getAll()) || []) : []; }
+            catch (e) { this._contas = []; }
+            try { this.R = this._montarReceber(); } catch (e) { console.warn('[Vision] contas a receber:', e); this.R = []; }
             return this.D;
+        },
+        // ── Contas a receber: espelha (somente leitura) as regras do ContasManager.renderAll ──
+        _hoje() { const d = new Date(); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); },
+        _montarReceber() {
+            const items = [], cli = new Map(this._all('clients').map(c => [c.id, c]));
+            const aVista = ['pix', 'cash', 'debit', 'credit'];
+            const lbl = { pix: 'PIX', cash: 'Dinheiro', debit: 'Débito', credit: 'Crédito', installment: 'Crediário', mixed: 'Misto' };
+            const pagaP = p => !!(p.paid || p.status === 'pago' || p.status === 'paid');
+            for (const sv of this._all('sales')) {
+                if (sv.status === 'cancelado') continue;
+                const nome = (cli.get(sv.clientId) || {}).name || 'Cliente';
+                const det = sv.paymentDetails || {}, method = sv.paymentMethod || '';
+                const venc0 = sv.deliveryForecast || sv.date || '';
+                const add = (id, desc, valor, venc, pago, cat) => items.push({
+                    id, saleId: sv.id, numero: sv.number, clientId: sv.clientId, cliente: nome,
+                    descricao: desc, categoria: cat, valor: parseFloat(valor) || 0, vencimento: String(venc || '').slice(0, 10), pago: !!pago
+                });
+                if (method === 'mixed' && Array.isArray(sv.mixedPayments) && sv.mixedPayments.length) {
+                    const r = parseFloat(det.retiradaValue || 0);
+                    if (r > 0.01) add('r_' + sv.id, 'Saldo na Retirada (' + sv.mixedPayments.map(x => lbl[x.method] || x.method).join('+') + ')', r, venc0, sv.retiradaPaga, 'Retirada');
+                    continue;
+                }
+                if (sv.paymentMode === 'dual' && sv.dualPayments && sv.dualPayments.length === 2) {
+                    sv.dualPayments.forEach((slot, idx) => {
+                        const sl = idx === 0 ? '1ª' : '2ª';
+                        if (slot.method === 'installment') {
+                            (slot.parcelas || []).forEach(pc => add('d' + idx + '_p' + pc.number, sl + ' Forma (Crediário) Parcela ' + pc.number + '/' + (slot.nParcelas || slot.parcelas.length), pagaP(pc) ? (pc.paidValue || pc.value || 0) : (pc.value || 0), pc.dueDate, pagaP(pc), 'Crediário'));
+                        }
+                        if ((slot.retirada || 0) > 0.01) add('d' + idx + '_ret', sl + ' Forma (' + (slot.method === 'installment' ? 'Crediário' : (lbl[slot.method] || slot.method)) + ') Retirada', slot.retirada, venc0, sv['retiradaPaga_dual' + idx], 'Retirada');
+                    });
+                    continue;
+                }
+                if (method === 'installment') {
+                    const parcelas = det.parcels || [];
+                    parcelas.forEach(pc => add('p' + pc.number, 'Parcela ' + pc.number + '/' + parcelas.length, pagaP(pc) ? (pc.paidValue || pc.value || 0) : (pc.value || 0), pc.dueDate, pagaP(pc), 'Crediário'));
+                    const r = parseFloat(det.retiradaEntry || 0) || parseFloat(det.retiradaValue || 0);
+                    if (r > 0.01) add('ret', 'Pagamento na Retirada', r, venc0, sv.retiradaPaga, 'Retirada');
+                    continue;
+                }
+                if (aVista.includes(method)) {
+                    const r = parseFloat(det.retiradaValue || 0);
+                    if (r > 0.01) add('ret', 'Saldo na Retirada (' + (lbl[method] || method) + ')', r, venc0, sv.retiradaPaga, 'Retirada');
+                    continue;
+                }
+                if ((det.parcels || []).length === 0 && sv.total > 0 && sv.status !== 'entregue') {
+                    const vp = sv._saldoRestanteTotal != null ? parseFloat(sv._saldoRestanteTotal) : parseFloat(sv.total || 0);
+                    add('total', 'Total', vp, venc0, sv.paymentStatus === 'pago' || sv.pago, 'Venda');
+                }
+            }
+            (this._contas || []).filter(c => c && c.tipo === 'receber').forEach(c => items.push({
+                id: c.id, saleId: null, numero: '', clientId: null, cliente: c.parte || '—', descricao: c.descricao || 'Conta a receber',
+                categoria: c.categoria || 'Manual', valor: parseFloat(c.valor || 0) || 0, vencimento: String(c.vencimento || '').slice(0, 10), pago: !!c.pago
+            }));
+            return items;
+        },
+        _diasAtraso(venc) { return venc ? Math.round((new Date(this._hoje() + 'T12:00:00') - new Date(venc + 'T12:00:00')) / 86400000) : 0; },
+        _vencida(i) { return !i.pago && i.valor > 0.009 && !!i.vencimento && i.vencimento < this._hoje(); },
+        _saldoVenda(sv) {
+            if (!sv || sv.status === 'cancelado' || sv.paymentStatus === 'pago') return 0;
+            return this.R.filter(i => i.saleId === sv.id && !i.pago).reduce((a, i) => a + i.valor, 0);
+        },
+        _numLimpo(v) { return String(v == null ? '' : v).replace(/\D/g, '').replace(/^0+/, ''); },
+        _vendaPorNumero(n) { const d = this._numLimpo(n); return d ? this._all('sales').filter(sv => this._numLimpo(sv.number) === d) : []; },
+        _resumoVenda(sv) {
+            const total = Number(sv.total) || 0, saldo = this._saldoVenda(sv);
+            const c = this._all('clients').find(x => x.id === sv.clientId) || {};
+            const venc = this.R.filter(i => i.saleId === sv.id && this._vencida(i));
+            return {
+                numero: sv.number, data: sv.date, cliente: c.name || '', telefone: c.phone || c.whatsapp || '',
+                total, pago: sv.status === 'cancelado' ? 0 : Math.max(0, total - saldo), saldo,
+                situacao_pagamento: sv.status === 'cancelado' ? 'cancelada' : (saldo > 0.009 ? 'pendente' : 'quitada'),
+                forma_pagamento: ({ pix: 'PIX', cash: 'Dinheiro', debit: 'Débito', credit: 'Crédito', installment: 'Crediário', mixed: 'Misto' })[sv.paymentMethod] || sv.paymentMethod || '',
+                status: sv.status, vendedor: sv.seller || '', previsao_entrega: sv.deliveryForecast || '',
+                parcelas_vencidas: venc.length, valor_vencido: venc.reduce((a, i) => a + i.valor, 0),
+                itens: (sv.items || []).map(i => i.name || i.desc || i.description).filter(Boolean).slice(0, 6)
+            };
         },
         _all(c) { return this.D[c] || []; },
         _mes(m) { return /^\d{4}-\d{2}$/.test(m || '') ? m : new Date().toISOString().slice(0, 7); },
@@ -34967,10 +35039,61 @@ window.ImportadorReceituario = ImportadorReceituario;
                 return { total: r.length, clientes: r.slice(0, 8).map(c => ({ nome: c.name, telefone: c.phone || c.whatsapp || '', cpf: VisionDB._cpf(c.cpf), cidade: c.city || '', nascimento: c.birthDate || '' })) };
             },
             receituario_cliente(a) {
-                const c = VisionDB._achar(a.cliente)[0];
+                let c = null, sv = null;
+                if (a.os) {
+                    sv = VisionDB._vendaPorNumero(a.os)[0];
+                    if (!sv) return { erro: 'OS ' + a.os + ' não encontrada' };
+                    c = VisionDB._all('clients').find(x => x.id === sv.clientId);
+                    if (!c) return { erro: 'a OS ' + a.os + ' não tem cliente vinculado' };
+                } else c = VisionDB._achar(a.cliente)[0];
                 if (!c) return { erro: 'cliente não encontrado' };
                 const p = VisionDB._all('prescriptions').filter(x => x.clientId === c.id).sort((x, y) => String(y.date).localeCompare(String(x.date)))[0];
-                return p ? { cliente: c.name, data: p.date, od: p.od, oe: p.oe, dp: p.dp } : { cliente: c.name, erro: 'sem receituário cadastrado' };
+                const base = sv ? { os: sv.number } : {};
+                return p ? Object.assign(base, { cliente: c.name, data: p.date, od: p.od, oe: p.oe, dp: p.dp, altura: p.height || '', profissional: p.optometrist || '', obs: p.notes || '' })
+                         : Object.assign(base, { cliente: c.name, erro: 'sem receituário cadastrado' });
+            },
+            buscar_venda(a) {
+                const V = VisionDB, st = norm(a.status), lim = Number(a.limite) || 8;
+                let r = V._all('sales');
+                if (a.numero) r = V._vendaPorNumero(a.numero);
+                else if (a.cliente || a.q) {
+                    const ids = new Set(V._achar(a.cliente || a.q).map(c => c.id));
+                    const d = V._numLimpo(a.q);
+                    r = r.filter(sv => ids.has(sv.clientId) || (d.length >= 3 && V._numLimpo(sv.number) === d));
+                } else if (a.valor) {
+                    const v = num(a.valor);
+                    r = r.filter(sv => Math.abs((Number(sv.total) || 0) - v) < 0.01);
+                }
+                r = r.filter(sv => (!st || norm(sv.status).includes(st)) && (!a.mes || String(sv.date || '').startsWith(a.mes)))
+                     .sort((x, y) => String(y.date).localeCompare(String(x.date)));
+                const lista = r.slice(0, lim).map(sv => V._resumoVenda(sv));
+                return {
+                    total: r.length, vendas: lista,
+                    soma_total: r.reduce((s, x) => s + (Number(x.total) || 0), 0),
+                    soma_saldo: r.reduce((s, x) => s + V._saldoVenda(x), 0)
+                };
+            },
+            contas_receber(a) {
+                const V = VisionDB, hoje = V._hoje(), lim = Number(a.limite) || 10;
+                const filtro = /vencer/.test(norm(a.filtro)) ? 'a_vencer' : (/todas|abert/.test(norm(a.filtro)) ? 'todas' : 'vencidas');
+                let base = V.R.filter(i => !i.pago && i.valor > 0.009);
+                const toks = V._tokens(a.cliente || '');
+                if (toks.length) base = base.filter(i => V._matchTokens(i.cliente, toks));
+                const soma = l => l.reduce((s, i) => s + i.valor, 0);
+                const vencidas = base.filter(i => V._vencida(i));
+                const aVencer = base.filter(i => i.vencimento && i.vencimento >= hoje);
+                const semVenc = base.filter(i => !i.vencimento);
+                let sel = filtro === 'vencidas' ? vencidas : filtro === 'a_vencer' ? aVencer : base;
+                sel = sel.slice().sort((x, y) => String(x.vencimento || '9999').localeCompare(String(y.vencimento || '9999')));
+                const por = {};
+                sel.forEach(i => { const k = i.cliente || '—'; (por[k] = por[k] || { nome: k, valor: 0, itens: 0 }); por[k].valor += i.valor; por[k].itens++; });
+                return {
+                    filtro, hoje, cliente: a.cliente || '',
+                    resumo: { vencido: soma(vencidas), qtd_vencidas: vencidas.length, a_vencer: soma(aVencer), sem_vencimento: soma(semVenc), total_aberto: soma(base) },
+                    total_itens: sel.length, total_valor: soma(sel),
+                    clientes: Object.values(por).sort((x, y) => y.valor - x.valor).slice(0, 5),
+                    itens: sel.slice(0, lim).map(i => ({ os: i.numero, cliente: i.cliente, descricao: i.descricao, valor: i.valor, vencimento: i.vencimento, dias_atraso: V._vencida(i) ? V._diasAtraso(i.vencimento) : 0 }))
+                };
             },
             consultar_estoque(a) {
                 const n = norm(a.q), baixo = String(a.somente_baixo) === 'true';
@@ -35007,7 +35130,9 @@ window.ImportadorReceituario = ImportadorReceituario;
         // Descrição das ferramentas (formato OpenAI function calling)
         schema: [
             ['buscar_clientes', 'Busca clientes por nome, telefone ou CPF', { q: 'nome, telefone ou CPF' }],
-            ['receituario_cliente', 'Último receituário (grau) de um cliente', { cliente: 'nome do cliente' }],
+            ['receituario_cliente', 'Receituário (grau, DNP, altura) de um cliente, por nome ou pelo número da OS', { cliente: 'nome do cliente (opcional se informar a OS)', os: 'número da OS/venda (opcional)' }],
+            ['buscar_venda', 'Busca venda/OS por número, cliente ou valor; mostra total, pago, saldo e parcelas vencidas', { numero: 'número da OS', cliente: 'nome, telefone ou CPF do cliente', valor: 'valor total da venda', mes: 'AAAA-MM', status: 'status', limite: 'máximo' }],
+            ['contas_receber', 'Contas a receber em aberto: vencidas, a vencer ou todas, geral ou de um cliente', { cliente: 'nome do cliente (opcional)', filtro: '\"vencidas\" (padrão), \"a_vencer\" ou \"todas\"', limite: 'máximo de itens' }],
             ['consultar_estoque', 'Consulta produtos e estoque', { q: 'nome/categoria/código (opcional)', somente_baixo: '"true" para só estoque no mínimo', limite: 'máximo de itens' }],
             ['listar_vendas', 'Lista vendas/OS', { cliente: 'nome', status: 'status', mes: 'AAAA-MM', pendentes: '"true" para não entregues', limite: 'máximo' }],
             ['listar_despesas', 'Lista despesas do mês', { mes: 'AAAA-MM (padrão: atual)', status: 'status (ex.: pendente)' }],
@@ -35310,7 +35435,7 @@ window.ImportadorReceituario = ImportadorReceituario;
                 box.innerHTML = `<div class="vz-msg vz-bot"><div class="vz-bubble">${semChave
                     ? 'Olá! Sou o Vision 🤖👓. Para usar minha inteligência completa, configure em <b>Configurações → Vision IA</b>. Enquanto isso, funciono com regras locais! Experimente: <i>analisar receita -2.00 -0.50 180 / -1.75 -0.25 175</i>'
                     : 'Olá! Sou o Vision 🤖👓. Como posso ajudar?'}</div></div>
-                    <div class="vz-chips" id="visionChips">${['Analisar receituário', 'Preço ideal de lente', 'Buscar cliente', 'Ver receituário', 'Resumo de vendas', 'Estoque baixo', 'Despesas do mês']
+                    <div class="vz-chips" id="visionChips">${['Analisar receituário', 'Preço ideal de lente', 'Buscar cliente', 'Ver receituário', 'Buscar venda', 'Contas vencidas', 'Resumo de vendas', 'Estoque baixo', 'Despesas do mês']
                         .map(c => `<button type="button" class="vz-chip" onclick="Vision._chip('${c}')">${c}</button>`).join('')}</div>`;
             } else {
                 box.innerHTML = this._msgs.map(m => this._bubbleHTML(m)).join('');
@@ -35322,7 +35447,9 @@ window.ImportadorReceituario = ImportadorReceituario;
                 'Analisar receituário': () => this._ask('Cole o grau (OD / OE). Ex.: <i>analisar receita -2.00 -0.50 180 / -1.75 -0.25 175</i>. Pode citar "dirige", "computador" ou "criança".'),
                 'Preço ideal de lente': () => this._ask('Informe categoria e custo. Ex.: <i>preço lente 1.61 custo 80</i>'),
                 'Buscar cliente': () => this._ask('Diga o nome, telefone ou CPF. Ex.: <i>cliente Maria Silva</i>'),
-                'Ver receituário': () => this._ask('Diga de quem. Ex.: <i>receituário de Maria Silva</i>'),
+                'Ver receituário': () => this._ask('Diga de quem ou a OS. Ex.: <i>receituário de Maria Silva</i> ou <i>receituário da OS 1234</i>'),
+                'Buscar venda': () => this._ask('Diga o número da OS ou o cliente. Ex.: <i>venda 1234</i> ou <i>vendas da Maria Silva</i>'),
+                'Contas vencidas': () => this.send('contas a receber vencidas'),
                 'Resumo de vendas': () => this.send('resumo de vendas'),
                 'Estoque baixo': () => this.send('estoque baixo'),
                 'Despesas do mês': () => this.send('despesas do mês')
@@ -35347,7 +35474,7 @@ window.ImportadorReceituario = ImportadorReceituario;
                 const hoje = new Date().toISOString().slice(0, 10);
                 const prontas = (VisionDB.D.sales || []).filter(s => s.deliveryForecast && s.deliveryForecast <= hoje && !/entreg|cancel/.test(norm(s.status))).length;
                 if (prontas) dicas.push(`📦 ${prontas} venda(s) com previsão de entrega vencida ou para hoje.`);
-                if (!(state.markupIAConfig || {}).visionDespesasOk) dicas.push('💡 Confirme as despesas da loja em Configurações → Vision IA para eu calcular preços melhores.');
+                if (!(state.markupIAConfig || {}).visionDespesasOk) dicas.push('💡 Confirme as despesas da loja em Produtos → Markup IA (botão Salvar Despesas) para eu calcular preços melhores.');
                 if (!dicas.length) return;
                 const ja = this._msgs.some(m => m.hint);
                 if (ja) return;
@@ -35407,7 +35534,7 @@ window.ImportadorReceituario = ImportadorReceituario;
         // IA online com acesso ao banco: o modelo chama as ferramentas do VisionDB (até 4 rodadas)
         async _respostaOnline(t) {
             await VisionDB.load();
-            const sys = 'Você é o Vision, assistente de uma ótica brasileira. Ajude o funcionário a interpretar receituários, sugerir lentes (material, índice, tratamento, tipo de visão) e preço de venda. Você TEM acesso ao banco de dados da loja pelas ferramentas: consulte-as antes de responder sobre clientes, estoque, vendas, despesas ou receitas, e nunca invente dados. Responda em português, de forma curta e prática. ' + this._contexto();
+            const sys = 'Você é o Vision, assistente de uma ótica brasileira. Ajude o funcionário a interpretar receituários, sugerir lentes (material, índice, tratamento, tipo de visão) e preço de venda. Você TEM acesso ao banco de dados da loja pelas ferramentas: consulte-as antes de responder sobre clientes, estoque, vendas (por número da OS ou cliente, com valor pago e saldo), contas a receber vencidas, despesas ou receitas, e nunca invente dados. Responda em português, de forma curta e prática. ' + this._contexto();
             const hist = this._msgs.slice(-11, -1).map(m => ({ role: m.role === 'user' ? 'user' : 'assistant', content: String(m.content).replace(/<br>/g, '\n').replace(/<[^>]+>/g, '') }));
             const msgs = [{ role: 'system', content: sys }, ...hist, { role: 'user', content: t }];
             try {
@@ -35452,7 +35579,14 @@ window.ImportadorReceituario = ImportadorReceituario;
                 const r = VisionRecommender.parseReceita(t.replace(/^.*?(receit\w*|grau)/i, ''));
                 if (r) return VisionRecommender.formatar(VisionRecommender.recomendar(r, t), r);
             }
-            if (/receituario (de|do|da)|receita (de|do|da)/.test(n)) return this._verReceituario(t);
+            if (/(receituario|receita|grau)\b.*\b(os|venda|pedido)\s*(n\S{0,8}\s*)?#?\d+|receituario (de|do|da)|receita (de|do|da)/.test(n)) return this._verReceituario(t);
+            // Contas a receber (vencidas, a vencer, por cliente) — antes de "vendas/pendente" para não confundir com entrega
+            if (/receber|vencid|vence\b|vencer|inadimpl|devedor|devendo|\bdeve\b|em atraso|parcelas? (atrasad|em aberto)|cobranca|em aberto/.test(n)) return this._contasReceber(t);
+            // Venda/OS por número ou por cliente, com valor pago e saldo
+            if (this._extrairOS(t) || /\b(venda|vendas|os|pedido|compra|compras)\b (de|do|da)\b|valor da (venda|os)|quanto (a|o|os|as)? ?\w+ (pagou|comprou|gastou|deve)/.test(n)) {
+                const rv = this._buscarVenda(t);
+                if (rv) return rv;
+            }
             if (/preco|custo|margem|markup|quanto cobrar/.test(n)) return this._precificar(t);
             if (/resumo|faturamento|vendas|vendi/.test(n)) return this._resumoVendas();
             if (/estoque|armac|produto|lente|oculos|óculos|reposi|acabando|c[oó]digo|\bcod\b/.test(n)) {
@@ -35479,7 +35613,7 @@ window.ImportadorReceituario = ImportadorReceituario;
                 const porCodigoOuNome = VisionDB.tools.consultar_estoque({ q: t, limite: '8' });
                 if (porCodigoOuNome.total) return this._lista('📦 Produto encontrado', porCodigoOuNome, i => this._formatarItemEstoque(i));
             }
-            return 'Posso: <b>analisar receita</b>, sugerir <b>preço</b>, <b>buscar cliente</b>, <b>receituário de</b> um cliente, <b>resumo de vendas</b>, <b>estoque/produto por nome ou código</b>, <b>despesas</b>, <b>entregas pendentes</b> ou <b>fornecedores</b>.';
+            return 'Posso: <b>analisar receita</b>, sugerir <b>preço</b>, <b>buscar cliente</b>, <b>receituário de</b> um cliente, <b>venda por nº da OS ou cliente</b> (com valor pago e saldo), <b>contas a receber vencidas</b>, <b>resumo de vendas</b>, <b>estoque/produto por nome ou código</b>, <b>despesas</b>, <b>entregas pendentes</b> ou <b>fornecedores</b>.';
         },
 
         // Preço sugerido (markup da loja) a partir do custo cadastrado do produto —
@@ -35531,12 +35665,85 @@ window.ImportadorReceituario = ImportadorReceituario;
             return '<b>👤 Clientes encontrados</b><br>' + achados.map(c => `• <b>${esc(c.name)}</b>${c.phone || c.whatsapp ? ' — ' + esc(c.phone || c.whatsapp) : ''}`).join('<br>');
         },
         _verReceituario(t) {
-            const c = this._achaClientes(t)[0];
-            if (!c) return 'Não encontrei esse cliente. Diga o nome como está cadastrado.';
-            const p = (VisionDB.D.prescriptions || []).filter(x => x.clientId === c.id).sort((a, b) => String(b.date).localeCompare(String(a.date)))[0];
+            const os = this._extrairOS(t);
+            const rr = os ? VisionDB.tools.receituario_cliente({ os }) : null;
+            let c, p;
+            if (os) {
+                if (rr.erro && !rr.cliente) return esc(rr.erro.charAt(0).toUpperCase() + rr.erro.slice(1)) + '. Confira o número.';
+                c = VisionDB._all('clients').find(x => norm(x.name) === norm(rr.cliente)) || { name: rr.cliente, id: null };
+                p = rr.erro ? null : { date: rr.data, od: rr.od, oe: rr.oe, dp: rr.dp, height: rr.altura, optometrist: rr.profissional, notes: rr.obs };
+            } else {
+                c = this._achaClientes(t)[0];
+                if (!c) return 'Não encontrei esse cliente. Diga o nome como está cadastrado.';
+                p = (VisionDB.D.prescriptions || []).filter(x => x.clientId === c.id).sort((a, b) => String(b.date).localeCompare(String(a.date)))[0];
+            }
             if (!p) return `${esc(c.name)} não tem receituário cadastrado.`;
-            const o = (x, n) => `${n}: esf ${esc(x.sph)} / cil ${esc(x.cyl)} × ${esc(x.axis)}°${num(x.add) ? ' / add ' + esc(x.add) : ''}`;
-            return `<b>👓 Receituário de ${esc(c.name)}</b><br>Data: ${esc(p.date || '—')}<br>${o(p.od || {}, 'OD')}<br>${o(p.oe || {}, 'OE')}<br>DP: ${esc(p.dp || '—')}<br><br>Quer a sugestão de lentes para esse grau? Cole: <i>analisar receita ${esc(p.od.sph)} ${esc(p.od.cyl)} ${esc(p.od.axis)} ${esc(p.od.add || 0)} / ${esc(p.oe.sph)} ${esc(p.oe.cyl)} ${esc(p.oe.axis)} ${esc(p.oe.add || 0)}</i>`;
+            const o = (x, n) => `${n}: esf ${esc(x.sph)} / cil ${esc(x.cyl)} × ${esc(x.axis)}°${num(x.add) ? ' / add ' + esc(x.add) : ''}${x.dnp ? ' / DNP ' + esc(x.dnp) : ''}`;
+            const od = p.od || {}, oe = p.oe || {};
+            return `<b>👓 Receituário de ${esc(c.name)}</b>${os ? ` (OS ${esc(os)})` : ''}<br>Data: ${esc(p.date || '—')}${p.optometrist ? ' · ' + esc(p.optometrist) : ''}<br>${o(od, 'OD')}<br>${o(oe, 'OE')}<br>DP: ${esc(p.dp || '—')}${p.height ? ' · Altura: ' + esc(p.height) : ''}${p.notes ? '<br>Obs.: ' + esc(p.notes) : ''}<br><br>Quer a sugestão de lentes para esse grau? Cole: <i>analisar receita ${esc(od.sph)} ${esc(od.cyl)} ${esc(od.axis)} / ${esc(oe.sph)} ${esc(oe.cyl)} ${esc(oe.axis)}</i>`;
+        },
+        // ---- Busca de vendas / contas a receber (modo offline) ----
+        _extrairOS(t) {
+            const n = norm(t);
+            const m = n.match(/\b(?:os|venda|pedido)\s*(?:n(?:umero|[º°o.])?\s*)?#?(\d{1,8})\b/) || n.match(/#(\d{1,8})\b/);
+            return m ? m[1] : '';
+        },
+        // Sobra só o nome do cliente: remove palavras de comando/encaixe e números
+        _nomeDaPergunta(t) {
+            const stop = new Set('venda vendas os pedido compra compras valor total quanto quantos quantas pagou paga pagar pago comprou gastou deve devendo devedor devedores ultima ultimas ultimo ver mostrar mostra me meu minha qual quais quem que tem tenho ha existe de do da dos das o a as um uma no na em por para com contas conta receber recebe vencida vencidas vencido vencidos vence vencem vencer atraso atrasada atrasadas atrasado atrasados aberto abertas abertos todas todos parcela parcelas crediario cobranca cobrancas pagamento pagamentos saldo restante falta faltando cliente clientes receituario receita grau numero n sobre dados hoje mes semana proximos proximas proxima dias lista listar busca buscar procurar'.split(' '));
+            return norm(t).replace(/r\$/g, ' ').split(/[^a-z0-9]+/).filter(w => w.length >= 2 && !/^\d+$/.test(w) && !stop.has(w)).join(' ');
+        },
+        _linhaVenda(v, detalhe) {
+            const sit = { quitada: '✅ Quitada', pendente: '⏳ Pendente', cancelada: '❌ Cancelada' }[v.situacao_pagamento];
+            let h = `<b>OS ${esc(v.numero)}</b> · ${esc(v.data || '—')} · ${esc(v.cliente || '—')}<br>Total <b>${brl(v.total)}</b> · Pago ${brl(v.pago)}${v.saldo > 0.009 ? ` · <b>Falta ${brl(v.saldo)}</b>` : ''} · ${sit}`;
+            if (v.forma_pagamento) h += ` · ${esc(v.forma_pagamento)}`;
+            if (v.parcelas_vencidas) h += `<br>⚠️ ${v.parcelas_vencidas} parcela(s) vencida(s) (${brl(v.valor_vencido)})`;
+            if (detalhe) {
+                h += `<br>Status: ${esc(v.status || '—')}${v.previsao_entrega ? ' · Entrega prevista: ' + esc(v.previsao_entrega) : ''}`;
+                if (v.vendedor) h += `<br>Vendedor: ${esc(v.vendedor)}`;
+                if (v.telefone) h += `<br>Telefone: ${esc(v.telefone)}`;
+                if (v.itens.length) h += `<br>Itens: ${v.itens.map(esc).join('; ')}`;
+            }
+            return h;
+        },
+        _buscarVenda(t) {
+            const os = this._extrairOS(t);
+            if (os) {
+                const r = VisionDB.tools.buscar_venda({ numero: os, limite: '3' });
+                if (!r.vendas.length) return `Não encontrei a OS ${esc(os)}. Confira o número.`;
+                return '<b>🧾 Venda encontrada</b><br>' + r.vendas.map(v => this._linhaVenda(v, true)).join('<hr style="border:0;border-top:1px solid #e6c9a3;margin:8px 0">') +
+                    `<br><br>Quer o receituário? Diga: <i>receituário da OS ${esc(os)}</i>.`;
+            }
+            const nome = this._nomeDaPergunta(t);
+            if (!nome) return null; // sem nome nem número: deixa as outras regras tratarem
+            const r = VisionDB.tools.buscar_venda({ cliente: nome, limite: '6' });
+            if (!r.total) return null; // sem cliente com vendas: cai nas regras de cliente/estoque
+            const nomes = [...new Set(r.vendas.map(v => v.cliente).filter(Boolean))];
+            return `<b>🧾 Vendas de ${esc(nomes.length === 1 ? nomes[0] : '"' + nome + '"')}</b> (${r.total})<br>` + r.vendas.map(v => '• ' + this._linhaVenda(v, false)).join('<br>') +
+                (r.total > r.vendas.length ? `<br><small>…e mais ${r.total - r.vendas.length}. Informe o número da OS para detalhar.</small>` : '') +
+                `<br><br>Total: <b>${brl(r.soma_total)}</b>${r.soma_saldo > 0.009 ? ` · Em aberto: <b>${brl(r.soma_saldo)}</b>` : ''}`;
+        },
+        _contasReceber(t) {
+            const n = norm(t);
+            const filtro = /a vencer|vencer|proxim|vence\b/.test(n) ? 'a_vencer' : (/todas|todos|em aberto|abert/.test(n) ? 'todas' : 'vencidas');
+            const nome = this._nomeDaPergunta(t);
+            const r = VisionDB.tools.contas_receber({ cliente: nome, filtro, limite: '10' });
+            const titulo = { vencidas: '💳 Contas a receber vencidas', a_vencer: '📅 Contas a receber a vencer', todas: '💳 Contas a receber em aberto' }[filtro];
+            const nomesC = [...new Set(r.itens.map(i => i.cliente).filter(Boolean))];
+            const quem = nome ? ` — ${esc(nomesC.length === 1 ? nomesC[0] : nome)}` : '';
+            if (!r.total_itens) {
+                if (nome && !r.resumo.total_aberto) return `Não encontrei contas a receber em aberto para "${esc(nome)}".`;
+                return `<b>${titulo}${quem}</b><br>Nada ${filtro === 'vencidas' ? 'vencido' : filtro === 'a_vencer' ? 'a vencer' : 'em aberto'} 🎉` +
+                    (r.resumo.total_aberto ? `<br><small>Em aberto no total: ${brl(r.resumo.total_aberto)}.</small>` : '');
+            }
+            let h = `<b>${titulo}${quem}</b> (${r.total_itens})<br>Total: <b>${brl(r.total_valor)}</b>`;
+            if (filtro === 'vencidas') h += ` · A vencer: ${brl(r.resumo.a_vencer)}`;
+            else if (filtro === 'a_vencer') h += ` · Já vencido: ${brl(r.resumo.vencido)}`;
+            else h += ` · Vencido: ${brl(r.resumo.vencido)} · A vencer: ${brl(r.resumo.a_vencer)}`;
+            if (!nome && r.clientes.length > 1) h += '<br><br><b>Maiores valores:</b><br>' + r.clientes.map(c => `• ${esc(c.nome)} — ${brl(c.valor)} (${c.itens})`).join('<br>');
+            h += '<br><br>' + r.itens.map(i => `• ${i.os ? 'OS ' + esc(i.os) + ' · ' : ''}${esc(i.cliente)} — ${esc(i.descricao)} · <b>${brl(i.valor)}</b> · venc. ${esc(i.vencimento || '—')}${i.dias_atraso ? ` (<b>${i.dias_atraso} dia(s) em atraso</b>)` : ''}`).join('<br>');
+            if (r.total_itens > r.itens.length) h += `<br><small>…e mais ${r.total_itens - r.itens.length}.</small>`;
+            return h;
         },
         _resumoVendas() {
             const vendas = VisionDB.D.sales || [];
@@ -35551,41 +35758,28 @@ window.ImportadorReceituario = ImportadorReceituario;
         },
 
         // ══════════ Aba Configurações → Vision IA ══════════
-        // Fonte única: state.markupIAConfig (a mesma da aba Markup IA)
-        _campos: {
-            fixas: { 'vision-aluguel': 'aluguel', 'vision-funcionario': 'funcionario', 'vision-luz': 'luz', 'vision-agua': 'agua', 'vision-internet': 'internet', 'vision-logistica': 'transporte', 'vision-outras-fixas': 'outrasFixas' },
-            vars: { 'vision-sacola': 'sacola', 'vision-estojo': 'estojo', 'vision-montagem': 'montagem' }
-        },
+        // As despesas são editadas só em Produtos → Markup IA (state.markupIAConfig);
+        // aqui o Vision só LÊ e mostra um resumo.
         loadDespesasNoForm() {
-            const c = Products.miaCfg(), set = (id, v) => { const el = document.getElementById(id); if (el) el.value = fmtMask(v); };
-            Object.entries(this._campos.fixas).forEach(([id, k]) => set(id, c.despesasFixas[k] || 0));
-            Object.entries(this._campos.vars).forEach(([id, k]) => set(id, c.despesasVariaveis[k] || 0));
-            const v = document.getElementById('vision-vendasmensais'); if (v) v.value = c.vendasMensais || 100;
+            const c = Products.miaCfg();
+            const fixo = Object.values(c.despesasFixas).reduce((a, v) => a + (Number(v) || 0), 0);
+            const variavel = Object.values(c.despesasVariaveis).reduce((a, v) => a + (Number(v) || 0), 0);
+            const vendas = c.vendasMensais || 1;
+            const box = document.getElementById('vision-despesas-resumo');
+            if (box) box.innerHTML = `Despesas fixas/mês: <b>${brl(fixo)}</b><br>Variáveis por venda: <b>${brl(variavel)}</b><br>Vendas/mês: <b>${vendas}</b><br>Rateio fixo por venda: <b>${brl(fixo / vendas)}</b>` +
+                (c.visionDespesasOk ? '' : '<br><small style="color:#c75300;">⚠️ Ainda não confirmadas — abra o Markup IA e clique em “Salvar Despesas”.</small>');
             const co = this._co();
             const en = document.getElementById('vision-enabled'); if (en) en.checked = !!co.visionEnabled;
             const ak = document.getElementById('vision-apikey'); if (ak) ak.value = this._apiKey();
             const au = document.getElementById('vision-apiurl'); if (au) au.value = co.visionApiUrl || 'https://api.openai.com/v1/chat/completions';
             const am = document.getElementById('vision-model'); if (am) am.value = co.visionModel || 'gpt-4o-mini';
         },
-        // Salva ao digitar (debounce 600 ms) e ao sair do campo
-        saveDespesasDebounced() {
-            clearTimeout(this._saveTimer);
-            this._saveTimer = setTimeout(() => this.saveDespesas(), 600);
-        },
-        async saveDespesas(manual) {
-            clearTimeout(this._saveTimer);
-            const c = Products.miaCfg();
-            const lerM = id => Utils.parseMoney((document.getElementById(id) || {}).value);
-            Object.entries(this._campos.fixas).forEach(([id, k]) => { c.despesasFixas[k] = lerM(id); });
-            Object.entries(this._campos.vars).forEach(([id, k]) => { c.despesasVariaveis[k] = lerM(id); });
-            c.vendasMensais = parseInt((document.getElementById('vision-vendasmensais') || {}).value, 10) || 100;
-            c.visionDespesasOk = true;
+        irParaMarkupIA() {
             try {
-                if (window.LocalFirst) { LocalFirst._lastLocalConfigEdit = Date.now(); LocalFirst._lastLocalConfigEditStore = storeId(); }
-                await App.saveData();
-                try { SupaSync.upsertConfig(); } catch (e) {}
-                Toast.show('💾 Despesas salvas', 'success', 1500);
-            } catch (e) { Toast.show('Erro ao salvar despesas', 'error'); }
+                const mi = document.querySelector('.menu-item[data-section="products"]');
+                if (mi) mi.click();
+                setTimeout(() => { try { Products.setSubTab('products-markupia'); } catch (e) {} }, 150);
+            } catch (e) { Toast.show('Abra Produtos → Markup IA', 'info'); }
         },
         saveApiConfig(silencioso) {
             const co = this._co(), v = id => (document.getElementById(id) || {}).value || '';
