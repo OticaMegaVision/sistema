@@ -24007,6 +24007,7 @@ tbody tr td{border:1.5px solid #000;padding:2mm;text-align:center;font-weight:70
             // por código com produtos já cadastrados, recalcular preço de
             // venda pelo markup e atualizar/cadastrar automaticamente.
             // ══════════════════════════════════════════════════════════════
+            MIA_ESTOQUE_PADRAO: 100, // lentes de laboratório são sob encomenda: estoque padrão 100
             _miaProdutosProcessados: [],
             _miaLabDetectado: '',
 
@@ -24086,6 +24087,7 @@ tbody tr td{border:1.5px solid #000;padding:2mm;text-align:center;font-weight:70
                 // (sem reordenar) já casa código com preço corretamente — por isso
                 // guardamos também essa versão "crua", por página, só pra esse caso.
                 this._miaPaginasNatural = [];
+                this._miaPaginasPos = []; // linhas com posição, p/ identificar blocos (linha do produto)
                 for (let i = 1; i <= pdf.numPages; i++) {
                     const page = await pdf.getPage(i);
                     const content = await page.getTextContent();
@@ -24108,18 +24110,21 @@ tbody tr td{border:1.5px solid #000;padding:2mm;text-align:center;font-weight:70
                         if (Math.abs(dy) > 2) return dy;
                         return a.transform[4] - b.transform[4];
                     });
-                    let lastY = null, linhaAtual = [];
-                    const linhas = [];
+                    let lastY = null, linhaAtual = [], itensLinha = [];
+                    const linhas = [], linhasPos = [];
+                    const fecha = () => { linhas.push(linhaAtual.join(' ')); linhasPos.push({ y: lastY, texto: linhaAtual.join(' '), items: itensLinha }); };
                     items.forEach(it => {
                         const y = it.transform[5];
                         if (lastY !== null && Math.abs(y - lastY) > 2) {
-                            linhas.push(linhaAtual.join(' '));
-                            linhaAtual = [];
+                            fecha();
+                            linhaAtual = []; itensLinha = [];
                         }
                         linhaAtual.push(it.str);
+                        itensLinha.push({ x: it.transform[4], y, str: it.str });
                         lastY = y;
                     });
-                    if (linhaAtual.length) linhas.push(linhaAtual.join(' '));
+                    if (linhaAtual.length) fecha();
+                    this._miaPaginasPos.push(linhasPos);
                     texto += linhas.join('\n') + '\n';
                 }
                 return texto;
@@ -24148,6 +24153,7 @@ tbody tr td{border:1.5px solid #000;padding:2mm;text-align:center;font-weight:70
                 // aparecem de verdade no texto extraído, e esse laboratório
                 // sempre caía no genérico. Detecta agora por frases que são
                 // texto de verdade e são específicas dessa tabela.
+                if (t.includes('multi c.o.') || t.includes('lentes c.o.')) return 'brasprecios';
                 if (t.includes('valores em pares e reais') || t.includes('incluir o antirreflexo no ato do pedido') || t.includes('c.o. a.r.')) return 'brasprecios';
                 return 'generico';
             },
@@ -24238,6 +24244,76 @@ tbody tr td{border:1.5px solid #000;padding:2mm;text-align:center;font-weight:70
                     if (custo > 0 && custo < 50000 && nome && !produtos.find(p => p.codigo === codigo)) {
                         produtos.push({ codigo, nome, categoria, custo, laboratorio: 'brasprecios' });
                     }
+                });
+                return produtos;
+            },
+
+            // ✅ PARSER INTELIGENTE C.O. (Braspreços): reconhece a LINHA do produto de
+            // cada bloco da página ("MULTI C.O." + "PRO HD" / "PRO"), pega código +
+            // material/índice + valor, e expande o Photoguard 1.50 nas 6 cores usando
+            // os códigos que a tabela traz acima (GREY BROWN GREEN BLUE PURPLE PINK).
+            miaParseBraspreciosCO(paginas) {
+                const produtos = [];
+                const CORES = ['Grey', 'Brown', 'Green', 'Blue', 'Purple', 'Pink'];
+                (paginas || []).forEach(linhas => {
+                    // cabeçalhos de bloco: item "MULTI C.O." + variante (PRO HD / PRO / SELECT) logo abaixo
+                    const todos = [];
+                    linhas.forEach(l => l.items.forEach(it => todos.push(it)));
+                    const blocos = [];
+                    todos.filter(it => /^MULTI C\.O\.?$/i.test(it.str.trim())).forEach(h => {
+                        const v = todos
+                            .filter(it => /^(PRO HD|PRO|SELECT)$/i.test(it.str.trim()) && Math.abs(it.x - h.x) < 40 && it.y < h.y && h.y - it.y < 60)
+                            .sort((a, b) => b.y - a.y)[0];
+                        if (v) blocos.push({ y: h.y, variante: v.str.trim().toUpperCase(), cores: [], linhas: [] });
+                    });
+                    if (!blocos.length) return;
+                    blocos.sort((a, b) => b.y - a.y);
+                    linhas.forEach(l => {
+                        // bloco = o cabeçalho mais próximo ACIMA da linha (ou o 1º, se a linha estiver acima de todos)
+                        const acima = blocos.filter(b => b.y >= l.y - 2);
+                        const bloco = acima.length ? acima[acima.length - 1] : null;
+                        if (bloco) bloco.linhas.push(l);
+                    });
+                    blocos.forEach(b => {
+                        const nomeLinha = 'MULTI C.O. ' + b.variante;
+                        const categoria = b.variante === 'PRO HD' ? 'Multifocais C.O. Pro HD' : (b.variante === 'PRO' ? 'Multifocais C.O. Pro' : 'Multifocais C.O. Select');
+                        const pend = [];
+                        b.linhas.forEach(l => {
+                            let t = l.texto.replace(/Safi\s+ra/gi, 'Safira').replace(/Cód\.?\s*Web/gi, ' ');
+                            const cod5 = t.match(/\b\d{5}\b/g) || [];
+                            const temPreco = /R\$\s*[\d.,]+/.test(t);
+                            // linha só com os 6 códigos das cores (às vezes junto da linha do Photoguard)
+                            if (cod5.length >= 6 && !/^\s*\d{3,6}\s+\d\.\d{2}/.test(t)) {
+                                b.cores = cod5.slice(-6);
+                                cod5.slice(-6).forEach(c => { t = t.replace(c, ' '); });
+                            }
+                            if (!temPreco) return;
+                            let m = /(?:^|\s)(\d{3,6})\s+(\d\.\d{2}\s[^$]*?)\s*R\$\s*([\d.,]+)/.exec(t);
+                            let codigo = null, material, preco;
+                            if (m) { codigo = m[1]; material = m[2]; preco = m[3]; }
+                            else {
+                                m = /(\d\.\d{2}\s[^$]*?)\s*R\$\s*([\d.,]+)/.exec(t);
+                                if (!m) return;
+                                material = m[1]; preco = m[2];
+                            }
+                            material = material.replace(/\s+/g, ' ').trim();
+                            const custo = this.miaParseNumero(preco);
+                            if (!(custo > 0 && custo < 50000) || !material) return;
+                            pend.push({ codigo, material, custo });
+                        });
+                        pend.forEach(r => {
+                            const base = 'Multifocal ' + nomeLinha + ' ';
+                            if (r.codigo) {
+                                if (!produtos.find(p => p.codigo === r.codigo))
+                                    produtos.push({ codigo: r.codigo, nome: base + r.material, categoria, custo: r.custo, laboratorio: 'brasprecios' });
+                            } else if (/photoguard/i.test(r.material) && b.cores.length === 6) {
+                                b.cores.forEach((cod, i) => {
+                                    if (!produtos.find(p => p.codigo === cod))
+                                        produtos.push({ codigo: cod, nome: base + r.material + ' ' + CORES[i], categoria, custo: r.custo, laboratorio: 'brasprecios' });
+                                });
+                            }
+                        });
+                    });
                 });
                 return produtos;
             },
@@ -24482,7 +24558,10 @@ tbody tr td{border:1.5px solid #000;padding:2mm;text-align:center;font-weight:70
                     setProgress(60, 'Extraindo produtos...');
                     let produtos = [];
                     if (this._miaLabDetectado === 'tech-vantagens') produtos = this.miaParseTechVantagens(texto);
-                    else if (this._miaLabDetectado === 'brasprecios') produtos = this.miaParseBrasprecios(texto);
+                    else if (this._miaLabDetectado === 'brasprecios') {
+                        produtos = this.miaParseBraspreciosCO(this._miaPaginasPos);
+                        if (!produtos.length) produtos = this.miaParseBrasprecios(texto);
+                    }
                     else if (this._miaLabDetectado === 'sygma') produtos = this.miaParseSygma(texto);
                     else if (this._miaLabDetectado === 'visco') produtos = this.miaParseVisco(texto);
                     else produtos = this.miaParseGenerico(texto);
@@ -24553,6 +24632,7 @@ tbody tr td{border:1.5px solid #000;padding:2mm;text-align:center;font-weight:70
                     const calc = this.miaCalcular(p.custo, p.laboratorio, p.categoria);
                     prod.costPrice = p.custo;
                     prod.price = parseFloat(calc.precoVenda.toFixed(2));
+                    prod.qty = this.MIA_ESTOQUE_PADRAO;
                     prod.updated_at = agora;
                     SupaSync.upsertProduto(prod);
                     atualizadosCount++;
@@ -24567,7 +24647,7 @@ tbody tr td{border:1.5px solid #000;padding:2mm;text-align:center;font-weight:70
                         name: p.nome,
                         costPrice: p.custo,
                         price: parseFloat(calc.precoVenda.toFixed(2)),
-                        qty: 0,
+                        qty: this.MIA_ESTOQUE_PADRAO,
                         minQty: 5,
                         color: '',
                         frameType: '',
