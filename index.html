@@ -24020,9 +24020,18 @@ tbody tr td{border:1.5px solid #000;padding:2mm;text-align:center;font-weight:70
                 return c;
             },
 
+            // ✅ FIX MARKUP-IA-CLIQUE-MORTO: fmtMask só existe dentro do IIFE do Vision;
+            // aqui (escopo do Products) dava ReferenceError e o miaInit abortava ANTES
+            // de ligar o clique da área de upload. Agora tem formatador próprio.
+            miaFmtMask(n) {
+                return (Number(n) || 0).toFixed(2).replace('.', ',').replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+            },
+
             miaInit() {
+                // Liga o upload PRIMEIRO: nada abaixo pode impedir o botão de funcionar.
+                try { this.miaSetupDropZone(); } catch (e) { console.error('[MarkupIA] drop zone:', e); }
                 const c = this.miaCfg();
-                const setMoney = (id, v) => { const el = document.getElementById(id); if (el) el.value = fmtMask(v); };
+                const setMoney = (id, v) => { const el = document.getElementById(id); if (el) el.value = this.miaFmtMask(v); };
                 setMoney('mia-aluguel', c.despesasFixas.aluguel);
                 setMoney('mia-funcionario', c.despesasFixas.funcionario);
                 setMoney('mia-luz', c.despesasFixas.luz);
@@ -24063,8 +24072,12 @@ tbody tr td{border:1.5px solid #000;padding:2mm;text-align:center;font-weight:70
             miaFormatMoney(v) { return Number(v || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }); },
 
             async miaExtrairTextoPDF(file) {
+                if (typeof pdfjsLib === 'undefined') throw new Error('Biblioteca de PDF não carregou (verifique a internet e recarregue a página).');
+                if (pdfjsLib.GlobalWorkerOptions && !pdfjsLib.GlobalWorkerOptions.workerSrc) {
+                    pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+                }
                 const arrayBuffer = await file.arrayBuffer();
-                const pdf = await pdfjsLib.getDocument(arrayBuffer).promise;
+                const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
                 let texto = '';
                 // ✅ FIX VISCO-LENTES-PRONTAS (achado testando com o PDF real): esse
                 // layout específico (códigos CH1/CH2/CH3) é tão visualmente
@@ -24668,7 +24681,8 @@ tbody tr td{border:1.5px solid #000;padding:2mm;text-align:center;font-weight:70
                 const zone = document.getElementById('miaDropZone');
                 const input = document.getElementById('miaFileInput');
                 if (!zone || !input) return;
-                zone.onclick = () => input.click();
+                input.onclick = (e) => e.stopPropagation();
+                zone.onclick = () => { input.value = ''; input.click(); };
                 zone.ondragover = (e) => { e.preventDefault(); zone.classList.add('dragover'); };
                 zone.ondragleave = () => zone.classList.remove('dragover');
                 zone.ondrop = (e) => {
