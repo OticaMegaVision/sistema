@@ -9856,7 +9856,7 @@ body.dark-mode,
                                 <div class="bkp-status-ic" style="background:#f3f0ff;color:#7c3aed;"><i class="fas fa-code-branch"></i></div>
                                 <div class="txt">
                                     <b>Versão do sistema</b>
-                                    <span>versão <strong>021020262105</strong></span>
+                                    <span>versão <strong>031020261043</strong></span>
                                 </div>
                             </div>
                         </div>
@@ -35385,12 +35385,36 @@ window.ImportadorReceituario = ImportadorReceituario;
                 if ((e.key === 'Enter' || e.keyCode === 13) && !e.shiftKey && !e.isComposing) { e.preventDefault(); this.send(); }
             });
             // O botão não pode tirar o foco do campo: no celular isso fechava o teclado, a tela mudava de tamanho
-            // no meio do toque e o clique se perdia (era preciso tocar várias vezes). Envia no toque e mantém o teclado.
-            let ultimoToque = 0;
+            // no meio do toque e o "click" se perdia (era preciso tocar várias vezes). Por isso o envio não espera
+            // o click: acontece ao soltar o dedo (se ainda estiver sobre o botão) e o campo mantém o foco.
+            let ultimoEnvio = 0, pressionado = false;
+            const enviar = () => { if (Date.now() - ultimoEnvio < 400) return; ultimoEnvio = Date.now(); this.send(); try { inpV.focus({ preventScroll: true }); } catch (_) {} };
+            const sobreBotao = e => { const r = btnV.getBoundingClientRect(); return e.clientX >= r.left - 16 && e.clientX <= r.right + 16 && e.clientY >= r.top - 16 && e.clientY <= r.bottom + 16; };
             btnV.addEventListener('mousedown', e => e.preventDefault());
-            btnV.addEventListener('touchstart', e => { e.preventDefault(); }, { passive: false });
-            btnV.addEventListener('touchend', e => { e.preventDefault(); ultimoToque = Date.now(); this.send(); inpV.focus({ preventScroll: true }); }, { passive: false });
-            btnV.addEventListener('click', () => { if (Date.now() - ultimoToque < 700) return; this.send(); inpV.focus({ preventScroll: true }); });
+            btnV.addEventListener('touchstart', e => e.preventDefault(), { passive: false });
+            if (window.PointerEvent) {
+                btnV.addEventListener('pointerdown', e => {
+                    if (e.button > 0) return;
+                    e.preventDefault(); pressionado = true;
+                    try { btnV.setPointerCapture(e.pointerId); } catch (_) {}
+                });
+                btnV.addEventListener('pointerup', e => {
+                    if (!pressionado) return;
+                    pressionado = false; e.preventDefault();
+                    if (sobreBotao(e)) enviar();
+                });
+                btnV.addEventListener('pointercancel', () => { pressionado = false; });
+            } else {
+                btnV.addEventListener('touchend', e => { e.preventDefault(); enviar(); }, { passive: false });
+            }
+            // Teclado (Enter/Espaço no botão), leitores de tela e navegadores sem Pointer Events
+            btnV.addEventListener('click', e => { if (window.PointerEvent && e.detail !== 0) return; enviar(); });
+            // Mantém o painel exatamente na área visível (acima do teclado) para o botão não "pular" de lugar
+            if (window.visualViewport) {
+                const aj = () => this._ajustarViewport();
+                window.visualViewport.addEventListener('resize', () => { aj(); const m = document.getElementById('visionMsgs'); if (m) m.scrollTop = m.scrollHeight; });
+                window.visualViewport.addEventListener('scroll', aj);
+            }
             document.addEventListener('keydown', e => { if (e.key === 'Escape') this.close(); });
             await this._loadHistory();
             // Mostra o botão só depois do login; recarrega histórico ao trocar de loja
@@ -35407,11 +35431,21 @@ window.ImportadorReceituario = ImportadorReceituario;
             document.getElementById('visionPanel').classList.add('vz-open');
             document.getElementById('visionFab').setAttribute('aria-expanded', 'true');
             this._unread = 0; this._updateBadge();
-            setTimeout(() => document.getElementById('visionInput').focus(), 250);
+            this._ajustarViewport();
+            setTimeout(() => { document.getElementById('visionInput').focus(); this._ajustarViewport(); }, 250);
         },
         close() {
             document.getElementById('visionPanel').classList.remove('vz-open');
             document.getElementById('visionFab').setAttribute('aria-expanded', 'false');
+            this._ajustarViewport();
+        },
+        // Celular: o painel ocupa só a área realmente visível (acima do teclado), então a barra de envio não muda de lugar
+        _ajustarViewport() {
+            const panel = document.getElementById('visionPanel');
+            if (!panel) return;
+            const vv = window.visualViewport;
+            if (!vv || window.innerWidth > 560 || !panel.classList.contains('vz-open')) { panel.style.top = ''; panel.style.bottom = ''; panel.style.height = ''; return; }
+            panel.style.top = vv.offsetTop + 'px'; panel.style.bottom = 'auto'; panel.style.height = vv.height + 'px';
         },
         toggle() { document.getElementById('visionPanel').classList.contains('vz-open') ? this.close() : this.open(); },
 
@@ -35922,7 +35956,7 @@ window.ImportadorReceituario = ImportadorReceituario;
             .vz-head .vz-robot{background:#fff;border-radius:50%;padding:2px}
             .vz-title{flex:1;display:flex;flex-direction:column;line-height:1.2}.vz-title small{font-size:.72rem;opacity:.95}
             .vz-hbtn{background:rgba(255,255,255,.22);border:none;color:#fff;width:32px;height:32px;border-radius:8px;cursor:pointer}
-            .vz-msgs{flex:1;overflow-y:auto;padding:14px;display:flex;flex-direction:column;gap:10px;background:#fff8f0}
+            .vz-msgs{flex:1;overflow-y:auto;overscroll-behavior:contain;padding:14px;display:flex;flex-direction:column;gap:10px;background:#fff8f0}
             .vz-msg{display:flex}.vz-user{justify-content:flex-end}
             .vz-bubble{max-width:86%;padding:10px 13px;border-radius:14px;font-size:.88rem;line-height:1.45;word-break:break-word}
             .vz-bot .vz-bubble{background:#ffe8c2;color:#3b2a10;border-bottom-left-radius:4px}
@@ -35936,7 +35970,7 @@ window.ImportadorReceituario = ImportadorReceituario;
             .vz-foot{display:flex;gap:8px;padding:10px;border-top:1px solid #f0d9bd;background:#fff}
             .vz-foot input{flex:1;border:1px solid #e6c9a3;border-radius:22px;padding:10px 14px;font-size:.9rem;outline:none;background:#fff;color:#222}
             .vz-foot input:focus{border-color:#ff6b00}
-            .vz-send{width:42px;height:42px;border-radius:50%;border:none;background:#ff6b00;color:#fff;cursor:pointer}
+            .vz-send{width:48px;height:48px;flex:none;border-radius:50%;border:none;background:#ff6b00;color:#fff;cursor:pointer;touch-action:manipulation;-webkit-tap-highlight-color:transparent;user-select:none;-webkit-user-select:none}
             body.dark-mode .vz-panel,body.dark-mode .vz-foot,body.dark-mode .vz-fab{background:#1e2230}
             body.dark-mode .vz-msgs{background:#161a26}
             body.dark-mode .vz-bot .vz-bubble{background:#3a2e1c;color:#ffe8c2}
