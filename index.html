@@ -9856,7 +9856,7 @@ body.dark-mode,
                                 <div class="bkp-status-ic" style="background:#f3f0ff;color:#7c3aed;"><i class="fas fa-code-branch"></i></div>
                                 <div class="txt">
                                     <b>Versão do sistema</b>
-                                    <span>versão <strong>021020262037</strong></span>
+                                    <span>versão <strong>021020262105</strong></span>
                                 </div>
                             </div>
                         </div>
@@ -34997,7 +34997,26 @@ window.ImportadorReceituario = ImportadorReceituario;
             return this.R.filter(i => i.saleId === sv.id && !i.pago).reduce((a, i) => a + i.valor, 0);
         },
         _numLimpo(v) { return String(v == null ? '' : v).replace(/\D/g, '').replace(/^0+/, ''); },
-        _vendaPorNumero(n) { const d = this._numLimpo(n); return d ? this._all('sales').filter(sv => this._numLimpo(sv.number) === d) : []; },
+        // Decompõe o número da OS em ano + sequencial: "OS-2026-0034", "2026-034" e "2026034" viram {ano:'2026', seq:34}.
+        // Números simples ("1000") ficam só com sequencial/dígitos.
+        _chaveOS(v) {
+            const raw = String(v == null ? '' : v).toLowerCase();
+            const m = raw.match(/(20\d{2})\s*[-\/.\s]\s*(\d+)/) || raw.replace(/\s/g, '').match(/^(?:os)?(20\d{2})(\d{3,4})$/);
+            if (m) return { ano: m[1], seq: parseInt(m[2], 10), dig: this._numLimpo(m[1] + m[2]) };
+            const dig = this._numLimpo(raw);
+            return { ano: '', seq: dig ? parseInt(dig, 10) : NaN, dig };
+        },
+        _vendaPorNumero(n) {
+            const q = this._chaveOS(n);
+            if (!q.dig) return [];
+            return this._all('sales').filter(sv => {
+                const k = this._chaveOS(sv.number);
+                if (!k.dig) return false;
+                if (q.ano && k.ano) return q.ano === k.ano && q.seq === k.seq;      // ano + sequência completos
+                if (q.dig === k.dig) return true;                                    // mesmo número (sem formatação)
+                return !q.ano && !isNaN(q.seq) && q.seq === k.seq;                   // só o sequencial digitado ("34" → OS-2026-0034)
+            });
+        },
         _resumoVenda(sv) {
             const total = Number(sv.total) || 0, saldo = this._saldoVenda(sv);
             const c = this._all('clients').find(x => x.id === sv.clientId) || {};
@@ -35058,8 +35077,8 @@ window.ImportadorReceituario = ImportadorReceituario;
                 if (a.numero) r = V._vendaPorNumero(a.numero);
                 else if (a.cliente || a.q) {
                     const ids = new Set(V._achar(a.cliente || a.q).map(c => c.id));
-                    const d = V._numLimpo(a.q);
-                    r = r.filter(sv => ids.has(sv.clientId) || (d.length >= 3 && V._numLimpo(sv.number) === d));
+                    const porNum = new Set(V._numLimpo(a.q).length >= 3 ? V._vendaPorNumero(a.q).map(x => x.id) : []);
+                    r = r.filter(sv => ids.has(sv.clientId) || porNum.has(sv.id));
                 } else if (a.valor) {
                     const v = num(a.valor);
                     r = r.filter(sv => Math.abs((Number(sv.total) || 0) - v) < 0.01);
@@ -35360,9 +35379,18 @@ window.ImportadorReceituario = ImportadorReceituario;
             wrap.id = 'visionRoot';
             wrap.innerHTML = this._html();
             document.body.appendChild(wrap);
-            document.getElementById('visionInput').addEventListener('keydown', e => {
-                if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); this.send(); }
+            const inpV = document.getElementById('visionInput'), btnV = document.getElementById('visionSendBtn');
+            inpV.addEventListener('keydown', e => {
+                // keyCode 13 cobre teclados de celular que não informam e.key === 'Enter'
+                if ((e.key === 'Enter' || e.keyCode === 13) && !e.shiftKey && !e.isComposing) { e.preventDefault(); this.send(); }
             });
+            // O botão não pode tirar o foco do campo: no celular isso fechava o teclado, a tela mudava de tamanho
+            // no meio do toque e o clique se perdia (era preciso tocar várias vezes). Envia no toque e mantém o teclado.
+            let ultimoToque = 0;
+            btnV.addEventListener('mousedown', e => e.preventDefault());
+            btnV.addEventListener('touchstart', e => { e.preventDefault(); }, { passive: false });
+            btnV.addEventListener('touchend', e => { e.preventDefault(); ultimoToque = Date.now(); this.send(); inpV.focus({ preventScroll: true }); }, { passive: false });
+            btnV.addEventListener('click', () => { if (Date.now() - ultimoToque < 700) return; this.send(); inpV.focus({ preventScroll: true }); });
             document.addEventListener('keydown', e => { if (e.key === 'Escape') this.close(); });
             await this._loadHistory();
             // Mostra o botão só depois do login; recarrega histórico ao trocar de loja
@@ -35447,8 +35475,8 @@ window.ImportadorReceituario = ImportadorReceituario;
                 'Analisar receituário': () => this._ask('Cole o grau (OD / OE). Ex.: <i>analisar receita -2.00 -0.50 180 / -1.75 -0.25 175</i>. Pode citar "dirige", "computador" ou "criança".'),
                 'Preço ideal de lente': () => this._ask('Informe categoria e custo. Ex.: <i>preço lente 1.61 custo 80</i>'),
                 'Buscar cliente': () => this._ask('Diga o nome, telefone ou CPF. Ex.: <i>cliente Maria Silva</i>'),
-                'Ver receituário': () => this._ask('Diga de quem ou a OS. Ex.: <i>receituário de Maria Silva</i> ou <i>receituário da OS 1234</i>'),
-                'Buscar venda': () => this._ask('Diga o número da OS ou o cliente. Ex.: <i>venda 1234</i> ou <i>vendas da Maria Silva</i>'),
+                'Ver receituário': () => this._ask('Diga de quem ou a OS. Ex.: <i>receituário de Maria Silva</i> ou <i>receituário da OS 2026-034</i>'),
+                'Buscar venda': () => this._ask('Diga o número da OS ou o cliente. Ex.: <i>venda 2026-034</i> ou <i>vendas da Maria Silva</i>'),
                 'Contas vencidas': () => this.send('contas a receber vencidas'),
                 'Resumo de vendas': () => this.send('resumo de vendas'),
                 'Estoque baixo': () => this.send('estoque baixo'),
@@ -35483,29 +35511,49 @@ window.ImportadorReceituario = ImportadorReceituario;
         },
 
         // ---- Envio ----
+        // Nunca descarta o que a pessoa enviou: se o Vision ainda estiver respondendo, a mensagem entra
+        // numa fila e é respondida na sequência (antes ela era ignorada em silêncio e era preciso tocar de novo).
+        _comTimeout(promessa, ms, msg) {
+            let timer;
+            const limite = new Promise((_, rej) => { timer = setTimeout(() => rej(new Error(msg || 'tempo esgotado')), ms); });
+            return Promise.race([promessa, limite]).finally(() => clearTimeout(timer));
+        },
         async send(texto) {
-            if (this._busy) return;
             const inp = document.getElementById('visionInput');
-            const t = String(texto != null ? texto : inp.value).trim();
+            const t = String(texto != null ? texto : (inp ? inp.value : '')).trim();
             if (!t) return;
-            inp.value = '';
-            this._addMessage('user', esc(t));
-            this._busy = true;
+            if (texto == null && inp) inp.value = '';
+            if (!this._fila) this._fila = [];
+            // Trava presa (resposta que nunca voltou)? Libera depois de 30 s em vez de bloquear para sempre.
+            if (this._busy && Date.now() - (this._busySince || 0) > 30000) this._busy = false;
+            if (this._busy) { this._fila.push(t); this._addMessage('user', esc(t)); return; }
+            this._busy = true; this._busySince = Date.now();
+            try {
+                await this._processar(t, false);
+                while (this._fila.length) { this._busySince = Date.now(); await this._processar(this._fila.shift(), true); }
+            } finally { this._busy = false; }
+        },
+        async _processar(t, jaMostrada) {
+            if (!jaMostrada) this._addMessage('user', esc(t));
+            const box = document.getElementById('visionMsgs');
             const typing = document.createElement('div');
             typing.className = 'vz-msg vz-bot'; typing.id = 'visionTyping';
             typing.innerHTML = '<div class="vz-bubble vz-typing"><span></span><span></span><span></span></div>';
-            document.getElementById('visionMsgs').appendChild(typing);
-            document.getElementById('visionMsgs').scrollTop = 1e9;
+            box.appendChild(typing);
+            box.scrollTop = box.scrollHeight;
             let resp;
             try {
-                await VisionDB.load();
-                if (this._online()) {
-                    try { resp = await this._respostaOnline(t); }
+                // Leitura do banco local com limite de tempo: se travar, responde com os dados que já estão em memória
+                try { await this._comTimeout(VisionDB.load(), 5000, 'banco local lento'); } catch (e) { console.warn('[Vision] load:', e.message); }
+                const semInternet = typeof navigator !== 'undefined' && navigator.onLine === false;
+                if (this._online() && !semInternet) {
+                    try { resp = await this._comTimeout(this._respostaOnline(t), 25000, 'tempo esgotado'); }
                     catch (e) { resp = this._respostaOffline(t) + `<br><small>(IA online indisponível: ${esc(e.message)}. Usei regras locais.)</small>`; }
-                } else resp = this._respostaOffline(t);
+                } else {
+                    resp = this._respostaOffline(t) + (this._online() && semInternet ? '<br><small>(sem internet: usei as regras locais)</small>' : '');
+                }
             } catch (e) { resp = 'Não consegui processar isso: ' + esc(e.message); }
             typing.remove();
-            this._busy = false;
             this._addMessage('bot', resp);
         },
 
@@ -35521,11 +35569,18 @@ window.ImportadorReceituario = ImportadorReceituario;
             const url = co.visionApiUrl || 'https://api.openai.com/v1/chat/completions';
             const body = { model: co.visionModel || 'gpt-4o-mini', messages, max_tokens: maxTokens || 600, temperature: 0.4 };
             if (tools) { body.tools = tools; body.tool_choice = 'auto'; }
-            const r = await fetch(url, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + this._apiKey() },
-                body: JSON.stringify(body)
-            });
+            const ctrl = typeof AbortController !== 'undefined' ? new AbortController() : null;
+            const timer = ctrl ? setTimeout(() => ctrl.abort(), 12000) : null;
+            let r;
+            try {
+                r = await fetch(url, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + this._apiKey() },
+                    body: JSON.stringify(body),
+                    signal: ctrl ? ctrl.signal : undefined
+                });
+            } catch (e) { throw new Error(e && e.name === 'AbortError' ? 'tempo esgotado' : (e && e.message) || 'sem conexão'); }
+            finally { if (timer) clearTimeout(timer); }
             if (!r.ok) throw new Error('HTTP ' + r.status);
             const j = await r.json();
             const m = (j.choices && j.choices[0] && j.choices[0].message) || {};
@@ -35579,7 +35634,8 @@ window.ImportadorReceituario = ImportadorReceituario;
                 const r = VisionRecommender.parseReceita(t.replace(/^.*?(receit\w*|grau)/i, ''));
                 if (r) return VisionRecommender.formatar(VisionRecommender.recomendar(r, t), r);
             }
-            if (/(receituario|receita|grau)\b.*\b(os|venda|pedido)\s*(n\S{0,8}\s*)?#?\d+|receituario (de|do|da)|receita (de|do|da)/.test(n)) return this._verReceituario(t);
+            if ((/receituario|receita|grau/.test(n) && this._extrairOS(t)) || /receituario (de|do|da)|receita (de|do|da)/.test(n)) return this._verReceituario(t);
+            if (/^(ajuda|help|comandos?|menu|o que (voce )?(sabe|faz|pode)|como (usar|funciona)|\?)$/.test(n.replace(/[!?.]+$/, '').trim()) || n.trim() === '?') return this._ajuda();
             // Contas a receber (vencidas, a vencer, por cliente) — antes de "vendas/pendente" para não confundir com entrega
             if (/receber|vencid|vence\b|vencer|inadimpl|devedor|devendo|\bdeve\b|em atraso|parcelas? (atrasad|em aberto)|cobranca|em aberto/.test(n)) return this._contasReceber(t);
             // Venda/OS por número ou por cliente, com valor pago e saldo
@@ -35613,7 +35669,21 @@ window.ImportadorReceituario = ImportadorReceituario;
                 const porCodigoOuNome = VisionDB.tools.consultar_estoque({ q: t, limite: '8' });
                 if (porCodigoOuNome.total) return this._lista('📦 Produto encontrado', porCodigoOuNome, i => this._formatarItemEstoque(i));
             }
-            return 'Posso: <b>analisar receita</b>, sugerir <b>preço</b>, <b>buscar cliente</b>, <b>receituário de</b> um cliente, <b>venda por nº da OS ou cliente</b> (com valor pago e saldo), <b>contas a receber vencidas</b>, <b>resumo de vendas</b>, <b>estoque/produto por nome ou código</b>, <b>despesas</b>, <b>entregas pendentes</b> ou <b>fornecedores</b>.';
+            return this._ajuda(true);
+        },
+
+        // Lista de todos os comandos do modo offline (mostrada quando o comando não é entendido ou ao digitar "ajuda")
+        _ajuda(naoEntendi) {
+            const L = (t, itens) => `<b>${t}</b><br>` + itens.map(i => '• <i>' + esc(i) + '</i>').join('<br>');
+            return (naoEntendi ? '🤔 Não entendi esse comando. Veja tudo o que eu sei fazer:' : '🤖 <b>Comandos do Vision</b> (digite um deles):') + '<br><br>' + [
+                L('🧾 Vendas / OS', ['venda 2026-034', 'OS 2026-034', 'vendas da Maria Silva', 'entregas pendentes']),
+                L('💳 Contas a receber', ['contas a receber vencidas', 'quanto a Maria deve', 'contas a vencer', 'contas em aberto']),
+                L('👓 Receituário e lentes', ['receituário da OS 2026-034', 'receituário de Maria Silva', 'analisar receita -2.00 -0.50 180 / -1.75 -0.25 175']),
+                L('👤 Clientes', ['cliente Maria Silva', 'telefone da Maria']),
+                L('📦 Estoque e produtos', ['estoque baixo', 'produto 27120', 'lente transitions 1.50']),
+                L('💰 Preço', ['preço lente 1.61 custo 80']),
+                L('📈 Financeiro', ['resumo de vendas', 'despesas do mês', 'fornecedores'])
+            ].join('<br><br>') + '<br><br><small>Digite <i>ajuda</i> a qualquer momento para ver esta lista.</small>';
         },
 
         // Preço sugerido (markup da loja) a partir do custo cadastrado do produto —
@@ -35683,9 +35753,12 @@ window.ImportadorReceituario = ImportadorReceituario;
             return `<b>👓 Receituário de ${esc(c.name)}</b>${os ? ` (OS ${esc(os)})` : ''}<br>Data: ${esc(p.date || '—')}${p.optometrist ? ' · ' + esc(p.optometrist) : ''}<br>${o(od, 'OD')}<br>${o(oe, 'OE')}<br>DP: ${esc(p.dp || '—')}${p.height ? ' · Altura: ' + esc(p.height) : ''}${p.notes ? '<br>Obs.: ' + esc(p.notes) : ''}<br><br>Quer a sugestão de lentes para esse grau? Cole: <i>analisar receita ${esc(od.sph)} ${esc(od.cyl)} ${esc(od.axis)} / ${esc(oe.sph)} ${esc(oe.cyl)} ${esc(oe.axis)}</i>`;
         },
         // ---- Busca de vendas / contas a receber (modo offline) ----
+        // Aceita o número completo: "2026-034", "OS-2026-0034", "os 2026/034", ou só "1234" quando vem depois de os/venda/pedido
         _extrairOS(t) {
             const n = norm(t);
-            const m = n.match(/\b(?:os|venda|pedido)\s*(?:n(?:umero|[º°o.])?\s*)?#?(\d{1,8})\b/) || n.match(/#(\d{1,8})\b/);
+            let m = n.match(/\b(20\d{2}\s*[-\/.]\s*\d{1,5})(?![-\/.]\d)\b/);
+            if (m) return m[1].replace(/\s+/g, '');
+            m = n.match(/\b(?:os|venda|pedido)[\s-]*(?:n(?:umero|[º°o.])?\s*)?#?(\d{1,8})\b/) || n.match(/#(\d{1,8})\b/);
             return m ? m[1] : '';
         },
         // Sobra só o nome do cliente: remove palavras de comando/encaixe e números
@@ -35829,8 +35902,8 @@ window.ImportadorReceituario = ImportadorReceituario;
                 </header>
                 <div id="visionMsgs" class="vz-msgs" aria-live="polite"></div>
                 <footer class="vz-foot">
-                    <input id="visionInput" type="text" placeholder="Pergunte ao Vision…" autocomplete="off" aria-label="Mensagem para o Vision">
-                    <button type="button" class="vz-send" onclick="Vision.send()" aria-label="Enviar"><i class="fas fa-paper-plane"></i></button>
+                    <input id="visionInput" type="text" placeholder="Pergunte ao Vision…" autocomplete="off" enterkeyhint="send" aria-label="Mensagem para o Vision">
+                    <button type="button" id="visionSendBtn" class="vz-send" aria-label="Enviar"><i class="fas fa-paper-plane"></i></button>
                 </footer>
             </section>`;
         },
