@@ -10548,13 +10548,28 @@ body.dark-mode,
                         <h3 style="color:var(--primary);margin-bottom:.5rem;"><i class="fas fa-robot" style="color:#ff6b00;"></i> Vision IA</h3>
                         <p style="color:var(--gray);font-size:.85rem;margin-bottom:1rem;">Sem chave, o Vision funciona em modo offline (regras locais).</p>
                         <div class="form-group"><label style="display:flex;align-items:center;gap:8px;cursor:pointer;"><input type="checkbox" id="vision-enabled" onchange="Vision.saveApiConfig()"> Ativar Vision (IA online)</label></div>
+                        <div class="form-group"><label style="display:flex;align-items:center;gap:8px;cursor:pointer;"><input type="checkbox" id="vision-economico" onchange="Vision.saveApiConfig()"> Modo econômico</label><small style="color:var(--gray);display:block;margin-top:2px;">O Vision tenta primeiro as regras locais e só chama a IA quando não entende. Economiza cota e evita enviar dados da loja sem necessidade.</small></div>
+                        <div class="form-group"><label for="vision-provider">Provedor</label>
+                            <select id="vision-provider" class="form-control" onchange="Vision.onProvedor()">
+                                <option value="gemini">Google Gemini (gratuito)</option>
+                                <option value="groq">Groq (gratuito)</option>
+                                <option value="openrouter">OpenRouter (modelos :free)</option>
+                                <option value="mistral">Mistral (gratuito)</option>
+                                <option value="outro">Outro (OpenAI-compatível)</option>
+                            </select></div>
                         <div class="vz-grid">
                             <div class="form-group"><label for="vision-apikey">API Key</label><input type="password" id="vision-apikey" class="form-control" autocomplete="off" placeholder="sk-..." onblur="Vision.saveApiConfig()"></div>
-                            <div class="form-group"><label for="vision-model">Modelo</label><input type="text" id="vision-model" class="form-control" placeholder="gpt-4o-mini" onblur="Vision.saveApiConfig()"></div>
+                            <div class="form-group"><label for="vision-model-sel">Modelo</label>
+                                <select id="vision-model-sel" class="form-control" onchange="Vision.onModeloSel()"></select>
+                                <input type="text" id="vision-model" class="form-control" style="display:none;margin-top:6px;" placeholder="Digite o nome do modelo" onblur="Vision.saveApiConfig()">
+                            </div>
                         </div>
+                        <div class="form-group"><button type="button" class="btn btn-secondary" onclick="Vision.atualizarModelos()"><i class="fas fa-sync-alt"></i> Atualizar modelos</button>
+                            <span id="vision-models-result" style="margin-left:10px;font-weight:600;" aria-live="polite"></span></div>
                         <div class="form-group"><label for="vision-apiurl">URL base</label><input type="text" id="vision-apiurl" class="form-control" placeholder="https://api.openai.com/v1/chat/completions" onblur="Vision.saveApiConfig()"></div>
                         <button type="button" class="btn btn-secondary" onclick="Vision.testarConexao()"><i class="fas fa-plug"></i> Testar conexão</button>
-                        <span id="vision-test-result" style="margin-left:10px;font-weight:600;" aria-live="polite"></span>
+                        <span id="vision-test-result" style="display:block;margin-top:8px;font-weight:600;white-space:pre-wrap;word-break:break-word;" aria-live="polite"></span>
+                        <p style="color:var(--gray);font-size:.78rem;margin-top:.75rem;">⚠️ Ao responder, o Vision envia dados da loja (nomes, telefones, vendas) ao provedor. Nos planos gratuitos do Google e da Mistral, isso pode ser usado para treino. Os limites gratuitos mudam: confirme no painel de cada provedor.</p>
                         <p style="color:var(--gray);font-size:.78rem;margin-top:.75rem;">🔐 A chave fica só neste aparelho e não é enviada para a nuvem nem entra no backup.</p>
                     </div>
                     <div class="form-container" style="margin-top:1rem;">
@@ -35894,8 +35909,18 @@ window.ImportadorReceituario = ImportadorReceituario;
                 try { await this._comTimeout(VisionDB.load(), 5000, 'banco local lento'); } catch (e) { console.warn('[Vision] load:', e.message); }
                 const semInternet = typeof navigator !== 'undefined' && navigator.onLine === false;
                 if (this._online() && !semInternet) {
-                    try { resp = await this._comTimeout(this._respostaOnline(t), 25000, 'tempo esgotado'); }
-                    catch (e) { resp = this._respostaOffline(t) + `<br><small>(IA online indisponível: ${esc(e.message)}. Usei regras locais.)</small>`; }
+                    // Modo econômico: tenta as regras locais primeiro; só chama a IA se o Vision não entendeu
+                    let local = null;
+                    if (this._co().visionEconomico !== false) {
+                        this._vzNaoEntendi = false;
+                        try { local = this._respostaOffline(t); } catch (e) { local = null; }
+                        if (this._vzNaoEntendi) local = null;
+                    }
+                    if (local != null) resp = local;
+                    else {
+                        try { resp = await this._comTimeout(this._respostaOnline(t), 25000, 'tempo esgotado'); }
+                        catch (e) { resp = this._respostaOffline(t) + `<br><small>(IA online indisponível: ${esc(e.message)}. Usei regras locais.)</small>`; }
+                    }
                 } else {
                     resp = this._respostaOffline(t) + (this._online() && semInternet ? '<br><small>(sem internet: usei as regras locais)</small>' : '');
                 }
@@ -35928,7 +35953,7 @@ window.ImportadorReceituario = ImportadorReceituario;
                 });
             } catch (e) { throw new Error(e && e.name === 'AbortError' ? 'tempo esgotado' : (e && e.message) || 'sem conexão'); }
             finally { if (timer) clearTimeout(timer); }
-            if (!r.ok) throw new Error('HTTP ' + r.status);
+            if (!r.ok) throw await this._erroHttp(r);
             const j = await r.json();
             const m = (j.choices && j.choices[0] && j.choices[0].message) || {};
             return tools ? m : (m.content || '');
@@ -35953,7 +35978,7 @@ window.ImportadorReceituario = ImportadorReceituario;
                 }
                 return 'Não consegui concluir a consulta. Tente reformular a pergunta.';
             } catch (e) {
-                if (!/^HTTP 4/.test(e.message) || msgs.length > hist.length + 2) throw e;
+                if (!/^HTTP 4/.test(e.message) || [401, 402, 403, 429].includes(e.status) || msgs.length > hist.length + 2) throw e;
                 msgs[0].content += ' DADOS DA LOJA (JSON): ' + JSON.stringify(VisionDB.digest(t)).slice(0, 7000);
                 return esc(await this._chamarAPI(msgs, 700)).replace(/\n/g, '<br>');
             }
@@ -36369,6 +36394,7 @@ window.ImportadorReceituario = ImportadorReceituario;
             return this._CATALOGO.map(c => ({ c, p: pont(c) })).filter(x => x.p >= 0.7).sort((x, y) => y.p - x.p).slice(0, 3).map(x => x.c);
         },
         _naoEntendi(t) {
+            this._vzNaoEntendi = true;
             const sug = this._sugerir(t);
             const lista = this._ajuda(true);
             if (!sug.length) return lista;
@@ -36488,6 +36514,9 @@ window.ImportadorReceituario = ImportadorReceituario;
             const ak = document.getElementById('vision-apikey'); if (ak) ak.value = this._apiKey();
             const au = document.getElementById('vision-apiurl'); if (au) au.value = co.visionApiUrl || 'https://api.openai.com/v1/chat/completions';
             const am = document.getElementById('vision-model'); if (am) am.value = co.visionModel || 'gpt-4o-mini';
+            const ec = document.getElementById('vision-economico'); if (ec) ec.checked = co.visionEconomico !== false;
+            const pv = document.getElementById('vision-provider');
+            if (pv) { pv.value = co.visionProvider || this._provDaUrl(au ? au.value : ''); this._renderModelos(); }
         },
         irParaMarkupIA() {
             try {
@@ -36496,12 +36525,117 @@ window.ImportadorReceituario = ImportadorReceituario;
                 setTimeout(() => { try { Products.setSubTab('products-markupia'); } catch (e) {} }, 150);
             } catch (e) { Toast.show('Abra Produtos → Markup IA', 'info'); }
         },
+
+        // ══════════ Provedores de IA (aba Configurações → Vision IA) ══════════
+        _PROV: {
+            gemini:     { nome: 'Google Gemini', url: 'https://generativelanguage.googleapis.com/v1beta/openai/chat/completions', modelo: 'gemini-3.8-flash', modelos: ['gemini-3.8-flash'], filtro: id => /^gemini/i.test(id) },
+            groq:       { nome: 'Groq', url: 'https://api.groq.com/openai/v1/chat/completions', modelo: 'openai/gpt-oss-120b', modelos: ['openai/gpt-oss-120b', 'openai/gpt-oss-20b', 'qwen/qwen3.8-27b'], filtro: id => !/whisper|tts|guard|embed|orpheus|playai/i.test(id) },
+            openrouter: { nome: 'OpenRouter', url: 'https://openrouter.ai/api/v1/chat/completions', modelo: 'openrouter/free', modelos: ['openrouter/free'], filtro: id => /:free$/.test(id) || id === 'openrouter/free', semChave: true },
+            mistral:    { nome: 'Mistral', url: 'https://api.mistral.ai/v1/chat/completions', modelo: 'mistral-small-latest', modelos: ['mistral-small-latest'], filtro: id => !/embed|moderation|ocr|voxtral/i.test(id) },
+            outro:      { nome: 'Outro', url: '', modelo: '', modelos: [] }
+        },
+        _provDaUrl(u) {
+            u = String(u || '');
+            if (/generativelanguage\.googleapis/.test(u)) return 'gemini';
+            if (/api\.groq\.com/.test(u)) return 'groq';
+            if (/openrouter\.ai/.test(u)) return 'openrouter';
+            if (/api\.mistral\.ai/.test(u)) return 'mistral';
+            return 'outro';
+        },
+        _explicaHttp(st) {
+            if (st === 400) return 'Requisição recusada. Confira se o modelo existe e aceita esse formato.';
+            if (st === 401) return 'Chave inválida ou sem permissão. Confira a API Key e se ela é do provedor selecionado.';
+            if (st === 402) return 'Sem créditos ou com faturamento pendente na conta do provedor.';
+            if (st === 403) return 'Acesso negado. A chave pode não ter permissão para este modelo ou região.';
+            if (st === 404) return 'Modelo ou URL não encontrados. Confira o modelo e a URL base.';
+            if (st === 429) return 'Limite de uso atingido (por minuto ou por dia). Aguarde um pouco ou troque de modelo/provedor.';
+            if (st >= 500) return 'Instabilidade no provedor. Tente de novo em instantes.';
+            return '';
+        },
+        async _erroHttp(r) {
+            let det = '';
+            try {
+                const tx = await r.text();
+                try {
+                    const j = JSON.parse(tx), e = Array.isArray(j) ? j[0] : j;
+                    det = (e && e.error && (e.error.message || (typeof e.error === 'string' ? e.error : ''))) || (e && e.message) || tx;
+                } catch (_) { det = tx; }
+            } catch (_) {}
+            det = String(det || '').replace(/\s+/g, ' ').trim().slice(0, 400);
+            const exp = this._explicaHttp(r.status);
+            const err = new Error('HTTP ' + r.status + (exp ? ' — ' + exp : '') + (det ? ' [Provedor: ' + det + ']' : ''));
+            err.status = r.status;
+            return err;
+        },
+        _modelosDe(p) {
+            const cache = (this._co().visionModelsCache || {})[p];
+            return (cache && cache.length) ? cache : ((this._PROV[p] || {}).modelos || []);
+        },
+        _renderModelos() {
+            const sel = document.getElementById('vision-model-sel'), inp = document.getElementById('vision-model'), pv = document.getElementById('vision-provider');
+            if (!sel || !inp || !pv) return;
+            const lista = this._modelosDe(pv.value), atual = inp.value.trim();
+            const opt = (v, t) => `<option value="${esc(v)}">${esc(t)}</option>`;
+            sel.innerHTML = lista.map(m => opt(m, m)).join('') + opt('__outro__', 'Outro (digitar)…');
+            if (atual && lista.includes(atual)) { sel.value = atual; inp.style.display = 'none'; }
+            else if (!atual && lista.length) { sel.value = lista[0]; inp.value = lista[0]; inp.style.display = 'none'; }
+            else { sel.value = '__outro__'; inp.style.display = ''; }
+        },
+        onProvedor() {
+            const pv = document.getElementById('vision-provider'), P = this._PROV[pv.value] || this._PROV.outro;
+            const au = document.getElementById('vision-apiurl'), am = document.getElementById('vision-model');
+            if (pv.value !== 'outro') {
+                au.value = P.url;
+                const lista = this._modelosDe(pv.value);
+                if (!lista.includes(am.value.trim())) am.value = P.modelo;
+            }
+            const r = document.getElementById('vision-models-result'); if (r) r.textContent = '';
+            this._renderModelos();
+            this.saveApiConfig(true);
+        },
+        onModeloSel() {
+            const sel = document.getElementById('vision-model-sel'), inp = document.getElementById('vision-model');
+            if (sel.value === '__outro__') { inp.style.display = ''; inp.value = ''; inp.focus(); return; }
+            inp.value = sel.value; inp.style.display = 'none';
+            this.saveApiConfig(true);
+        },
+        async atualizarModelos() {
+            const el = document.getElementById('vision-models-result'), pv = document.getElementById('vision-provider').value;
+            const P = this._PROV[pv] || this._PROV.outro;
+            const url = (document.getElementById('vision-apiurl').value || '').trim();
+            const key = (document.getElementById('vision-apikey').value || '').trim();
+            if (!/\/chat\/completions\/?$/.test(url)) { el.textContent = '❌ Preencha uma URL base terminada em /chat/completions.'; return; }
+            if (!key && !P.semChave) { el.textContent = '❌ Preencha a API Key primeiro.'; return; }
+            el.textContent = 'Buscando…';
+            const ctrl = typeof AbortController !== 'undefined' ? new AbortController() : null;
+            const timer = ctrl ? setTimeout(() => ctrl.abort(), 12000) : null;
+            try {
+                let r;
+                try {
+                    r = await fetch(url.replace(/\/chat\/completions\/?$/, '/models'), { headers: key ? { 'Authorization': 'Bearer ' + key } : {}, signal: ctrl ? ctrl.signal : undefined });
+                } catch (e) { throw new Error(e && e.name === 'AbortError' ? 'tempo esgotado' : (e && e.message) || 'sem conexão'); }
+                if (!r.ok) throw await this._erroHttp(r);
+                const j = await r.json();
+                let ids = (j.data || j.models || []).map(m => String(m.id || m.name || '').replace(/^models\//, '')).filter(Boolean);
+                if (P.filtro) ids = ids.filter(P.filtro);
+                ids = Array.from(new Set(ids)).sort();
+                if (!ids.length) throw new Error('o provedor não devolveu nenhum modelo utilizável');
+                const co = this._co();
+                co.visionModelsCache = Object.assign({}, co.visionModelsCache || {}, { [pv]: ids });
+                this._renderModelos();
+                this.saveApiConfig(true);
+                el.textContent = '✅ ' + ids.length + ' modelo' + (ids.length > 1 ? 's' : '') + (pv === 'openrouter' ? ' gratuitos' : '') + ' encontrado' + (ids.length > 1 ? 's' : '') + (pv === 'gemini' ? ' (confira no painel do Google quais têm camada gratuita)' : '');
+            } catch (e) { el.textContent = '❌ Falhou: ' + e.message; }
+            finally { if (timer) clearTimeout(timer); }
+        },
         saveApiConfig(silencioso) {
             const co = this._co(), v = id => (document.getElementById(id) || {}).value || '';
             co.visionEnabled = !!(document.getElementById('vision-enabled') || {}).checked;
             co.visionApiKey = v('vision-apikey').trim();
             co.visionApiUrl = v('vision-apiurl').trim() || 'https://api.openai.com/v1/chat/completions';
-            co.visionModel = v('vision-model').trim() || 'gpt-4o-mini';
+            co.visionModel = v('vision-model').trim() || ((this._PROV[v('vision-provider')] || {}).modelo) || 'gpt-4o-mini';
+            co.visionProvider = v('vision-provider') || co.visionProvider || 'outro';
+            co.visionEconomico = !!(document.getElementById('vision-economico') || {}).checked;
             try { localStorage.setItem('vision_key_' + storeId(), co.visionApiKey); } catch (e) {}
             if (window.LocalFirst) { LocalFirst._lastLocalConfigEdit = Date.now(); LocalFirst._lastLocalConfigEditStore = storeId(); }
             App.saveData(true);
