@@ -9022,8 +9022,18 @@ body.dark-mode,
                     <div class="mv-filter-row" style="margin-bottom:8px;">
                         <div class="sh-search-field">
                             <i class="fas fa-magnifying-glass"></i>
-                            <input type="text" id="searchProduct" placeholder="Buscar produto..." onkeyup="Products.search()" autocomplete="off">
+                            <input type="text" id="searchProduct" placeholder="Buscar por nome, código ou categoria" onkeyup="Products.search()" autocomplete="off">
                         </div>
+                        <select id="productCategoryFilter" class="form-control" style="flex:0 0 auto;min-width:170px;max-width:100%;" onchange="Products.onCategoryFilter()" title="Filtrar por categoria">
+                            <option value="">Categoria: Todas</option>
+                        </select>
+                    </div>
+                    <div id="prodSelBar" style="display:none;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;background:#fdecea;border:1px solid #f5c2bd;border-radius:8px;padding:8px 12px;margin-bottom:8px;">
+                        <span id="prodSelText" style="color:#a32d2d;font-weight:600;font-size:.85rem;"></span>
+                        <span style="display:flex;gap:6px;">
+                            <button type="button" class="btn btn-sm" onclick="Products.clearSelection()">Limpar seleção</button>
+                            <button type="button" class="btn btn-danger btn-sm" onclick="Products.deleteSelected()"><i class="fas fa-trash"></i> Excluir selecionados</button>
+                        </span>
                     </div>
                     <div class="mv-toolbar">
                         <button class="mv-icon-btn mv-import" onclick="document.getElementById('importProductsFile').click()" title="Importar produtos via Excel/CSV">
@@ -9059,6 +9069,7 @@ body.dark-mode,
                     <table id="productsTable">
                         <thead>
                             <tr>
+                                <th style="width:34px;text-align:center;"><input type="checkbox" id="prodSelAll" onchange="Products.toggleSelectAll(this.checked)" title="Selecionar todos os produtos da lista"></th>
                                 <th>Código</th>
                                 <th>Imagem</th>
                                 <th>Nome</th>
@@ -9856,7 +9867,7 @@ body.dark-mode,
                                 <div class="bkp-status-ic" style="background:#f3f0ff;color:#7c3aed;"><i class="fas fa-code-branch"></i></div>
                                 <div class="txt">
                                     <b>Versão do sistema</b>
-                                    <span>versão <strong>031020261716</strong></span>
+                                    <span>versão <strong>071020261112</strong></span>
                                 </div>
                             </div>
                         </div>
@@ -24922,12 +24933,17 @@ tbody tr td{border:1.5px solid #000;padding:2mm;text-align:center;font-weight:70
                 // Filtra por busca
                 const termRaw = (document.getElementById('searchProduct')?.value || '').toLowerCase().trim();
                 const term = this._normalizeSearch(termRaw);
-                const list = term
-                    ? (state.products || []).filter(p =>
+                this._populateCategoryFilter();
+                const catSel = document.getElementById('productCategoryFilter')?.value || '';
+                const list = (state.products || []).filter(p =>
+                    (!catSel || this.categoryLabel(p.category) === catSel) &&
+                    (!term ||
                         this._normalizeSearch(p.name).includes(term) ||
                         this._normalizeSearch(p.code).includes(term) ||
-                        this._normalizeSearch(p.category).includes(term))
-                    : (state.products || []);
+                        this._normalizeSearch(p.category).includes(term) ||
+                        this._normalizeSearch(this.categoryLabel(p.category)).includes(term)));
+                const _listIds = new Set(list.map(p => p.id));
+                [...this._selected].forEach(id => { if (!_listIds.has(id)) this._selected.delete(id); });
                 // Atualiza badge de contagem
                 const badge = document.getElementById('productsCountBadge');
                 if (badge) badge.textContent = list.length + ' produto' + (list.length !== 1 ? 's' : '');
@@ -24935,7 +24951,7 @@ tbody tr td{border:1.5px solid #000;padding:2mm;text-align:center;font-weight:70
                 if (subtabBadge) subtabBadge.textContent = (state.products || []).length;
                 // Renderiza com DocumentFragment — suporta 2700+ produtos sem travar
                 const PAGE = 200; // renderiza os primeiros 200, busca mostra todos filtrados
-                const toRender = list.slice(0, term ? list.length : PAGE);
+                const toRender = list.slice(0, (term || catSel) ? list.length : PAGE);
                 const frag = document.createDocumentFragment();
                 toRender.forEach(p => {
                     const status = p.qty === 0 ? 'danger' : (p.qty <= (p.minQty||5) ? 'warning' : 'success');
@@ -24946,6 +24962,7 @@ tbody tr td{border:1.5px solid #000;padding:2mm;text-align:center;font-weight:70
                     const thumb = p.image || (window.MediaCache && p.id ? MediaCache.get('products', p.id) : null);
                     const tr = document.createElement('tr');
                     tr.innerHTML = `
+                        <td style="text-align:center;"><input type="checkbox" class="prod-row-cb" ${this._selected.has(p.id) ? 'checked' : ''} onchange="Products.toggleRow('${p.id}', this.checked)"></td>
                         <td style="font-family:monospace;font-size:.82rem;font-weight:700;">${Utils.sanitizeHTML(p.code||'')}</td>
                         <td style="text-align:center;">
                             ${thumb
@@ -24953,7 +24970,7 @@ tbody tr td{border:1.5px solid #000;padding:2mm;text-align:center;font-weight:70
                                 : `<button class="prod-thumb-btn prod-thumb-empty" onclick="ProdView.open('${p.id}')" title="Ver produto"><i class="fas fa-box"></i></button>`}
                         </td>
                         <td><span style="font-weight:600;cursor:pointer;" onclick="ProdView.open('${p.id}')" title="Visualizar produto">${Utils.sanitizeHTML(p.name)}</span></td>
-                        <td>${Utils.sanitizeHTML(p.category||'')}</td>
+                        <td>${Utils.sanitizeHTML(this.categoryLabel(p.category))}</td>
                         <td>${Utils.formatCurrency(p.costPrice || 0)}</td>
                         <td style="font-weight:700;color:#ff6b00;">${Utils.formatCurrency(p.price)}</td>
                         <td>${p.qty}</td>
@@ -24967,9 +24984,10 @@ tbody tr td{border:1.5px solid #000;padding:2mm;text-align:center;font-weight:70
                 });
                 tbody.innerHTML = '';
                 tbody.appendChild(frag);
-                if (!term && list.length > PAGE) {
+                this._updateSelectionUI(list);
+                if (!(term || catSel) && list.length > PAGE) {
                     const tr = document.createElement('tr');
-                    tr.innerHTML = `<td colspan="9" style="text-align:center;color:#888;padding:0.75rem;font-size:0.82rem;">
+                    tr.innerHTML = `<td colspan="10" style="text-align:center;color:#888;padding:0.75rem;font-size:0.82rem;">
                         Mostrando ${PAGE} de ${list.length} produtos. Use a busca para encontrar produtos específicos.
                     </td>`;
                     tbody.appendChild(tr);
@@ -25444,16 +25462,164 @@ tbody tr td{border:1.5px solid #000;padding:2mm;text-align:center;font-weight:70
                 wrap.style.display = (cat === 'armacoes') ? 'grid' : 'none';
             },
 
-            search() {
-                // Chama renderTable que já integra busca + DocumentFragment para 2700+ produtos
+            // ── Categorias: nome de exibição profissional (os dados salvos não mudam) ──
+            _CAT_LABELS: {
+                lentes: 'Lentes', lente: 'Lentes',
+                armacoes: 'Armações', armacao: 'Armações',
+                oculos_sol: 'Óculos de Sol', oculos_de_sol: 'Óculos de Sol', oculos_solar: 'Óculos de Sol', oculos: 'Óculos',
+                tratamentos: 'Tratamentos', tratamento: 'Tratamentos',
+                coloracao: 'Coloração', coloracoes: 'Coloração'
+            },
+            categoryLabel(c) {
+                const raw = (c == null ? '' : String(c)).trim();
+                if (!raw) return 'Sem categoria';
+                const key = raw.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[\s\-]+/g, '_');
+                if (this._CAT_LABELS[key]) return this._CAT_LABELS[key];
+                const small = ['de', 'da', 'do', 'das', 'dos', 'e'];
+                return raw.replace(/_/g, ' ').replace(/\s+/g, ' ').toLowerCase().split(' ')
+                    .map((w, i) => (i > 0 && small.includes(w)) ? w : w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
+            },
+
+            _selected: new Set(),
+            _lastSearchTerm: '',
+            _catSignature: null,
+
+            _populateCategoryFilter() {
+                const sel = document.getElementById('productCategoryFilter');
+                if (!sel) return;
+                const labels = [...new Set((state.products || []).map(p => this.categoryLabel(p.category)))]
+                    .sort((a, b) => a.localeCompare(b, 'pt-BR'));
+                const sig = labels.join('|');
+                if (sig === this._catSignature) return;
+                this._catSignature = sig;
+                const cur = sel.value;
+                sel.innerHTML = '<option value="">Categoria: Todas</option>' +
+                    labels.map(l => `<option value="${Utils.sanitizeHTML(l)}">${Utils.sanitizeHTML(l)}</option>`).join('');
+                sel.value = labels.includes(cur) ? cur : '';
+            },
+
+            onCategoryFilter() {
+                this._selected.clear();
                 this.renderTable();
             },
 
-            // ── Seleciona todos os produtos ───────────────────────────────
+            search() {
+                // Troca o termo → limpa seleção (nunca excluir itens que o usuário não está vendo)
+                const t = (document.getElementById('searchProduct')?.value || '').trim();
+                if (t !== this._lastSearchTerm) {
+                    this._lastSearchTerm = t;
+                    this._selected.clear();
+                }
+                this.renderTable();
+            },
+
+            _currentList() {
+                const termRaw = (document.getElementById('searchProduct')?.value || '').toLowerCase().trim();
+                const term = this._normalizeSearch(termRaw);
+                const catSel = document.getElementById('productCategoryFilter')?.value || '';
+                return (state.products || []).filter(p =>
+                    (!catSel || this.categoryLabel(p.category) === catSel) &&
+                    (!term ||
+                        this._normalizeSearch(p.name).includes(term) ||
+                        this._normalizeSearch(p.code).includes(term) ||
+                        this._normalizeSearch(p.category).includes(term) ||
+                        this._normalizeSearch(this.categoryLabel(p.category)).includes(term)));
+            },
+
+            toggleRow(id, checked) {
+                if (checked) this._selected.add(id); else this._selected.delete(id);
+                this._updateSelectionUI();
+            },
+
+            // Seleciona/desmarca TODOS os produtos da lista atual (busca + categoria),
+            // inclusive os que a tabela não mostra por causa do limite de linhas.
+            toggleSelectAll(checked) {
+                const list = this._currentList();
+                if (checked) list.forEach(p => this._selected.add(p.id));
+                else list.forEach(p => this._selected.delete(p.id));
+                document.querySelectorAll('#productsTable tbody .prod-row-cb').forEach(cb => cb.checked = !!checked);
+                this._updateSelectionUI(list);
+            },
+
             selectAll() {
-                const checkboxes = document.querySelectorAll('#productsTable tbody input[type="checkbox"]');
-                checkboxes.forEach(cb => cb.checked = true);
-                Toast.show(`${checkboxes.length} produto(s) selecionado(s)`, 'success');
+                const list = this._currentList();
+                if (!list.length) { Toast.show('Nenhum produto na lista.', 'warning'); return; }
+                this.toggleSelectAll(true);
+                Toast.show(`${list.length} produto(s) selecionado(s)`, 'success');
+            },
+
+            clearSelection() {
+                this._selected.clear();
+                document.querySelectorAll('#productsTable tbody .prod-row-cb').forEach(cb => cb.checked = false);
+                this._updateSelectionUI();
+            },
+
+            _updateSelectionUI(list) {
+                list = list || this._currentList();
+                const n = this._selected.size;
+                const bar = document.getElementById('prodSelBar');
+                const txt = document.getElementById('prodSelText');
+                const all = document.getElementById('prodSelAll');
+                const catSel = document.getElementById('productCategoryFilter')?.value || '';
+                if (bar) bar.style.display = n > 0 ? 'flex' : 'none';
+                if (txt) txt.textContent = `${n} selecionado${n !== 1 ? 's' : ''}` + (catSel ? ` em ${catSel}` : '');
+                if (all) {
+                    const total = list.length;
+                    all.checked = total > 0 && n >= total;
+                    all.indeterminate = n > 0 && n < total;
+                }
+            },
+
+            // ── Exclui somente os produtos selecionados, com confirmação forte ──
+            deleteSelected() {
+                const sel = (state.products || []).filter(p => this._selected.has(p.id));
+                if (!sel.length) { Toast.show('Nenhum produto selecionado.', 'warning'); return; }
+                const labels = [...new Set(sel.map(p => this.categoryLabel(p.category)))];
+                const single = labels.length === 1;
+                const phrase = single ? labels[0] : 'EXCLUIR';
+                const esc = v => Utils.sanitizeHTML(v);
+                document.getElementById('prodDelOverlay')?.remove();
+                const ov = document.createElement('div');
+                ov.id = 'prodDelOverlay';
+                ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:99999;display:flex;align-items:center;justify-content:center;padding:12px;';
+                ov.innerHTML = `
+                    <div style="background:#fff;border-radius:12px;padding:20px;width:100%;max-width:400px;box-shadow:0 10px 30px rgba(0,0,0,.25);">
+                        <h3 style="margin:0 0 8px;color:#a32d2d;"><i class="fas fa-triangle-exclamation"></i> Excluir ${single ? 'categoria ' + esc(phrase) : 'produtos selecionados'}?</h3>
+                        <p style="margin:0 0 10px;font-size:.9rem;color:#444;">
+                            <b>${sel.length}</b> produto(s) ${single ? 'da categoria <b>' + esc(phrase) + '</b>' : 'de ' + labels.length + ' categorias (' + esc(labels.join(', ')) + ')'} serão removidos.
+                            Produtos de outras categorias não serão afetados. Esta ação não pode ser desfeita.
+                        </p>
+                        <label style="display:block;font-size:.82rem;color:#666;margin-bottom:4px;">Para confirmar, digite <b>${esc(phrase)}</b></label>
+                        <input type="text" id="prodDelInput" class="form-control" autocomplete="off" style="width:100%;margin-bottom:12px;">
+                        <div style="display:flex;gap:8px;justify-content:flex-end;">
+                            <button type="button" class="btn btn-sm" id="prodDelCancel">Cancelar</button>
+                            <button type="button" class="btn btn-danger btn-sm" id="prodDelOk" disabled style="opacity:.5;">Excluir ${sel.length}</button>
+                        </div>
+                    </div>`;
+                document.body.appendChild(ov);
+                const inp = ov.querySelector('#prodDelInput');
+                const ok = ov.querySelector('#prodDelOk');
+                const close = () => ov.remove();
+                const match = () => this._normalizeSearch(inp.value) === this._normalizeSearch(phrase);
+                inp.addEventListener('input', () => { const m = match(); ok.disabled = !m; ok.style.opacity = m ? '1' : '.5'; });
+                ov.querySelector('#prodDelCancel').onclick = close;
+                ov.addEventListener('click', e => { if (e.target === ov) close(); });
+                ok.onclick = () => {
+                    if (!match()) return;
+                    const ids = sel.map(p => p.id);
+                    const idSet = new Set(ids);
+                    state.products = state.products.filter(p => !idSet.has(p.id));
+                    this._selected.clear();
+                    App.saveData();
+                    ids.forEach(id => {
+                        SupaSync.deletarProduto(id).catch(() => {});
+                        try { if (window.MediaCache) MediaCache.remove('products', id); } catch (_e) {}
+                    });
+                    close();
+                    this.renderTable();
+                    Toast.show(`${ids.length} produto(s) removido(s) com sucesso!`, 'success', 5000);
+                };
+                setTimeout(() => inp.focus(), 50);
             },
 
             // ── Remove todos os produtos com confirmação ──────────────────
