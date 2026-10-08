@@ -9874,7 +9874,7 @@ body.dark-mode,
                                 <div class="bkp-status-ic" style="background:#f3f0ff;color:#7c3aed;"><i class="fas fa-code-branch"></i></div>
                                 <div class="txt">
                                     <b>Versão do sistema</b>
-                                    <span>versão <strong>081020261554</strong></span>
+                                    <span>versão <strong>081020261616</strong></span>
                                 </div>
                             </div>
                         </div>
@@ -18366,7 +18366,7 @@ body.dark-mode,
                 const j = this._calcAtrasoCobranca(c);
                 const jurosResumo = j.dias > 0
                     ? `⚠️ *Parcela em atraso há ${j.dias} dia(s).*\nMulta de ${pct(j.mp)}% (${brl(j.multa)}) + juros de ${pct(j.jp)}% ao dia (${brl(j.jurosTotal)}).\n💰 *Valor atualizado: ${brl(j.atualizado)}*`
-                    : `⚠️ Se não for paga no vencimento: multa de ${pct(j.mp)}% (${brl(j.multa)}) + juros de ${pct(j.jp)}% ao dia (≈ ${brl(j.jurosDia)} por dia).`;
+                    : `⚠️ Após o vencimento: multa de ${pct(j.mp)}% + juros de ${pct(j.jp)}% ao dia.`;
 
                 const tpl = (typeof ConfigWpp !== 'undefined' ? ConfigWpp.get('cobranca') : '');
                 const msg = tpl
@@ -18382,87 +18382,97 @@ body.dark-mode,
                     .replace(/{{TELEFONE}}/g,          tel)
                     || `Olá, *${nome1}*! 👋\n\n📋 *${c.descricao}*\n🔢 Parcela: *${parcelaTxt}*\n💰 *${this.fmt(c.valor)}*\n📅 Venc: *${vencLabel}*\n\n${jurosResumo}\n\n_${emp}_`;
 
-                const url = `https://wa.me/55${phone}?text=${encodeURIComponent(msg)}`;
                 const ctx = { nome: c.parte, phone, parcelaTxt, vencLabel, atualizado: j.atualizado, dias: j.dias };
-                WppConfirm.show({
-                    nome: c.parte, phone, subtitle: 'Mensagem 1 de 2 — Cobrança (a 2ª leva o QR Code + Pix)', msg, url,
-                    onSent: () => ContasManager._cobrancaPixEtapa2(ctx)
-                });
+                this._cobrancaEtapa1(ctx, msg);
             },
 
-            // 2ª mensagem: QR Code do Pix (valor atualizado com multa e juros) + Pix copia e cola
-            _cobrancaPixEtapa2(ctx) {
-                const chave = Utils.normalizePixKey(state.company?.pix || state.company?.cnpj) || '';
-                if (!chave) { Toast.show('Cadastre a chave PIX nas configurações para enviar o QR Code','warning'); return; }
-                if (typeof window.qrcode !== 'function') { Toast.show('Biblioteca de QR Code indisponível','warning'); return; }
-                let payload = '';
+            // Gera payload Pix (valor atualizado) + QR (SVG p/ tela, PNG/File p/ compartilhar)
+            _gerarPixCobranca(ctx) {
                 try {
-                    payload = Sales.PAY.buildPixPayload(chave, ctx.atualizado || 0, state.company?.name || 'OTICA', state.company?.city || 'BRASIL');
-                } catch (e) { Toast.show('Não foi possível gerar o Pix','warning'); return; }
-
-                const valorTxt = 'R$ ' + (ctx.atualizado||0).toFixed(2).replace('.',',').replace(/\B(?=(\d{3})+(?!\d))/g,'.');
-                const msg2 = `💳 *Pix — ${valorTxt}*\nParcela ${ctx.parcelaTxt} · vencimento ${ctx.vencLabel}` +
-                    (ctx.dias > 0 ? ` (valor atualizado com multa e juros)` : '') +
-                    `\n\n*Pix copia e cola:*\n${payload}`;
-
-                // Gera o QR (SVG síncrono) e uma versão PNG para compartilhar
-                let qr = null;
-                for (let t = 4; t <= 40; t++) {
-                    try { qr = window.qrcode(t, 'M'); qr.addData(payload); qr.make(); break; } catch (e) { qr = null; }
-                }
-                if (!qr) { Toast.show('Não foi possível gerar o QR Code','warning'); return; }
-                const holder = document.createElement('div');
-                holder.innerHTML = qr.createSvgTag(6);
-                const svgEl = holder.querySelector('svg');
-                let png = null;
-                if (svgEl) {
+                    const chave = Utils.normalizePixKey(state.company?.pix || state.company?.cnpj) || '';
+                    if (!chave || typeof window.qrcode !== 'function') return null;
+                    const payload = Sales.PAY.buildPixPayload(chave, ctx.atualizado || 0, state.company?.name || 'OTICA', state.company?.city || 'BRASIL');
+                    let qr = null;
+                    for (let t = 4; t <= 40; t++) {
+                        try { qr = window.qrcode(t, 'M'); qr.addData(payload); qr.make(); break; } catch (e) { qr = null; }
+                    }
+                    if (!qr) return null;
+                    const holder = document.createElement('div');
+                    holder.innerHTML = qr.createSvgTag(6);
+                    const svgEl = holder.querySelector('svg');
+                    if (!svgEl) return null;
                     const w = parseInt(svgEl.getAttribute('width') || '100'), h = parseInt(svgEl.getAttribute('height') || '100');
                     svgEl.setAttribute('viewBox', '0 0 ' + w + ' ' + h);
-                    Sales.PAY._svgToPngDataUrl(svgEl, 512, d => { png = d; const im = document.getElementById('wppPixQrImg'); if (im && d) im.src = d; });
-                }
-                const svgUrl = svgEl ? 'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(new XMLSerializer().serializeToString(svgEl)))) : '';
+                    const out = {
+                        payload, png: null, file: null,
+                        svgUrl: 'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(new XMLSerializer().serializeToString(svgEl))))
+                    };
+                    Sales.PAY._svgToPngDataUrl(svgEl, 512, d => {
+                        out.png = d;
+                        if (d) fetch(d).then(r => r.blob()).then(bl => { out.file = new File([bl], 'pix-qrcode.png', { type: 'image/png' }); }).catch(() => {});
+                    });
+                    return out;
+                } catch (e) { return null; }
+            },
 
+            // Mensagem 1: QR Code (imagem) + informações da parcela (legenda)
+            _cobrancaEtapa1(ctx, msg) {
+                ctx.pix = this._gerarPixCobranca(ctx);
+                const waUrl = (t) => `https://wa.me/55${ctx.phone}?text=${encodeURIComponent(t)}`;
+                if (!ctx.pix) Toast.show('Chave Pix não cadastrada nas configurações — a cobrança irá só como texto','warning', 5000);
                 WppConfirm.show({
                     nome: ctx.nome, phone: ctx.phone,
-                    subtitle: 'Mensagem 2 de 2 — QR Code + Pix copia e cola', msg: msg2,
-                    url: `https://wa.me/55${ctx.phone}?text=${encodeURIComponent(msg2)}`
+                    subtitle: ctx.pix ? 'Mensagem 1 de 2 — QR Code + informações da parcela' : 'Cobrança (sem QR Code)',
+                    msg, url: waUrl(msg)
                 });
-                // QR visível acima da prévia (fora do #wppConfirmPreview, que é re-renderizado ao editar)
-                document.getElementById('wppPixQrImg')?.remove();
+                if (!ctx.pix) return;
                 const prev = document.getElementById('wppConfirmPreview');
-                if (prev && prev.parentNode && svgUrl) {
+                if (prev && prev.parentNode) {
                     const img = document.createElement('img');
                     img.id = 'wppPixQrImg';
-                    img.src = svgUrl;
+                    img.src = ctx.pix.svgUrl;
                     img.alt = 'QR Code Pix';
                     img.style.cssText = 'display:block;width:150px;height:150px;margin:0 auto 10px;background:#fff;border:1px solid #c8e6c9;border-radius:8px;padding:6px;';
                     prev.parentNode.insertBefore(img, prev);
                 }
-                // Envio: tenta compartilhar QR + texto juntos (celular); senão baixa o QR e abre o WhatsApp com o texto
+                const avancar = () => setTimeout(() => ContasManager._cobrancaEtapa2(ctx), 400);
                 const btn = document.getElementById('wppConfirmSendBtn');
                 if (btn) btn.onclick = async () => {
                     const ta = document.getElementById('wppConfirmEdit');
-                    const texto = (ta ? ta.value.trim() : '') || msg2;
-                    if (png && navigator.share && navigator.canShare) {
+                    const texto = (ta ? ta.value.trim() : '') || msg;
+                    // Celular: compartilha QR + legenda juntos (imagem com texto, numa só mensagem)
+                    if (ctx.pix.file && navigator.share && navigator.canShare && navigator.canShare({ files: [ctx.pix.file] })) {
                         try {
-                            const blob = await (await fetch(png)).blob();
-                            const file = new File([blob], 'pix-qrcode.png', { type: 'image/png' });
-                            if (navigator.canShare({ files: [file] })) {
-                                WppConfirm.close();
-                                await navigator.share({ files: [file], text: texto, title: 'Pix' });
-                                return;
-                            }
-                        } catch (e) { /* cancelou ou não suportado: cai no fallback */ }
+                            await navigator.share({ files: [ctx.pix.file], text: texto, title: 'Cobrança' });
+                            WppConfirm.close(); avancar(); return;
+                        } catch (e) {
+                            if (e && e.name === 'AbortError') return; // cancelou: mantém a tela aberta
+                        }
                     }
-                    if (png) {
+                    // Computador: baixa o QR para anexar e abre o WhatsApp com a legenda
+                    if (ctx.pix.png) {
                         const a = document.createElement('a');
-                        a.href = png; a.download = 'pix-qrcode.png';
+                        a.href = ctx.pix.png; a.download = 'pix-qrcode.png';
                         document.body.appendChild(a); a.click(); document.body.removeChild(a);
-                        Toast.show('QR Code baixado — anexe a imagem antes de enviar a mensagem','warning', 5000);
+                        Toast.show('QR Code baixado — anexe a imagem junto da mensagem no WhatsApp','warning', 6000);
                     }
-                    window.open(`https://wa.me/55${ctx.phone}?text=${encodeURIComponent(texto)}`, '_blank');
-                    WppConfirm.close();
+                    window.open(waUrl(texto), '_blank');
+                    WppConfirm.close(); avancar();
                 };
+            },
+
+            // Mensagem 2: somente o Pix copia e cola (fácil de copiar)
+            _cobrancaEtapa2(ctx) {
+                if (!ctx.pix || !ctx.pix.payload) return;
+                WppConfirm.show({
+                    nome: ctx.nome, phone: ctx.phone,
+                    subtitle: 'Mensagem 2 de 2 — somente o Pix copia e cola',
+                    msg: ctx.pix.payload,
+                    url: `https://wa.me/55${ctx.phone}?text=${encodeURIComponent(ctx.pix.payload)}`
+                });
+                // Prévia em texto puro (o código tem "***", que a prévia trataria como negrito)
+                const pv = document.getElementById('wppConfirmPreview');
+                if (pv) { pv.textContent = ctx.pix.payload; pv.style.fontFamily = 'monospace'; pv.style.wordBreak = 'break-all'; }
             },
         };
         window.ContasManager = ContasManager;
@@ -18612,6 +18622,8 @@ body.dark-mode,
 
             show({ nome, phone, subtitle, msg, url, onSent }) {
                 document.getElementById('wppPixQrImg')?.remove();
+                const _pv = document.getElementById('wppConfirmPreview');
+                if (_pv) { _pv.style.fontFamily = ''; _pv.style.wordBreak = ''; }
                 this._url    = url;
                 this._msg    = msg;
                 this._phone  = (phone || '').replace(/\D/g, '');
@@ -27059,7 +27071,7 @@ tbody tr td{border:1.5px solid #000;padding:2mm;text-align:center;font-weight:70
             statusPedido: "Olá *{{NOME}}*! 👋\n\nSegue a atualização do seu pedido:\n\n🏪 *{{EMPRESA}}*\n━━━━━━━━━━━━━━━━━━━━\n📋 *OS Nº:* {{OS}}\n📅 *Data da compra:* {{DATA_VENDA}}\n🚚 *Previsão de entrega:* {{PREVISAO}}\n\n🔄 *Status atual:*\n➡️ *{{STATUS}}*\n\n{{MSG_STATUS}}\n━━━━━━━━━━━━━━━━━━━━\nDúvidas? Fale conosco! 😊\n📞 {{TELEFONE}}",
             receituario: "👁️ *RECEITUÁRIO ÓPTICO*\n━━━━━━━━━━━━━━━━━━━━\n🏪 *{{EMPRESA}}*\n📍 {{ENDERECO}}\n📞 {{TELEFONE}}\n━━━━━━━━━━━━━━━━━━━━\n\n👤 *Paciente:* {{PACIENTE}}\n📅 *Data:* {{DATA}}\n\n*🔵 OLHO DIREITO (OD)*\n{{DADOS_OD}}\n\n*🔴 OLHO ESQUERDO (OE)*\n{{DADOS_OE}}\n\n{{DADOS_EXTRA}}\n━━━━━━━━━━━━━━━━━━━━\n_Documento gerado por {{EMPRESA}}_\n_Válido mediante assinatura do profissional._",
             comprovante: "✅ *COMPROVANTE DE PAGAMENTO*\n━━━━━━━━━━━━━━━━━━━━\n🏪 *{{EMPRESA}}*\n📍 {{ENDERECO}}\n━━━━━━━━━━━━━━━━━━━━\n\n👤 *Cliente:* {{NOME}}\n🆔 *CPF:* {{CPF}}\n\n📋 *OS Nº:* {{OS}}\n🔢 *Parcela:* {{PARCELA}}\n📅 *Vencimento:* {{VENCIMENTO}}\n📅 *Data Pagamento:* {{DATA_PAGAMENTO}}\n\n💵 *VALOR PAGO: {{VALOR}}*\n💳 *Forma:* {{FORMA_PAGAMENTO}}\n\n✅ *PAGAMENTO CONFIRMADO*\n\n━━━━━━━━━━━━━━━━━━━━\n📞 {{TELEFONE}}\n_Documento gerado por {{EMPRESA}}_",
-            cobranca: "Olá *{{NOME}}*! 👋\n\nEstou passando para lembrar sobre uma parcela com vencimento em *{{VENCIMENTO}}*.\n\n━━━━━━━━━━━━━━━━━━━━\n📋 *{{DESCRICAO}}*\n🔢 *Parcela:* {{PARCELA}}\n📅 *Vencimento:* {{VENCIMENTO}}\n💰 *Valor:* {{VALOR}}\n━━━━━━━━━━━━━━━━━━━━\n\n{{JUROS_RESUMO}}\n\nEm seguida envio o QR Code e o Pix copia e cola para pagamento. 😊\n\n📞 {{TELEFONE}}\n_{{EMPRESA}}_",
+            cobranca: "Olá *{{NOME}}*! 👋\n\nSegue o Pix da sua parcela na *{{EMPRESA}}*:\n\n📋 *{{DESCRICAO}}*\n🔢 *Parcela:* {{PARCELA}}\n📅 *Vencimento:* {{VENCIMENTO}}\n💰 *Valor:* {{VALOR}}\n\n{{JUROS_RESUMO}}\n\n📲 Escaneie o QR Code ou use o *Pix copia e cola* na mensagem abaixo 👇",
             confirmacaoOS: "Olá *{{NOME}}*! 👋\n\n✅ Seu pedido foi registrado com sucesso na *{{EMPRESA}}*!\n\n━━━━━━━━━━━━━━━━━━━━\n📋 *OS Nº:* {{OS}}\n📅 *Data:* {{DATA_VENDA}}\n🚚 *Previsão de entrega:* {{PREVISAO}}\n💳 *Pagamento:* {{PAGAMENTO}}\n💰 *Total:* {{TOTAL}}\n━━━━━━━━━━━━━━━━━━━━\n\nAvisaremos quando estiver pronto! 👓\n\nQualquer dúvida estamos à disposição.\n📞 {{TELEFONE}}",
             lembreteRetirada: "Olá *{{NOME}}*! 👋\n\n🎉 *Seus óculos estão prontos para retirada!*\n\n━━━━━━━━━━━━━━━━━━━━\n🏪 *{{EMPRESA}}*\n📋 *OS Nº:* {{OS}}\n━━━━━━━━━━━━━━━━━━━━\n\n{{SALDO_RETIRADA}}\n\nVenha nos visitar, estamos aguardando você! 😊\n\n📍 {{ENDERECO}}\n📞 {{TELEFONE}}"
         };
@@ -27097,9 +27109,9 @@ tbody tr td{border:1.5px solid #000;padding:2mm;text-align:center;font-weight:70
             },
             cobranca: {
                 title:  '💸 Cobrança / Lembrete de Pagamento',
-                sub:    'Contas a Receber → botão WhatsApp na parcela (1ª mensagem; a 2ª leva o QR Code + Pix)',
+                sub:    'Contas a Receber → botão WhatsApp na parcela (vai junto com o QR Code; o Pix copia e cola segue em outra mensagem)',
                 vars:   ['{{NOME}}','{{DESCRICAO}}','{{PARCELA}}','{{VALOR}}','{{VENCIMENTO}}','{{JUROS_RESUMO}}','{{VALOR_ATUALIZADO}}','{{DIAS_ATRASO}}','{{EMPRESA}}','{{TELEFONE}}'],
-                exemplo:{ '{{NOME}}':'João', '{{DESCRICAO}}':'OS 2025/042 — Parcela 2/5', '{{PARCELA}}':'2 de 5', '{{VALOR}}':'R$ 200,00', '{{VENCIMENTO}}':'15/03/2025', '{{JUROS_RESUMO}}':'⚠️ Se não for paga no vencimento: multa de 2% (R$ 4,00) + juros de 0,033% ao dia (≈ R$ 0,07 por dia).', '{{VALOR_ATUALIZADO}}':'R$ 204,00', '{{DIAS_ATRASO}}':'0', '{{EMPRESA}}':'Ótica Exemplo', '{{TELEFONE}}':'(11) 9999-9999' }
+                exemplo:{ '{{NOME}}':'João', '{{DESCRICAO}}':'OS 2025/042 — Parcela 2/5', '{{PARCELA}}':'2 de 5', '{{VALOR}}':'R$ 200,00', '{{VENCIMENTO}}':'15/03/2025', '{{JUROS_RESUMO}}':'⚠️ Após o vencimento: multa de 2% + juros de 0,033% ao dia.', '{{VALOR_ATUALIZADO}}':'R$ 204,00', '{{DIAS_ATRASO}}':'0', '{{EMPRESA}}':'Ótica Exemplo', '{{TELEFONE}}':'(11) 9999-9999' }
             },
             confirmacaoOS: {
                 title:  '📋 Confirmação de OS',
