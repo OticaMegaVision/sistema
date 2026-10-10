@@ -9892,7 +9892,7 @@ body.dark-mode,
                                 <div class="bkp-status-ic" style="background:#f3f0ff;color:#7c3aed;"><i class="fas fa-code-branch"></i></div>
                                 <div class="txt">
                                     <b>Versão do sistema</b>
-                                    <span>versão <strong>101020261153</strong></span>
+                                    <span>versão <strong>101020261330</strong></span>
                                 </div>
                             </div>
                         </div>
@@ -31403,7 +31403,16 @@ ${container.innerHTML}
                 // ── Receituário ──
                 const buildPrescHtml = () => {
                     if (!presc) return '';
-                    const hasAdd = parseFloat(presc.od?.add) > 0 || parseFloat(presc.oe?.add) > 0;
+                    // Venda só de lente OD ou só OE (meio par): a O.S. mostra apenas o olho da venda.
+                    // Sem lente na venda, ou com lente de Par → mostra OD e OE (como sempre).
+                    const _lentesOS = (sale?.items || []).filter(it => it && it.type === 'lente');
+                    let mostrarOD = true, mostrarOE = true;
+                    if (_lentesOS.length && _lentesOS.every(it => it.olho === 'OD' || it.olho === 'OE')) {
+                        mostrarOD = _lentesOS.some(it => it.olho === 'OD');
+                        mostrarOE = _lentesOS.some(it => it.olho === 'OE');
+                    }
+                    const umOlho = mostrarOD !== mostrarOE;
+                    const hasAdd = (mostrarOD && parseFloat(presc.od?.add) > 0) || (mostrarOE && parseFloat(presc.oe?.add) > 0);
                     return `
                     <div class="os-receita-section">
                       <div class="os-section-title">Receituário Óptico</div>
@@ -31411,18 +31420,19 @@ ${container.innerHTML}
                         <colgroup><col style="width:8%"><col style="width:11%"><col style="width:14%"><col style="width:13%"><col style="width:11%"><col style="width:13%"><col style="width:13%"></colgroup>
                         <thead><tr><th>Olho</th><th>Tipo</th><th>ESF</th><th>CIL</th><th>EIXO</th><th>ADIÇÃO</th><th>DNP</th></tr></thead>
                         <tbody>
-                          <tr><td class="os-olho-label">OD</td><td>Longe</td><td>${presc.od?.sph||'—'}</td><td>${presc.od?.cyl||'—'}</td><td>${presc.od?.axis||'—'}</td><td>${presc.od?.add||'—'}</td><td>${presc.od?.dnp||'—'}</td></tr>
-                          <tr><td class="os-olho-label">OE</td><td>Longe</td><td>${presc.oe?.sph||'—'}</td><td>${presc.oe?.cyl||'—'}</td><td>${presc.oe?.axis||'—'}</td><td>${presc.oe?.add||'—'}</td><td>${presc.oe?.dnp||'—'}</td></tr>
+                          ${mostrarOD ? `<tr><td class="os-olho-label">OD</td><td>Longe</td><td>${presc.od?.sph||'—'}</td><td>${presc.od?.cyl||'—'}</td><td>${presc.od?.axis||'—'}</td><td>${presc.od?.add||'—'}</td><td>${presc.od?.dnp||'—'}</td></tr>` : ''}
+                          ${mostrarOE ? `<tr><td class="os-olho-label">OE</td><td>Longe</td><td>${presc.oe?.sph||'—'}</td><td>${presc.oe?.cyl||'—'}</td><td>${presc.oe?.axis||'—'}</td><td>${presc.oe?.add||'—'}</td><td>${presc.oe?.dnp||'—'}</td></tr>` : ''}
                           ${hasAdd ? `
-                          <tr><td class="os-olho-label">OD</td><td>Perto</td><td>${(parseFloat(presc.od?.sph||0)+parseFloat(presc.od?.add||0)).toFixed(2)}</td><td>${presc.od?.cyl||'—'}</td><td>${presc.od?.axis||'—'}</td><td>—</td><td>${presc.od?.dnp?(parseFloat(presc.od.dnp)-2.5).toFixed(1):'—'}</td></tr>
-                          <tr><td class="os-olho-label">OE</td><td>Perto</td><td>${(parseFloat(presc.oe?.sph||0)+parseFloat(presc.oe?.add||0)).toFixed(2)}</td><td>${presc.oe?.cyl||'—'}</td><td>${presc.oe?.axis||'—'}</td><td>—</td><td>${presc.oe?.dnp?(parseFloat(presc.oe.dnp)-2.5).toFixed(1):'—'}</td></tr>` : ''}
+                          ${mostrarOD ? `<tr><td class="os-olho-label">OD</td><td>Perto</td><td>${(parseFloat(presc.od?.sph||0)+parseFloat(presc.od?.add||0)).toFixed(2)}</td><td>${presc.od?.cyl||'—'}</td><td>${presc.od?.axis||'—'}</td><td>—</td><td>${presc.od?.dnp?(parseFloat(presc.od.dnp)-2.5).toFixed(1):'—'}</td></tr>` : ''}
+                          ${mostrarOE ? `<tr><td class="os-olho-label">OE</td><td>Perto</td><td>${(parseFloat(presc.oe?.sph||0)+parseFloat(presc.oe?.add||0)).toFixed(2)}</td><td>${presc.oe?.cyl||'—'}</td><td>${presc.oe?.axis||'—'}</td><td>—</td><td>${presc.oe?.dnp?(parseFloat(presc.oe.dnp)-2.5).toFixed(1):'—'}</td></tr>` : ''}` : ''}
+                        ${umOlho ? `<tr><td colspan="7" style="text-align:left;font-style:italic;color:#777;">${mostrarOD ? 'OE' : 'OD'} — não incluído nesta O.S. (venda de ½ par)</td></tr>` : ''}
                         </tbody>
                       </table>
                       <div class="os-receita-extra">
                         <span>${Clients.profTypeLabel(presc.profType)}: <strong>${presc.optometrist||'______'}</strong></span>
                         <span>${Clients.profRegAbbrev(presc.profType)}: <strong>${presc.regNum||presc.cro||'______'}</strong></span>
-                        <span>DP Longe: <strong>${presc.dp||'—'} mm</strong></span>
-                        <span>DP Perto: <strong>${presc.dpNear||'—'} mm</strong></span>
+                        ${umOlho ? '' : `<span>DP Longe: <strong>${presc.dp||'—'} mm</strong></span>`}
+                        ${umOlho ? '' : `<span>DP Perto: <strong>${presc.dpNear||'—'} mm</strong></span>`}
                         <span>Altura: <strong>${presc.height||'—'} mm</strong></span>
                         ${presc.frameRef ? `<span>Armação Ref: <strong>${presc.frameRef}</strong></span>` : ''}
                       </div>
