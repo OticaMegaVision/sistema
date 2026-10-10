@@ -3344,6 +3344,8 @@ var qrcode=function(){function r(t,e){if(void 0===t.length)throw new Error(t.len
         .lente-olho-btn small { display:block; font-weight:400; font-size:.68rem; color:#999; }
         .lente-olho-btn.active { border-color:#ff6b00; background:#fff3e0; color:#e65100; }
         .lente-olho-btn.active small { color:#e65100; }
+        .presc-table tr.presc-row-off td { opacity:.35; }
+        .presc-table tr.presc-row-off td:first-child::after { content:" · não incl."; font-size:.62rem; font-weight:400; white-space:nowrap; }
         .dark-mode .mv-cat-select { background-color: #2d2d2d; border-color: #444; color: #e0e0e0; }
         .mv-menu-drop {
             display: none; position: absolute; top: 42px; right: 0; background: #fff;
@@ -7160,6 +7162,10 @@ body.dark-mode,
                             </div>
                         </div>
 
+                        <div id="prescOlhoAviso" style="display:none;align-items:flex-start;gap:8px;background:#fff3e0;border:1px solid #ffcc80;border-radius:10px;padding:8px 12px;margin-bottom:14px;color:#a14a00;font-size:.85rem;">
+                            <i class="fas fa-circle-info" style="margin-top:2px;"></i>
+                            <span id="prescOlhoAvisoTxt"></span>
+                        </div>
                         <!-- Tabela LONGE -->
                         <div style="margin-bottom: 30px;">
                             <h4 style="color: var(--primary);">LONGE</h4>
@@ -9892,7 +9898,7 @@ body.dark-mode,
                                 <div class="bkp-status-ic" style="background:#f3f0ff;color:#7c3aed;"><i class="fas fa-code-branch"></i></div>
                                 <div class="txt">
                                     <b>Versão do sistema</b>
-                                    <span>versão <strong>101020261330</strong></span>
+                                    <span>versão <strong>101020262040</strong></span>
                                 </div>
                             </div>
                         </div>
@@ -29359,6 +29365,7 @@ ${container.innerHTML}
             },
 
             renderItems() {
+                try { this._prescOlhoAtualizar(); } catch (_e) {}
                 const container = document.getElementById('saleItemsContainer');
                 if (!container) return;
                 const hint = document.getElementById('emptyItemsHint');
@@ -29662,6 +29669,37 @@ ${container.innerHTML}
             },
 
             // ── Lente por olho: Par (padrão) | Só OD | Só OE (½ par) ──
+            // Olhos incluídos nas lentes da venda (sem lente ou lente de Par → ambos)
+            olhosDaVenda(sale) {
+                const lentes = (sale?.items || []).filter(it => it && it.type === 'lente');
+                let od = true, oe = true;
+                if (lentes.length && lentes.every(it => it.olho === 'OD' || it.olho === 'OE')) {
+                    od = lentes.some(it => it.olho === 'OD');
+                    oe = lentes.some(it => it.olho === 'OE');
+                }
+                return { od, oe };
+            },
+
+            // Só visual: clareia a linha do olho que não faz parte da venda (campos seguem editáveis)
+            _prescOlhoAtualizar() {
+                const { od, oe } = this.olhosDaVenda(state.currentSale);
+                document.querySelectorAll('#prescSection .presc-table tbody tr').forEach(tr => {
+                    const t = (tr.cells[0]?.textContent || '').trim();
+                    const off = (t.startsWith('OD') && !od) || (t.startsWith('OE') && !oe);
+                    tr.classList.toggle('presc-row-off', off);
+                });
+                const aviso = document.getElementById('prescOlhoAviso');
+                const txt = document.getElementById('prescOlhoAvisoTxt');
+                if (aviso) {
+                    const umOlho = od !== oe;
+                    aviso.style.display = umOlho ? 'flex' : 'none';
+                    if (umOlho && txt) {
+                        const inc = od ? 'OD' : 'OE', exc = od ? 'OE' : 'OD';
+                        txt.innerHTML = `Venda de ½ par: somente <b>${inc}</b> está incluído. O <b>${exc}</b> não entra na O.S.`;
+                    }
+                }
+            },
+
             fmtQtd(q) {
                 const n = Number(q);
                 if (!isFinite(n)) return String(q);
