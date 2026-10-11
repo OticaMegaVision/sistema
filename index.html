@@ -6396,6 +6396,9 @@ body.dark-mode,
 .ss-item-meta .ss-stock-low { color: #d97706; font-weight: 600; }
 .ss-item-meta .ss-stock-out { color: #dc2626; font-weight: 600; }
 .ss-item-price { font-weight: 800; color: var(--orange-2, #e85500); font-size: 0.85rem; white-space: nowrap; flex: none; }
+.ss-fav { flex: none; width: 30px; height: 30px; display: inline-flex; align-items: center; justify-content: center; border-radius: 8px; color: #c4c9d0; font-size: 1.05rem; cursor: pointer; }
+.ss-fav:hover { background: #fff3e0; color: #ff9800; }
+.ss-fav.on { color: #ff9800; }
 .dark-mode .ss-item-name { color: #eee; }
 
 /* ── Cards de resultado de cliente (busca na tela de venda) ── */
@@ -9898,7 +9901,7 @@ body.dark-mode,
                                 <div class="bkp-status-ic" style="background:#f3f0ff;color:#7c3aed;"><i class="fas fa-code-branch"></i></div>
                                 <div class="txt">
                                     <b>Versão do sistema</b>
-                                    <span>versão <strong>101020262040</strong></span>
+                                    <span>versão <strong>111020261005</strong></span>
                                 </div>
                             </div>
                         </div>
@@ -25481,6 +25484,10 @@ tbody tr td{border:1.5px solid #000;padding:2mm;text-align:center;font-weight:70
                     updated_at: new Date().toISOString()
                 };
                 
+                if (state.editingId) {
+                    const _antigo = (state.products || []).find(p => p.id === state.editingId);
+                    if (_antigo && _antigo.fav) product.fav = true;   // não perder o favorito ao editar
+                }
                 if (product.price <= 0) {
                     Toast.show('Preço de venda deve ser maior que zero', 'warning');
                     return;
@@ -25844,6 +25851,10 @@ tbody tr td{border:1.5px solid #000;padding:2mm;text-align:center;font-weight:70
                     updated_at: new Date().toISOString()
                 };
                 
+                if (state.editingId) {
+                    const _antigo = (state.services || []).find(sv => sv.id === state.editingId);
+                    if (_antigo && _antigo.fav) service.fav = true;   // não perder o favorito ao editar
+                }
                 if (service.value <= 0) {
                     Toast.show('Valor deve ser maior que zero', 'warning');
                     return;
@@ -28561,6 +28572,13 @@ ${container.innerHTML}
                     ? options.filter(o => this._ssNormalize(o.textContent).includes(term))
                     : options;
 
+                // Favoritos primeiro (ordenação estável: o restante mantém a ordem de sempre)
+                const _favIds = new Set([...(state.products || []), ...(state.services || [])].filter(x => x && x.fav).map(x => x.id));
+                if (_favIds.size) {
+                    const _isFav = o => _favIds.has((o.value || '').split('|')[0]) ? 1 : 0;
+                    matches.sort((a, b) => _isFav(b) - _isFav(a));
+                }
+
                 dropdown.innerHTML = '';
                 if (matches.length === 0) {
                     dropdown.innerHTML = '<div class="ss-empty">Nenhum resultado encontrado</div>';
@@ -28619,8 +28637,35 @@ ${container.innerHTML}
                         <div class="ss-item-name">${Utils.sanitizeHTML(src.name || '')}</div>
                         <div class="ss-item-meta">${codeText ? `<span>${codeText}</span>` : ''}${stockText ? `<span class="${stockClass}">${stockText}</span>` : ''}</div>
                     </div>
+                    <span class="ss-fav ${src.fav ? 'on' : ''}" title="${src.fav ? 'Remover dos favoritos' : 'Favoritar'}" onmousedown="Sales.toggleFav(event, '${Utils.sanitizeHTML(String(src.id))}')"><i class="${src.fav ? 'fas' : 'far'} fa-star"></i></span>
                     <div class="ss-item-price">${priceFmt}</div>`;
                 return item;
+            },
+
+            // Favoritar/desfavoritar produto ou serviço direto na lista (sem selecionar o item)
+            toggleFav(ev, id) {
+                try { ev.preventDefault(); ev.stopPropagation(); } catch (_e) {}
+                let kind = 'product';
+                let item = (state.products || []).find(p => p.id === id);
+                if (!item) { item = (state.services || []).find(sv => sv.id === id); kind = 'service'; }
+                if (!item) return;
+                item.fav = !item.fav;   // false explícito para a remoção também sincronizar
+                item.updated_at = new Date().toISOString();
+                App.saveData();
+                try {
+                    const p = kind === 'product' ? SupaSync.upsertProduto(item) : SupaSync.upsertServico(item);
+                    if (p && p.catch) p.catch(() => {});
+                } catch (_e) {}
+                // Atualiza a lista aberta mantendo o termo digitado e a posição de rolagem
+                try {
+                    const dd = ev.target.closest('.ss-dropdown');
+                    if (dd && /Dropdown$/.test(dd.id)) {
+                        const pre = dd.id.replace(/Dropdown$/, '');
+                        const top = dd.scrollTop;
+                        this.ssFilter(pre + 'Select', pre + 'Search', dd.id);
+                        dd.scrollTop = top;
+                    }
+                } catch (_e) {}
             },
 
             // Aplica a seleção: atualiza o select oculto (compatível com o resto do código) e o campo de busca
