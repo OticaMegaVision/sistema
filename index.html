@@ -9901,7 +9901,7 @@ body.dark-mode,
                                 <div class="bkp-status-ic" style="background:#f3f0ff;color:#7c3aed;"><i class="fas fa-code-branch"></i></div>
                                 <div class="txt">
                                     <b>Versão do sistema</b>
-                                    <span>versão <strong>161020260053</strong></span>
+                                    <span>versão <strong>161020260707</strong></span>
                                 </div>
                             </div>
                         </div>
@@ -24298,7 +24298,7 @@ tbody tr td{border:1.5px solid #000;padding:2mm;text-align:center;font-weight:70
                             linhaAtual = []; itensLinha = [];
                         }
                         linhaAtual.push(it.str);
-                        itensLinha.push({ x: it.transform[4], y, str: it.str });
+                        itensLinha.push({ x: it.transform[4], y, str: it.str, w: it.width || 0 });
                         lastY = y;
                     });
                     if (linhaAtual.length) fecha();
@@ -24335,6 +24335,117 @@ tbody tr td{border:1.5px solid #000;padding:2mm;text-align:center;font-weight:70
                 if (t.includes('multi c.o.') || t.includes('lentes c.o.')) return 'brasprecios';
                 if (t.includes('valores em pares e reais') || t.includes('incluir o antirreflexo no ato do pedido') || t.includes('c.o. a.r.')) return 'brasprecios';
                 return 'generico';
+            },
+
+            // ── Tech Vantagens por COLUNAS (posição no PDF): VALOR = sem AR; AR Premium / Trio Easy Clean /
+            //    AR MC Lite = com AR (sufixo -AR); Pro Coat, Crizal, No Reflex = "outros tratamentos" (opcionais).
+            //    Se algo der errado devolve [] e o leitor antigo (por linha) assume, como antes.
+            miaParseTechColunas() {
+                try {
+                    const paginas = this._miaPaginasPos || [];
+                    if (!paginas.length) return [];
+                    const PRECO = /^\d{1,3}(?:\.\d{3})*,\d{2}$|^\d{1,3}(?:\.\d{3})+\.\d{2}$/;
+                    const strip = v => String(v).normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase().replace(/\s+/g, ' ').trim();
+                    const slug = v => strip(v).replace(/[^A-Z0-9]/g, '');
+                    const todos = [], avisos = [], baseUsada = {};
+                    let typos = 0;
+                    paginas.forEach(linhas => {
+                        const its = [];
+                        linhas.forEach(l => (l.items || []).forEach(i => { const t = String(i.str || '').trim(); if (t) its.push({ s: t, x: i.x, y: i.y, cx: i.x + (i.w || 0) / 2 }); }));
+                        const heads = its.filter(i => i.s === 'PRODUTO' && i.x < 150).sort((p, q) => q.y - p.y);
+                        heads.forEach((h, k) => {
+                            const yTop = h.y - 8, yBot = k + 1 < heads.length ? heads[k + 1].y + 14 : -1e9;
+                            const tit = its.filter(i => i.y > h.y && i.y - h.y < 130 && /COMBO LENTES SURF|LENTES PRONTAS|LENTES MULTIFOCAIS KODAK/i.test(i.s)).sort((p, q) => p.y - q.y)[0];
+                            const secao = tit ? tit.s : '';
+                            // colunas do cabeçalho (títulos de 2 linhas são unidos)
+                            const hcols = [];
+                            its.filter(i => i.y <= h.y + 14 && i.y >= h.y - 9 && i.x > 150 && !PRECO.test(i.s) && i.s !== '-').sort((p, q) => p.x - q.x).forEach(f => {
+                                // título de 2 linhas: fragmento com o centro alinhado a uma coluna já aberta, em outra altura
+                                const last = hcols.find(c => Math.abs(f.cx - c.cxm) < 16 && c.fr.every(g => Math.abs(g.y - f.y) > 2));
+                                if (last) { last.fr.push(f); last.cxm = last.fr.reduce((a, g) => a + g.cx, 0) / last.fr.length; }
+                                else hcols.push({ fr: [f], cxm: f.cx });
+                            });
+                            hcols.forEach(c => { c.label = c.fr.sort((p, q) => q.y - p.y).map(f => f.s).join(' ').replace(/\s*-+\s*$/, ''); c.cx = c.fr.reduce((a, f) => a + f.cx, 0) / c.fr.length; });
+                            // linhas de dados
+                            const rows = [];
+                            its.filter(i => i.y < yTop && i.y > yBot).sort((p, q) => q.y - p.y).forEach(i => {
+                                const r = rows.find(r => Math.abs(r.y - i.y) <= 3);
+                                if (r) r.items.push(i); else rows.push({ y: i.y, items: [i] });
+                            });
+                            const dados = rows.map(r => { r.items.sort((p, q) => p.x - q.x); return r; })
+                                .filter(r => /^\d{4,5}(\s*\/\s*\d{4,5})?$/.test(r.items[0].s) && r.items[0].x < 70);
+                            if (!dados.length) return;
+                            // colunas de preço (agrupa pela posição do centro)
+                            const xs = [];
+                            dados.forEach(r => r.items.slice(1).forEach(i => { if (i.x > 150 && PRECO.test(i.s)) xs.push(i.cx); }));
+                            xs.sort((p, q) => p - q);
+                            const anchors = [];
+                            xs.forEach(x => { const a = anchors[anchors.length - 1]; if (a && x - a.max <= 22) { a.max = x; a.xs.push(x); } else anchors.push({ max: x, xs: [x] }); });
+                            anchors.forEach(a => { a.cx = a.xs.reduce((p, q) => p + q, 0) / a.xs.length; const hc = hcols.map(c => ({ c, d: Math.abs(c.cx - a.cx) })).sort((p, q) => p.d - q.d)[0]; a.label = hc && hc.d < 32 ? hc.c.label : ''; });
+                            const temMC = anchors.some(a => /MC LITE/i.test(a.label));
+                            anchors.forEach((a, i) => { if (!a.label) a.label = temMC ? 'NO REFLEX' : 'COLUNA ' + (i + 1); });
+                            dados.forEach(r => {
+                                const codStr = r.items[0].s.replace(/\s+/g, '');
+                                const codes = codStr.split('/').filter(Boolean);
+                                const priceItems = r.items.slice(1).filter(i => i.x > 150 && PRECO.test(i.s));
+                                const minX = priceItems.length ? Math.min(...priceItems.map(i => i.x)) : 1e9;
+                                let nome = this._miaLimparNome(r.items.slice(1).filter(i => i.x < minX - 2 && !PRECO.test(i.s) && i.s !== '-').map(i => i.s).join(' ')).substring(0, 100);
+                                if (!nome) return;
+                                // preços por coluna
+                                const porCol = {};
+                                priceItems.forEach(i => {
+                                    let bi = 0, bd = 1e9; anchors.forEach((a, n) => { const d = Math.abs(a.cx - i.cx); if (d < bd) { bd = d; bi = n; } });
+                                    if (porCol[bi] != null) return;
+                                    let t = i.s;
+                                    if (/^\d{1,3}(?:\.\d{3})+\.\d{2}$/.test(t)) { t = t.replace(/\.(\d{2})$/, ',$1'); typos++; }
+                                    const v = this.miaParseNumero(t);
+                                    if (v > 0 && v < 50000) porCol[bi] = v;
+                                });
+                                const vars = [];
+                                Object.keys(porCol).forEach(bi => {
+                                    const u = strip(anchors[bi].label);
+                                    if (u === 'VALOR') vars.push({ tipo: 'sem', valor: porCol[bi], ord: 0 });
+                                    else if (u === 'AR PREMIUM') vars.push({ tipo: 'ar', nome: 'AR PREMIUM', valor: porCol[bi], ord: 1 });
+                                    else if (u === 'TRIO EASY CLEAN') vars.push({ tipo: 'ar', nome: 'AR TRIO EASY CLEAN', valor: porCol[bi], ord: 1 });
+                                    else if (u === 'AR MC LITE') vars.push({ tipo: 'ar', nome: 'AR MC LITE', valor: porCol[bi], ord: 1 });
+                                    else vars.push({ tipo: 'extra', nome: u, slug: slug(u), valor: porCol[bi], ord: 2 });
+                                });
+                                if (!vars.length) return;
+                                const temBase = vars.some(v => v.tipo !== 'extra');
+                                vars.sort((p, q) => p.ord - q.ord);
+                                codes.forEach((c0, ci) => {
+                                    let nomeC = nome;
+                                    if (codes.length === 2 && /\s*\/\s*SMALL\b/i.test(nome)) nomeC = ci === 0 ? nome.replace(/\s*\/\s*SMALL\b/i, '') : nome.replace(/\s*\/\s*SMALL\b/i, ' SMALL');
+                                    let base = c0;
+                                    if (baseUsada[base]) {
+                                        const suf = /CIL\.?\s*(EXT|>)/i.test(nomeC) ? '-CILEXT' : (/POLY/i.test(nomeC) ? '-POLY' : '-' + (baseUsada[base] + 1));
+                                        avisos.push(`Código <b>${c0}</b> repetido no PDF (${Utils.sanitizeHTML(nomeC.substring(0, 40))}): este virou <b>${c0}${suf}</b>. Confirme com o laboratório.`);
+                                        base = c0 + suf;
+                                    }
+                                    baseUsada[c0] = (baseUsada[c0] || 0) + 1;
+                                    const usadosLinha = {};
+                                    vars.forEach(v => {
+                                        let codigo, nomeF;
+                                        if (v.tipo === 'sem') { codigo = base; nomeF = nomeC; }
+                                        else if (v.tipo === 'ar') { codigo = base + '-AR'; if (usadosLinha[codigo]) codigo = base + '-' + slug(v.nome); nomeF = nomeC + ' - ' + v.nome; }
+                                        else { codigo = base + '-' + v.slug; nomeF = nomeC + ' - ' + v.nome; }
+                                        usadosLinha[codigo] = 1;
+                                        todos.push({ codigo, nome: nomeF.substring(0, 100), categoria: this._miaCategoriaTech(nomeC, secao), custo: v.valor, laboratorio: 'tech-vantagens', extra: v.tipo === 'extra' && temBase });
+                                    });
+                                });
+                            });
+                        });
+                    });
+                    if (todos.length < 20) return [];   // não reconheceu o formato: usa o leitor antigo
+                    if (typos) avisos.push(`<b>${typos}</b> preço(s) vinham com ponto no lugar da vírgula no PDF (ex.: 1.116.90) e foram lidos como 1.116,90.`);
+                    this._miaTodosProdutos = todos;
+                    this._miaAvisos = avisos;
+                    return todos.filter(p => !p.extra);
+                } catch (e) {
+                    console.error('[MarkupIA] leitor por colunas falhou, usando o leitor por linha:', e);
+                    this._miaTodosProdutos = null; this._miaAvisos = [];
+                    return [];
+                }
             },
 
             miaParseTechVantagens(texto) {
@@ -24735,6 +24846,7 @@ tbody tr td{border:1.5px solid #000;padding:2mm;text-align:center;font-weight:70
                 try {
                     const ehImagem = this._miaEhImagem(file);
                     this._miaCampanha = null;
+                    this._miaTodosProdutos = null; this._miaAvisos = []; this._miaIncluirOutros = false;
                     let texto = '';
                     if (!ehImagem) {
                         setProgress(10, 'Extraindo texto do PDF...');
@@ -24750,7 +24862,10 @@ tbody tr td{border:1.5px solid #000;padding:2mm;text-align:center;font-weight:70
                     const pareceCampanha = !ehImagem && /campanha\s+v[aá]lida/i.test(texto) && /oferta\s+especial/i.test(texto);
                     const lerPorTexto = () => {
                         let pr = [];
-                        if (this._miaLabDetectado === 'tech-vantagens') pr = this.miaParseTechVantagens(texto);
+                        if (this._miaLabDetectado === 'tech-vantagens') {
+                            pr = this.miaParseTechColunas();
+                            if (!pr.length) pr = this.miaParseTechVantagens(texto);
+                        }
                         else if (this._miaLabDetectado === 'brasprecios') {
                             pr = this.miaParseBraspreciosCO(this._miaPaginasPos);
                             if (!pr.length) pr = this.miaParseBrasprecios(texto);
@@ -24772,6 +24887,7 @@ tbody tr td{border:1.5px solid #000;padding:2mm;text-align:center;font-weight:70
                             labInfo = this.miaGetLabInfo(ia.lab);
                             this._miaLidoPorIA = true;
                             this._miaCampanha = ia.campanha || null;
+                            this._miaTodosProdutos = null; this._miaAvisos = [];
                         } else if (ia && ia.msg) this._miaMsgIA = ia.msg;
                         // PDF de campanha em que a IA não foi usada/falhou: tenta o leitor por texto, como antes
                         if (produtos.length === 0 && pareceCampanha) produtos = lerPorTexto();
@@ -24824,18 +24940,25 @@ tbody tr td{border:1.5px solid #000;padding:2mm;text-align:center;font-weight:70
                     if (/^VS\b/i.test(nome)) return 'Visão Simples Surf';
                     return 'Lentes Acabadas';
                 }
-                if (lab === 'tech-vantagens') {
-                    const sec = String(secao || '');
-                    if (/TECHNOPARK/i.test(nome)) return /FOTO|TRANSITIONS/i.test(nome) ? 'Technopark Fotocromático' : 'Technopark';
-                    if (/KODAK/i.test(nome)) return /UHD/i.test(nome) ? 'Multifocais Kodak UHD' : 'Lentes Prontas Kodak';
-                    if (/ESSILOR/i.test(nome)) return 'Lentes Prontas Essilor';
-                    if (/PROGRESSIV.*PRO\s*DESIGN.*ELITE/i.test(nome)) return 'Progressivas Pro Design Elite';
-                    if (/^LP\b|PRO\s*DESIGN/i.test(nome)) return 'Lentes Prontas Pro Design';
-                    if (/VIS[ÃA]O\s*SIMPLES|^VS\b/i.test(nome)) return 'Surf Visão Simples';
-                    if (/\bMF\b|MULTI|PROGRESS/i.test(nome)) return 'Surf Progressivo';
-                    if (/ACABADA/i.test(sec)) return 'Lentes Prontas Pro Design';
-                    if (/SURFA/i.test(sec)) return 'Surf Visão Simples';
-                }
+                if (lab === 'tech-vantagens') return this._miaCategoriaTech(nome, secao);
+                return 'Lentes';
+            },
+
+            // Categorias do Markup da Tech Vantagens (as mesmas que já existem na configuração)
+            _miaCategoriaTech(nome, secao) {
+                const n = String(nome || ''), sec = String(secao || '');
+                if (/COMBO LENTES SURF\.?\s*VS/i.test(sec)) return 'Surf Visão Simples';
+                if (/PRO\s*DESIGN\s*SINGLE/i.test(n)) return 'Surf Visão Simples';
+                if (/PRO\s*DESIGN\s*(PLATINUM|ELITE|WISE|ADAPT)/i.test(n)) return 'Progressivas Pro Design Elite';
+                if (/KODAK\s*PRECISE/i.test(n)) return 'Multifocais Kodak UHD';
+                if (/KODAK/i.test(n)) return /UHD/i.test(n) ? 'Multifocais Kodak UHD' : 'Lentes Prontas Kodak';
+                if (/ESSILOR|^LP\s+(ORMA|AIRWEAR|STYLIS)/i.test(n)) return 'Lentes Prontas Essilor';
+                if (/TECHNOPARK/i.test(n)) return /TRANSITIONS/i.test(n) ? 'Technopark Fotocromático' : 'Technopark';
+                if (/^(LP|LT)\b|PRO\s*DESIGN/i.test(n)) return 'Lentes Prontas Pro Design';
+                if (/VIS[ÃA]O\s*SIMPLES|^VS\b/i.test(n)) return 'Surf Visão Simples';
+                if (/\bMF\b|MULTI|PROGRESS|ESPACE|\bGEN\b/i.test(n)) return 'Surf Progressivo';
+                if (/ACABADA/i.test(sec)) return 'Lentes Prontas Pro Design';
+                if (/SURFA/i.test(sec)) return 'Surf Visão Simples';
                 return 'Lentes';
             },
 
@@ -24895,13 +25018,16 @@ tbody tr td{border:1.5px solid #000;padding:2mm;text-align:center;font-weight:70
                     const nome = limpa(x.nome);
                     if (semAr > 0 || comAr > 0) {
                         // ---- linha de oferta (variantes) ----
-                        const cod = String(x.codigo == null ? '' : x.codigo).split('/')[0].toUpperCase().replace(/[^A-Z0-9]/g, '');
+                        let cod = String(x.codigo == null ? '' : x.codigo).split('/')[0].toUpperCase().replace(/[^A-Z0-9]/g, '');
                         if (!/^[A-Z]{0,3}\d{3,6}[A-Z]{0,3}$/.test(cod)) return;
+                        if (lab === 'tech-vantagens' && /^P\d{3,6}$/.test(cod)) cod = cod.substring(1);   // P10305 = produto 10305 da lista mensal
                         const selo = limpa(x.selo).toUpperCase();
                         const temAR = /\bA\.?R\.?\b/i.test(nome);
                         const temSemAR = /SEM\s*A\.?R/i.test(nome);
-                        if (semAr > 0) add(cod + '-SEMAR', temSemAR ? nome : nome + ' - SEM AR', semAr, x.secao);
-                        if (comAr > 0) {
+                        const tech = lab === 'tech-vantagens';
+                        if (semAr > 0) add(tech ? cod : cod + '-SEMAR', (tech || temSemAR) ? nome : nome + ' - SEM AR', semAr, x.secao);
+                        if (comAr > 0 && tech && !semAr && temAR && !selo) add(cod, nome, comAr, x.secao);   // lente pronta que já tem AR no nome: atualiza o produto atual
+                        else if (comAr > 0) {
                             let nomeAR;
                             if (selo && /^A\.?R\b/i.test(selo)) {            // selo já começa com "AR" (ex.: AR PREMIUM): não repete "AR"
                                 const resto = selo.replace(/^A\.?R\.?\s*/i, '').trim();
@@ -24953,6 +25079,7 @@ tbody tr td{border:1.5px solid #000;padding:2mm;text-align:center;font-weight:70
                     'TABELA COMUM DE PREÇOS: "custo" = o PRIMEIRO preço preenchido da linha, da esquerda para a direita (ex.: coluna "Sem A.R."; se vazia, a próxima coluna com valor); sem_ar=0, com_ar=0, selo="". ' +
                     'PANFLETO DE OFERTA/CAMPANHA (tem nome de campanha, período de validade e/ou "oferta especial"): preencha "campanha":{"nome":"nome da campanha","inicio":"AAAA-MM-DD","fim":"AAAA-MM-DD","regulamento":"texto do regulamento, ex.: Oferta não cumulativa com outras promoções"} (use o ano impresso no período; "" se não houver) ' +
                     'e, em cada produto, "sem_ar" = preço da coluna "sem AR" (0 se não existir ou estiver vazia), "com_ar" = preço da coluna "com AR" (0 se não existir), "selo" = etiqueta ao lado do preço com AR (ex.: TRIO EASY CLEAN, AR PREMIUM) ou ""; "custo"=0. ' +
+                    'TABELA DA TECH VANTAGENS/TECHNOPARK (colunas "VALOR", "AR PREMIUM", "TRIO EASY CLEAN", "AR MC LITE", "PRO COAT", "CRIZAL...", "NO REFLEX"): "sem_ar" = coluna VALOR; "com_ar" = o preço da coluna AR PREMIUM, ou TRIO EASY CLEAN, ou AR MC LITE (a que estiver preenchida) e "selo" = o nome dessa coluna (ex.: AR PREMIUM); ignore as colunas PRO COAT, CRIZAL e NO REFLEX; se só existir a coluna VALOR, use "custo". Se a linha tiver dois códigos separados por "/", use o primeiro. ' +
                     'Laboratório: brasprecios = Braspreços/Braslab (C.O.); tech-vantagens = Tech Vantagens/Technopark/LabTechnopark; sygma = Sygma; visco = Visco; senão generico.';
                 let total, getImg;
                 if (opts.imagem) {
@@ -25003,6 +25130,29 @@ tbody tr td{border:1.5px solid #000;padding:2mm;text-align:center;font-weight:70
                 return { produtos, lab, campanha };
             },
 
+            _miaOpcoesHtml() {
+                let h = '';
+                const tp = this._miaTodosProdutos;
+                if (tp && tp.some(p => p.extra)) {
+                    const n = tp.filter(p => p.extra).length;
+                    h += `<label style="display:flex;align-items:center;gap:8px;margin:8px 0;font-size:.85rem;cursor:pointer;"><input type="checkbox" ${this._miaIncluirOutros ? 'checked' : ''} onchange="Products.miaToggleExtras(this.checked)"> Incluir também Pro Coat, Crizal e No Reflex <b>(+${n} produtos)</b></label>`;
+                }
+                const av = this._miaAvisos || [];
+                if (av.length) {
+                    h += `<div style="background:#fff3e0;border:1px solid #ffcc80;border-radius:8px;padding:8px 12px;margin:8px 0;color:#a14a00;font-size:.82rem;"><b>⚠ ${av.length} aviso(s) para conferir</b>` +
+                        av.slice(0, 8).map(a => `<div style="margin-top:4px;">${a}</div>`).join('') + (av.length > 8 ? `<div style="margin-top:4px;">… e mais ${av.length - 8}</div>` : '') + '</div>';
+                }
+                return h;
+            },
+
+            miaToggleExtras(on) {
+                this._miaIncluirOutros = !!on;
+                const todos = this._miaTodosProdutos || [];
+                const sel = todos.filter(p => !p.extra || this._miaIncluirOutros);
+                this._miaProdutosProcessados = sel;
+                this.miaMostrarPreview(this.miaCompararComBase(sel), this._miaLabDetectado);
+            },
+
             _miaCampanhaBanner() {
                 const c = this._miaCampanha;
                 if (!c) return '';
@@ -25025,6 +25175,7 @@ tbody tr td{border:1.5px solid #000;padding:2mm;text-align:center;font-weight:70
                 </div>
                 <h4>${labInfo.icone} ${labInfo.nome}</h4>
                 ${this._miaCampanhaBanner()}
+                ${this._miaOpcoesHtml()}
                 <div class="mia-table-wrap"><table class="mia-table"><thead><tr>
                     <th>Status</th><th>Código</th><th>Produto</th><th>Categoria</th>
                     <th>Custo Anterior</th><th>Custo Novo</th><th>Preço Venda</th><th>Margem</th>
@@ -25116,6 +25267,7 @@ tbody tr td{border:1.5px solid #000;padding:2mm;text-align:center;font-weight:70
                 document.getElementById('miaCardPreview').style.display = 'none';
                 this._miaProdutosProcessados = [];
                 this._miaCampanha = null;
+                this._miaTodosProdutos = null; this._miaAvisos = []; this._miaIncluirOutros = false;
                 this.renderTable();
                 this.miaRenderHistorico();
                 this.miaUpdateStats();
