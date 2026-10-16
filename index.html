@@ -9159,10 +9159,10 @@ body.dark-mode,
                 </div>
 
                 <div class="mia-card">
-                    <h3>📤 Upload de PDF do Laboratório</h3>
+                    <h3>📤 Upload de PDF ou imagem do Laboratório</h3>
                     <div class="mia-drop" id="miaDropZone">
                         <div style="font-size:2.6rem;margin-bottom:8px;">📄</div>
-                        <h4 style="margin:0 0 6px;">Arraste o PDF aqui ou clique para selecionar</h4>
+                        <h4 style="margin:0 0 6px;">Arraste o PDF ou a imagem aqui, ou clique para selecionar</h4>
                         <p style="color:#4b5563;font-size:0.85rem;">Laboratórios suportados:</p>
                         <div class="mia-badges">
                             <span class="mia-badge mia-b-tech">🔵 Tech Vantagens</span>
@@ -9170,7 +9170,7 @@ body.dark-mode,
                             <span class="mia-badge mia-b-sygma">🟢 Sygma</span>
                             <span class="mia-badge mia-b-visco">🟣 Visco</span>
                         </div>
-                        <input type="file" id="miaFileInput" accept=".pdf" style="display:none;">
+                        <input type="file" id="miaFileInput" accept=".pdf,application/pdf,image/jpeg,image/png,image/webp,.jpg,.jpeg,.png,.webp" style="display:none;">
                     </div>
                     <div id="miaUploadStatus"></div>
                 </div>
@@ -9901,7 +9901,7 @@ body.dark-mode,
                                 <div class="bkp-status-ic" style="background:#f3f0ff;color:#7c3aed;"><i class="fas fa-code-branch"></i></div>
                                 <div class="txt">
                                     <b>Versão do sistema</b>
-                                    <span>versão <strong>111020261005</strong></span>
+                                    <span>versão <strong>161020260053</strong></span>
                                 </div>
                             </div>
                         </div>
@@ -24733,33 +24733,48 @@ tbody tr td{border:1.5px solid #000;padding:2mm;text-align:center;font-weight:70
                     if (t) t.textContent = txt;
                 };
                 try {
-                    setProgress(10, 'Extraindo texto do PDF...');
-                    const texto = await this.miaExtrairTextoPDF(file);
+                    const ehImagem = this._miaEhImagem(file);
+                    this._miaCampanha = null;
+                    let texto = '';
+                    if (!ehImagem) {
+                        setProgress(10, 'Extraindo texto do PDF...');
+                        texto = await this.miaExtrairTextoPDF(file);
+                    }
                     setProgress(40, 'Detectando laboratório...');
-                    this._miaLabDetectado = this.miaDetectarLaboratorio(texto);
+                    this._miaLabDetectado = ehImagem ? 'generico' : this.miaDetectarLaboratorio(texto);
                     let labInfo = this.miaGetLabInfo(this._miaLabDetectado);
                     this._miaLidoPorIA = false; this._miaMsgIA = '';
-                    setProgress(60, 'Extraindo produtos...');
-                    let produtos = [];
-                    if (this._miaLabDetectado === 'tech-vantagens') produtos = this.miaParseTechVantagens(texto);
-                    else if (this._miaLabDetectado === 'brasprecios') {
-                        produtos = this.miaParseBraspreciosCO(this._miaPaginasPos);
-                        if (!produtos.length) produtos = this.miaParseBrasprecios(texto);
-                    }
-                    else if (this._miaLabDetectado === 'sygma') produtos = this.miaParseSygma(texto);
-                    else if (this._miaLabDetectado === 'visco') produtos = this.miaParseVisco(texto);
-                    else produtos = this.miaParseGenerico(texto);
+                    setProgress(60, ehImagem ? 'Preparando imagem...' : 'Extraindo produtos...');
+                    // Panfleto de campanha/oferta (ex.: "Campanha válida de... / Oferta especial"):
+                    // os leitores por texto não entendem esse formato → vai direto para a IA com visão.
+                    const pareceCampanha = !ehImagem && /campanha\s+v[aá]lida/i.test(texto) && /oferta\s+especial/i.test(texto);
+                    const lerPorTexto = () => {
+                        let pr = [];
+                        if (this._miaLabDetectado === 'tech-vantagens') pr = this.miaParseTechVantagens(texto);
+                        else if (this._miaLabDetectado === 'brasprecios') {
+                            pr = this.miaParseBraspreciosCO(this._miaPaginasPos);
+                            if (!pr.length) pr = this.miaParseBrasprecios(texto);
+                        }
+                        else if (this._miaLabDetectado === 'sygma') pr = this.miaParseSygma(texto);
+                        else if (this._miaLabDetectado === 'visco') pr = this.miaParseVisco(texto);
+                        else pr = this.miaParseGenerico(texto);
+                        return pr;
+                    };
+                    let produtos = (ehImagem || pareceCampanha) ? [] : lerPorTexto();
                     // ✅ PLANO B (IA com visão): só roda se o leitor de texto acima NÃO achou nenhum
                     // produto (ex.: PDF cujo texto o pdf.js não consegue ler). Quando algum leitor
                     // funciona, esse bloco é ignorado e nada muda no comportamento anterior.
                     if (produtos.length === 0) {
-                        const ia = await this.miaLerComIA(file, setProgress);
+                        const ia = await this.miaLerComIA(file, setProgress, { imagem: ehImagem, campanha: pareceCampanha });
                         if (ia && ia.produtos.length) {
                             produtos = ia.produtos;
                             this._miaLabDetectado = ia.lab;
                             labInfo = this.miaGetLabInfo(ia.lab);
                             this._miaLidoPorIA = true;
+                            this._miaCampanha = ia.campanha || null;
                         } else if (ia && ia.msg) this._miaMsgIA = ia.msg;
+                        // PDF de campanha em que a IA não foi usada/falhou: tenta o leitor por texto, como antes
+                        if (produtos.length === 0 && pareceCampanha) produtos = lerPorTexto();
                     }
                     setProgress(80, 'Comparando com o cadastro atual...');
                     this._miaProdutosProcessados = produtos;
@@ -24774,13 +24789,13 @@ tbody tr td{border:1.5px solid #000;padding:2mm;text-align:center;font-weight:70
                             status.innerHTML = `<div class="mia-warning">⚠️ Nenhum produto reconhecido nesse PDF. Laboratório detectado: <span class="mia-badge ${labInfo.cls}">${labInfo.icone} ${labInfo.nome}</span>. Se o padrão desse PDF for diferente do esperado, me avise pra eu ajustar a leitura.</div>`;
                             return;
                         }
-                        status.innerHTML = `<div class="mia-success">✅ <strong>PDF processado!</strong><br>Laboratório: <span class="mia-badge ${labInfo.cls}">${labInfo.icone} ${labInfo.nome}</span><br>Produtos encontrados: <strong>${produtos.length}</strong></div>`;
-                        if (this._miaLidoPorIA) status.innerHTML += `<div class="mia-warning">🤖 Este PDF foi lido por <strong>IA (leitura por imagem)</strong>. Confira os códigos e preços na prévia antes de aplicar.</div>`;
+                        status.innerHTML = `<div class="mia-success">✅ <strong>${ehImagem ? 'Imagem processada!' : 'PDF processado!'}</strong><br>Laboratório: <span class="mia-badge ${labInfo.cls}">${labInfo.icone} ${labInfo.nome}</span><br>Produtos encontrados: <strong>${produtos.length}</strong></div>`;
+                        if (this._miaLidoPorIA) status.innerHTML += `<div class="mia-warning">🤖 Este arquivo foi lido por <strong>IA (leitura por imagem)</strong>. Confira os códigos e preços na prévia antes de aplicar.</div>`;
                         this.miaMostrarPreview(comp, this._miaLabDetectado);
                     }, 300);
                 } catch (error) {
                     console.error(error);
-                    status.innerHTML = `<div class="mia-warning">❌ Erro ao processar PDF: ${error.message}</div>`;
+                    status.innerHTML = `<div class="mia-warning">❌ Erro ao processar o arquivo: ${error.message}</div>`;
                 }
             },
 
@@ -24801,7 +24816,7 @@ tbody tr td{border:1.5px solid #000;padding:2mm;text-align:center;font-weight:70
                 return parseFloat(t) || 0;                               // formato com ponto decimal (85.00)
             },
 
-            _miaCategoriaIA(lab, nome) {
+            _miaCategoriaIA(lab, nome, secao) {
                 if (lab === 'brasprecios') {
                     if (/MULTI\s*C\.?O\.?\s*PRO\s*HD/i.test(nome)) return 'Multifocais C.O. Pro HD';
                     if (/MULTI\s*C\.?O\.?\s*PRO/i.test(nome)) return 'Multifocais C.O. Pro';
@@ -24809,7 +24824,99 @@ tbody tr td{border:1.5px solid #000;padding:2mm;text-align:center;font-weight:70
                     if (/^VS\b/i.test(nome)) return 'Visão Simples Surf';
                     return 'Lentes Acabadas';
                 }
+                if (lab === 'tech-vantagens') {
+                    const sec = String(secao || '');
+                    if (/TECHNOPARK/i.test(nome)) return /FOTO|TRANSITIONS/i.test(nome) ? 'Technopark Fotocromático' : 'Technopark';
+                    if (/KODAK/i.test(nome)) return /UHD/i.test(nome) ? 'Multifocais Kodak UHD' : 'Lentes Prontas Kodak';
+                    if (/ESSILOR/i.test(nome)) return 'Lentes Prontas Essilor';
+                    if (/PROGRESSIV.*PRO\s*DESIGN.*ELITE/i.test(nome)) return 'Progressivas Pro Design Elite';
+                    if (/^LP\b|PRO\s*DESIGN/i.test(nome)) return 'Lentes Prontas Pro Design';
+                    if (/VIS[ÃA]O\s*SIMPLES|^VS\b/i.test(nome)) return 'Surf Visão Simples';
+                    if (/\bMF\b|MULTI|PROGRESS/i.test(nome)) return 'Surf Progressivo';
+                    if (/ACABADA/i.test(sec)) return 'Lentes Prontas Pro Design';
+                    if (/SURFA/i.test(sec)) return 'Surf Visão Simples';
+                }
                 return 'Lentes';
+            },
+
+            _miaEhImagem(file) {
+                if (!file) return false;
+                return /^image\/(jpeg|png|webp)$/i.test(file.type || '') || /\.(jpe?g|png|webp)$/i.test(file.name || '');
+            },
+
+            // Imagem enviada pelo usuário → JPEG redimensionado (máx. 2000px) para a IA
+            async _miaImagemParaDataUrl(file) {
+                const url = URL.createObjectURL(file);
+                try {
+                    const img = await new Promise((res, rej) => {
+                        const im = new Image();
+                        im.onload = () => res(im);
+                        im.onerror = () => rej(new Error('Não consegui abrir a imagem. Use JPG, PNG ou WEBP (fotos HEIC do iPhone podem não funcionar).'));
+                        im.src = url;
+                    });
+                    const sc = Math.min(1, 2000 / Math.max(img.naturalWidth || 1, img.naturalHeight || 1));
+                    const canvas = document.createElement('canvas');
+                    canvas.width = Math.max(1, Math.round(img.naturalWidth * sc));
+                    canvas.height = Math.max(1, Math.round(img.naturalHeight * sc));
+                    const ctx = canvas.getContext('2d');
+                    ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, canvas.width, canvas.height);
+                    ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+                    const out = canvas.toDataURL('image/jpeg', 0.88);
+                    canvas.width = 0; canvas.height = 0;
+                    return out;
+                } finally { URL.revokeObjectURL(url); }
+            },
+
+            _miaDataIA(v) {
+                const t = String(v == null ? '' : v).trim();
+                let m = /^(\d{4})-(\d{2})-(\d{2})/.exec(t);
+                if (m) return `${m[1]}-${m[2]}-${m[3]}`;
+                m = /^(\d{1,2})\/(\d{1,2})\/(\d{4})/.exec(t);
+                if (m) return `${m[3]}-${m[2].padStart(2, '0')}-${m[1].padStart(2, '0')}`;
+                return '';
+            },
+
+            _miaDataBR(iso) { const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso || ''); return m ? `${m[3]}/${m[2]}/${m[1]}` : ''; },
+
+            // Converte o que a IA leu em produtos do Markup IA.
+            // • Tabela comum: usa "custo" (primeiro preço da linha) e código só com números — como sempre foi.
+            // • Panfleto de oferta: código com letras (P2708A), uma linha com "sem AR" e "com AR" vira 2 produtos
+            //   (sufixos -SEMAR e -AR, o mesmo padrão dos produtos da Braslab).
+            _miaMontarProdutosIA(todos, lab) {
+                const produtos = [];
+                const limpa = v => String(v || '').replace(/[<>]/g, '').replace(/\b(novidade|imperd[ií]vel)\b/gi, '').replace(/\s+/g, ' ').trim();
+                const add = (codigo, nome, custo, secao) => {
+                    nome = nome.substring(0, 100);
+                    if (codigo && nome && custo > 0 && custo < 50000 && !produtos.find(p => p.codigo === codigo))
+                        produtos.push({ codigo, nome, categoria: this._miaCategoriaIA(lab, nome, secao), custo, laboratorio: lab });
+                };
+                todos.forEach(x => {
+                    const semAr = this._miaNumeroIA(x.sem_ar), comAr = this._miaNumeroIA(x.com_ar);
+                    const nome = limpa(x.nome);
+                    if (semAr > 0 || comAr > 0) {
+                        // ---- linha de oferta (variantes) ----
+                        const cod = String(x.codigo == null ? '' : x.codigo).split('/')[0].toUpperCase().replace(/[^A-Z0-9]/g, '');
+                        if (!/^[A-Z]{0,3}\d{3,6}[A-Z]{0,3}$/.test(cod)) return;
+                        const selo = limpa(x.selo).toUpperCase();
+                        const temAR = /\bA\.?R\.?\b/i.test(nome);
+                        const temSemAR = /SEM\s*A\.?R/i.test(nome);
+                        if (semAr > 0) add(cod + '-SEMAR', temSemAR ? nome : nome + ' - SEM AR', semAr, x.secao);
+                        if (comAr > 0) {
+                            let nomeAR;
+                            if (selo && /^A\.?R\b/i.test(selo)) {            // selo já começa com "AR" (ex.: AR PREMIUM): não repete "AR"
+                                const resto = selo.replace(/^A\.?R\.?\s*/i, '').trim();
+                                nomeAR = temAR ? (nome + (resto ? ' ' + resto : '')) : (nome + ' - ' + selo);
+                            } else nomeAR = (temAR ? nome : nome + ' - AR') + (selo ? ' ' + selo : '');
+                            add(cod + '-AR', nomeAR, comAr, x.secao);
+                        }
+                    } else {
+                        // ---- tabela comum (comportamento de sempre) ----
+                        const codigo = String(x.codigo == null ? '' : x.codigo).split('/')[0].replace(/\D/g, '');
+                        const custo = this._miaNumeroIA(x.custo);
+                        if (/^\d{3,6}$/.test(codigo)) add(codigo, nome, custo, x.secao);
+                    }
+                });
+                return produtos;
             },
 
             async _miaPaginaParaImagem(pdf, n) {
@@ -24827,32 +24934,49 @@ tbody tr td{border:1.5px solid #000;padding:2mm;text-align:center;font-weight:70
                 return url;
             },
 
-            async miaLerComIA(file, setProgress) {
+            async miaLerComIA(file, setProgress, opts) {
+                opts = opts || {};
                 const cfg = this.miaIACfg();
-                if (!cfg.key) return { produtos: [], msg: '⚠️ Não consegui ler o texto desse PDF e a <strong>chave da IA não está configurada</strong>. Cadastre em Configurações → Vision IA (API Key) e envie o PDF de novo.' };
-                if (!confirm('Não consegui ler o texto desse PDF.\n\nPosso usar a IA para ler as páginas como imagem. As páginas serão enviadas ao provedor da IA configurada e há um pequeno custo por PDF.\n\nContinuar?'))
-                    return { produtos: [], msg: 'Leitura por IA cancelada. Nada foi alterado.' };
-                const PROMPT = 'Você lê tabelas de preços de laboratórios ópticos brasileiros. Extraia TODAS as linhas de produto da página. ' +
-                    'Responda SOMENTE com JSON, sem texto extra: {"laboratorio":"brasprecios|tech-vantagens|sygma|visco|generico","produtos":[{"codigo":"5431","nome":"MULTI C.O. PRO HD 1.50 CR","custo":85.00}]}. ' +
-                    'Regras: "codigo" = coluna Cód. Web (só o número; se houver dois separados por "/", use o primeiro). ' +
-                    '"nome" = descrição como impressa, sem selos como "Novidade" ou "imperdível". ' +
-                    '"custo" = o PRIMEIRO preço preenchido da linha, da esquerda para a direita (ex.: coluna "Sem A.R."; se vazia, a próxima coluna com valor), número com ponto decimal (ex.: 1021.90). ' +
-                    'Ignore linhas sem preço, textos promocionais, telefones, endereços e rodapés. Não invente produtos nem valores. ' +
-                    'Laboratório: brasprecios = Braspreços/Braslab (C.O.); tech-vantagens = Tech Vantagens/Technopark; sygma = Sygma; visco = Visco; senão generico.';
-                if (typeof pdfjsLib === 'undefined') return { produtos: [], msg: '❌ Biblioteca de PDF não carregou (verifique a internet e recarregue a página).' };
-                const pdf = await pdfjsLib.getDocument({ data: await file.arrayBuffer() }).promise;
+                const oque = opts.imagem ? 'esta imagem' : 'esse PDF';
+                if (!cfg.key) return { produtos: [], msg: `⚠️ Para ler ${oque} preciso da <strong>chave da IA</strong>, que não está configurada. Cadastre em Configurações → Vision IA (API Key) e envie o arquivo de novo.` };
+                const aviso = opts.imagem
+                    ? 'Vou usar a IA para ler esta imagem.\n\nA imagem será enviada ao provedor da IA configurada e há um pequeno custo.\n\nContinuar?'
+                    : opts.campanha
+                        ? 'Este PDF parece um panfleto de campanha/oferta.\n\nPosso usar a IA para ler as páginas como imagem (mais preciso nesse formato). As páginas serão enviadas ao provedor da IA configurada e há um pequeno custo.\n\nContinuar? (Cancelar = tentar ler só pelo texto)'
+                        : 'Não consegui ler o texto desse PDF.\n\nPosso usar a IA para ler as páginas como imagem. As páginas serão enviadas ao provedor da IA configurada e há um pequeno custo por PDF.\n\nContinuar?';
+                if (!confirm(aviso)) return { produtos: [], msg: 'Leitura por IA cancelada. Nada foi alterado.' };
+                const PROMPT = 'Você lê tabelas de preços e panfletos de laboratórios ópticos brasileiros. Extraia TODAS as linhas de produto da página. ' +
+                    'Responda SOMENTE com JSON, sem texto extra: {"laboratorio":"brasprecios|tech-vantagens|sygma|visco|generico","campanha":null,"produtos":[{"codigo":"5431","nome":"MULTI C.O. PRO HD 1.50 CR","secao":"","custo":85.00,"sem_ar":0,"com_ar":0,"selo":""}]}. ' +
+                    'Regras gerais: "codigo" = código do produto exatamente como impresso (pode ter letras, ex.: P2708A, P10305; na tabela Braspreços é a coluna Cód. Web; se houver dois códigos separados por "/", use o primeiro). ' +
+                    '"nome" = descrição como impressa, sem selos como "Novidade" ou "imperdível". "secao" = título da tabela acima da linha (ex.: LENTE ACABADA, LENTE SURFAÇADA) ou "". ' +
+                    'Números com ponto decimal (ex.: 1021.90, 114.90; em reais). Ignore logos, telefones, endereços, redes sociais, slogans e linhas sem preço. Não invente produtos nem valores. ' +
+                    'TABELA COMUM DE PREÇOS: "custo" = o PRIMEIRO preço preenchido da linha, da esquerda para a direita (ex.: coluna "Sem A.R."; se vazia, a próxima coluna com valor); sem_ar=0, com_ar=0, selo="". ' +
+                    'PANFLETO DE OFERTA/CAMPANHA (tem nome de campanha, período de validade e/ou "oferta especial"): preencha "campanha":{"nome":"nome da campanha","inicio":"AAAA-MM-DD","fim":"AAAA-MM-DD","regulamento":"texto do regulamento, ex.: Oferta não cumulativa com outras promoções"} (use o ano impresso no período; "" se não houver) ' +
+                    'e, em cada produto, "sem_ar" = preço da coluna "sem AR" (0 se não existir ou estiver vazia), "com_ar" = preço da coluna "com AR" (0 se não existir), "selo" = etiqueta ao lado do preço com AR (ex.: TRIO EASY CLEAN, AR PREMIUM) ou ""; "custo"=0. ' +
+                    'Laboratório: brasprecios = Braspreços/Braslab (C.O.); tech-vantagens = Tech Vantagens/Technopark/LabTechnopark; sygma = Sygma; visco = Visco; senão generico.';
+                let total, getImg;
+                if (opts.imagem) {
+                    total = 1;
+                    getImg = () => this._miaImagemParaDataUrl(file);
+                } else {
+                    if (typeof pdfjsLib === 'undefined') return { produtos: [], msg: '❌ Biblioteca de PDF não carregou (verifique a internet e recarregue a página).' };
+                    const pdf = await pdfjsLib.getDocument({ data: await file.arrayBuffer() }).promise;
+                    total = pdf.numPages;
+                    getImg = (n) => this._miaPaginaParaImagem(pdf, n);
+                }
                 const todos = [], votos = {}, erros = [];
-                for (let n = 1; n <= pdf.numPages; n++) {
-                    setProgress(45 + Math.round(30 * (n - 1) / pdf.numPages), `IA lendo página ${n} de ${pdf.numPages}...`);
+                let campanha = null;
+                for (let n = 1; n <= total; n++) {
+                    setProgress(45 + Math.round(30 * (n - 1) / total), opts.imagem ? 'IA lendo a imagem...' : `IA lendo página ${n} de ${total}...`);
                     try {
-                        const img = await this._miaPaginaParaImagem(pdf, n);
+                        const img = await getImg(n);
                         const r = await fetch(cfg.url, {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + cfg.key },
                             body: JSON.stringify({ model: cfg.model, temperature: 0, max_tokens: 4000, messages: [
                                 { role: 'system', content: PROMPT },
                                 { role: 'user', content: [
-                                    { type: 'text', text: `Extraia os produtos desta página (${n} de ${pdf.numPages}).` },
+                                    { type: 'text', text: opts.imagem ? 'Extraia os produtos desta imagem.' : `Extraia os produtos desta página (${n} de ${total}).` },
                                     { type: 'image_url', image_url: { url: img, detail: 'high' } } ] } ] })
                         });
                         if (!r.ok) { let d = ''; try { d = (await r.text()).slice(0, 160); } catch (_e) {} throw new Error('HTTP ' + r.status + (d ? ' — ' + d : '')); }
@@ -24861,23 +24985,33 @@ tbody tr td{border:1.5px solid #000;padding:2mm;text-align:center;font-weight:70
                         const m = /\{[\s\S]*\}/.exec(txt.replace(/```json|```/g, ''));
                         const dados = JSON.parse(m ? m[0] : '{}');
                         if (dados.laboratorio) votos[dados.laboratorio] = (votos[dados.laboratorio] || 0) + 1;
+                        if (dados.campanha && typeof dados.campanha === 'object' && !campanha) {
+                            const c = dados.campanha;
+                            const nomeC = String(c.nome || '').replace(/[<>]/g, '').trim().substring(0, 80);
+                            const fim = this._miaDataIA(c.fim), inicio = this._miaDataIA(c.inicio);
+                            if (nomeC || fim || inicio) campanha = { nome: nomeC, inicio, fim, regulamento: String(c.regulamento || '').replace(/[<>]/g, '').trim().substring(0, 200) };
+                        }
                         (dados.produtos || []).forEach(x => todos.push(x));
-                    } catch (e) { console.error('[MarkupIA] IA página ' + n, e); erros.push(`pág. ${n}: ${e.message}`); }
+                    } catch (e) { console.error('[MarkupIA] IA ' + (opts.imagem ? 'imagem' : 'página ' + n), e); erros.push(opts.imagem ? e.message : `pág. ${n}: ${e.message}`); }
                 }
                 const validos = ['brasprecios', 'tech-vantagens', 'sygma', 'visco'];
                 let lab = Object.keys(votos).filter(k => validos.includes(k)).sort((a, b) => votos[b] - votos[a])[0] || '';
-                if (!lab) lab = todos.some(x => /C\.?O\./i.test(String(x.nome || ''))) ? 'brasprecios' : 'generico';
-                const produtos = [];
-                todos.forEach(x => {
-                    const codigo = String(x.codigo == null ? '' : x.codigo).split('/')[0].replace(/\D/g, '');
-                    const nome = String(x.nome || '').replace(/\b(novidade|imperd[ií]vel)\b/gi, '').replace(/\s+/g, ' ').trim().substring(0, 100);
-                    const custo = this._miaNumeroIA(x.custo);
-                    if (/^\d{3,6}$/.test(codigo) && nome && custo > 0 && custo < 50000 && !produtos.find(p => p.codigo === codigo))
-                        produtos.push({ codigo, nome, categoria: this._miaCategoriaIA(lab, nome), custo, laboratorio: lab });
-                });
+                if (!lab) lab = todos.some(x => /C\.?O\./i.test(String(x.nome || ''))) ? 'brasprecios' : (todos.some(x => /TECHNOPARK|LP\s+PRO\s+DESIGN/i.test(String(x.nome || ''))) ? 'tech-vantagens' : 'generico');
+                const produtos = this._miaMontarProdutosIA(todos, lab);
                 if (!produtos.length) return { produtos: [], msg: '❌ A IA não retornou produtos válidos.' + (erros.length ? ' Detalhes: ' + erros.join(' | ') : '') + ' Confira a chave, a URL e se o modelo aceita imagens (Configurações → Vision IA).' };
                 if (erros.length) Toast.show('Algumas páginas falharam na IA: ' + erros.join(' | '), 'warning');
-                return { produtos, lab };
+                return { produtos, lab, campanha };
+            },
+
+            _miaCampanhaBanner() {
+                const c = this._miaCampanha;
+                if (!c) return '';
+                const hoje = new Date().toLocaleDateString('en-CA');
+                const vencida = !!c.fim && c.fim < hoje;
+                const per = c.inicio || c.fim ? `${c.inicio ? 'de <b>' + this._miaDataBR(c.inicio) + '</b> ' : ''}${c.fim ? 'até <b>' + this._miaDataBR(c.fim) + '</b>' : ''}` : '';
+                return `<div style="display:flex;gap:8px;align-items:flex-start;background:${vencida ? '#fdecea' : '#fff3e0'};border:1px solid ${vencida ? '#f5c2bd' : '#ffcc80'};border-radius:8px;padding:8px 12px;margin:8px 0;color:${vencida ? '#a32d2d' : '#a14a00'};font-size:.85rem;">
+                    <i class="fas fa-triangle-exclamation" style="margin-top:3px;"></i>
+                    <span><b>Campanha${c.nome ? ' "' + Utils.sanitizeHTML(c.nome) + '"' : ''}</b>${per ? ' · válida ' + per : ''}${vencida ? ' · <b>VENCIDA</b>' : ''}<br>${c.regulamento ? Utils.sanitizeHTML(c.regulamento) + '<br>' : ''}Estes são <b>preços promocionais</b>: ao aplicar, o custo dos produtos será trocado pelo valor da campanha.</span></div>`;
             },
 
             miaMostrarPreview(comp, lab) {
@@ -24890,6 +25024,7 @@ tbody tr td{border:1.5px solid #000;padding:2mm;text-align:center;font-weight:70
                     <div class="mia-result-card mia-res-iguais"><div class="num">${comp.iguais.length}</div><div class="label">✓ Sem Alteração</div></div>
                 </div>
                 <h4>${labInfo.icone} ${labInfo.nome}</h4>
+                ${this._miaCampanhaBanner()}
                 <div class="mia-table-wrap"><table class="mia-table"><thead><tr>
                     <th>Status</th><th>Código</th><th>Produto</th><th>Categoria</th>
                     <th>Custo Anterior</th><th>Custo Novo</th><th>Preço Venda</th><th>Margem</th>
@@ -24920,6 +25055,12 @@ tbody tr td{border:1.5px solid #000;padding:2mm;text-align:center;font-weight:70
                 const total = comp.novos.length + comp.atualizados.length;
                 if (total === 0) { Toast.show('Nada para aplicar', 'warning'); return; }
                 if (!confirm(`Aplicar ${total} produtos (${comp.novos.length} novos, ${comp.atualizados.length} atualizados)?`)) return;
+                const camp = this._miaCampanha || null;
+                if (camp) {
+                    const hojeIso = new Date().toLocaleDateString('en-CA');
+                    if (camp.fim && camp.fim < hojeIso && !confirm(`⚠️ A campanha${camp.nome ? ' "' + camp.nome + '"' : ''} VENCEU em ${this._miaDataBR(camp.fim)}.\n\nOs preços podem não valer mais. Aplicar mesmo assim?`)) return;
+                    if (!confirm(`Campanha${camp.nome ? ' "' + camp.nome + '"' : ''}${camp.fim ? ' — válida até ' + this._miaDataBR(camp.fim) : ''}.\n\nOs custos serão trocados pelos valores PROMOCIONAIS desta campanha. Depois do vencimento o sistema vai avisar para você atualizar.\n\nContinuar?`)) return;
+                }
 
                 let novosCount = 0, atualizadosCount = 0, algumLogo = false;
                 const agora = new Date().toISOString();
@@ -24930,6 +25071,8 @@ tbody tr td{border:1.5px solid #000;padding:2mm;text-align:center;font-weight:70
                     prod.costPrice = p.custo;
                     prod.price = parseFloat(calc.precoVenda.toFixed(2));
                     prod.qty = this.MIA_ESTOQUE_PADRAO;
+                    prod.promoAte = camp ? (camp.fim || '') : '';      // validade da campanha (vazio = preço normal)
+                    prod.promoNome = camp ? (camp.nome || '') : '';
                     // logo da marca: só preenche se não houver foto, ou se a imagem atual já é um logo de marca
                     // (nunca sobrescreve uma foto real do produto)
                     const logoUp = this.miaLogoParaProduto(p);
@@ -24955,6 +25098,7 @@ tbody tr td{border:1.5px solid #000;padding:2mm;text-align:center;font-weight:70
                         image: this.miaLogoParaProduto(p),
                         updated_at: agora
                     };
+                    if (camp) { novoProduto.promoAte = camp.fim || ''; novoProduto.promoNome = camp.nome || ''; }
                     if (novoProduto.image) algumLogo = true;
                     state.products.push(novoProduto);
                     SupaSync.upsertProduto(novoProduto);
@@ -24965,12 +25109,13 @@ tbody tr td{border:1.5px solid #000;padding:2mm;text-align:center;font-weight:70
                 if (algumLogo) { try { window.CloudSync?.pushMediaNow?.(); } catch (_e) {} } // envia os logos p/ os outros aparelhos
 
                 if (!state.markupIAHistorico) state.markupIAHistorico = [];
-                state.markupIAHistorico.unshift({ data: agora, laboratorio: this._miaLabDetectado, total, novos: novosCount, atualizados: atualizadosCount });
+                state.markupIAHistorico.unshift({ data: agora, laboratorio: this._miaLabDetectado, total, novos: novosCount, atualizados: atualizadosCount, campanha: camp ? (camp.nome || 'campanha') : '' });
                 state.markupIAHistorico = state.markupIAHistorico.slice(0, 50);
 
                 Toast.show(`✅ ${novosCount} novos, ${atualizadosCount} atualizados!`, 'success');
                 document.getElementById('miaCardPreview').style.display = 'none';
                 this._miaProdutosProcessados = [];
+                this._miaCampanha = null;
                 this.renderTable();
                 this.miaRenderHistorico();
                 this.miaUpdateStats();
@@ -25075,8 +25220,8 @@ tbody tr td{border:1.5px solid #000;padding:2mm;text-align:center;font-weight:70
                     e.preventDefault();
                     zone.classList.remove('dragover');
                     const file = e.dataTransfer.files[0];
-                    if (file && file.type === 'application/pdf') this.miaProcessarPDF(file);
-                    else Toast.show('Envie um arquivo PDF', 'warning');
+                    if (file && (file.type === 'application/pdf' || this._miaEhImagem(file))) this.miaProcessarPDF(file);
+                    else Toast.show('Envie um arquivo PDF ou imagem (JPG, PNG ou WEBP)', 'warning');
                 };
                 input.onchange = (e) => { const file = e.target.files[0]; if (file) this.miaProcessarPDF(file); };
             },
@@ -25084,6 +25229,23 @@ tbody tr td{border:1.5px solid #000;padding:2mm;text-align:center;font-weight:70
             // ✅ FIX FILTRO-PRODUTO-TOLERANTE: ignora acentos, espaços extras e
             // caracteres como - . / ao comparar, pra não perder o produto por
             // pequena diferença de formatação no código digitado.
+            _promoBadge(p) {
+                if (!p || !p.promoAte) return '';
+                const hoje = new Date().toLocaleDateString('en-CA');
+                const br = this._miaDataBR(p.promoAte);
+                if (p.promoAte < hoje) return ` <span style="display:inline-block;background:#fdecea;color:#a32d2d;border-radius:6px;padding:0 6px;font-size:.68rem;font-weight:700;white-space:nowrap;" title="Preço promocional vencido em ${br}. Atualize o custo.">⚠ promo vencida</span>`;
+                return ` <span style="display:inline-block;background:#fff3e0;color:#a14a00;border-radius:6px;padding:0 6px;font-size:.68rem;font-weight:700;white-space:nowrap;" title="Preço promocional${p.promoNome ? ' — ' + Utils.sanitizeHTML(p.promoNome) : ''}">🏷 promo até ${br.slice(0, 5)}</span>`;
+            },
+
+            // Aviso (1x por abertura) se há produtos com preço promocional vencido
+            checarPromosVencidas() {
+                if (window._promoAvisoFeito) return;
+                const hoje = new Date().toLocaleDateString('en-CA');
+                const n = (state.products || []).filter(p => p.promoAte && p.promoAte < hoje).length;
+                window._promoAvisoFeito = true;
+                if (n > 0) Toast.show(`⚠️ ${n} produto(s) com preço promocional vencido. Veja em Produtos e atualize o custo.`, 'warning', 8000);
+            },
+
             _normalizeSearch(v) {
                 return (v || '')
                     .toString()
@@ -25134,7 +25296,7 @@ tbody tr td{border:1.5px solid #000;padding:2mm;text-align:center;font-weight:70
                                 ? `<button class="prod-thumb-btn" onclick="ProdView.open('${p.id}')" title="Ver produto"><img src="${thumb}" alt="${Utils.sanitizeHTML(p.name)}"></button>`
                                 : `<button class="prod-thumb-btn prod-thumb-empty" onclick="ProdView.open('${p.id}')" title="Ver produto"><i class="fas fa-box"></i></button>`}
                         </td>
-                        <td><span style="font-weight:600;cursor:pointer;" onclick="ProdView.open('${p.id}')" title="Visualizar produto">${Utils.sanitizeHTML(p.name)}</span></td>
+                        <td><span style="font-weight:600;cursor:pointer;" onclick="ProdView.open('${p.id}')" title="Visualizar produto">${Utils.sanitizeHTML(p.name)}</span>${this._promoBadge(p)}</td>
                         <td>${Utils.sanitizeHTML(this.categoryLabel(p.category))}</td>
                         <td>${Utils.formatCurrency(p.costPrice || 0)}</td>
                         <td style="font-weight:700;color:#ff6b00;">${Utils.formatCurrency(p.price)}</td>
@@ -25487,6 +25649,7 @@ tbody tr td{border:1.5px solid #000;padding:2mm;text-align:center;font-weight:70
                 if (state.editingId) {
                     const _antigo = (state.products || []).find(p => p.id === state.editingId);
                     if (_antigo && _antigo.fav) product.fav = true;   // não perder o favorito ao editar
+                    if (_antigo && _antigo.promoAte) { product.promoAte = _antigo.promoAte; product.promoNome = _antigo.promoNome || ''; }
                 }
                 if (product.price <= 0) {
                     Toast.show('Preço de venda deve ser maior que zero', 'warning');
@@ -33717,6 +33880,7 @@ ${container.innerHTML}
                 }
             }
             Dashboard.update().catch(()=>{});
+            setTimeout(() => { try { Products.checarPromosVencidas(); } catch (_e) {} }, 4000);
             Usuarios.renderTable().catch(()=>{});
             BackupManager.init();
             KeyboardShortcuts.init();
