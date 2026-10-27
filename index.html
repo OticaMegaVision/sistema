@@ -3344,6 +3344,15 @@ var qrcode=function(){function r(t,e){if(void 0===t.length)throw new Error(t.len
         .lente-olho-btn small { display:block; font-weight:400; font-size:.68rem; color:#999; }
         .lente-olho-btn.active { border-color:#ff6b00; background:#fff3e0; color:#e65100; }
         .lente-olho-btn.active small { color:#e65100; }
+        .fiador-sug { position:absolute; left:0; right:0; top:100%; z-index:60; background:#fff; border:1.5px solid #ffcc80; border-radius:10px; box-shadow:0 8px 24px rgba(0,0,0,.15); max-height:240px; overflow-y:auto; margin-top:2px; }
+        .fiador-sug-item { display:flex; justify-content:space-between; align-items:center; gap:8px; padding:8px 12px; cursor:pointer; border-bottom:1px solid #f3f3f3; font-size:.85rem; }
+        .fiador-sug-item:last-child { border-bottom:none; }
+        .fiador-sug-item:hover, .fiador-sug-item.ativo { background:#fff3e0; }
+        .fiador-sug-item small { color:#888; display:block; }
+        .fiador-sug-tag { color:#2e7d32; font-size:.7rem; font-weight:700; white-space:nowrap; }
+        .fiador-msg { display:block; min-height:14px; font-size:.72rem; margin-top:2px; }
+        .fiador-msg.ok { color:#2e7d32; } .fiador-msg.erro { color:#c62828; } .fiador-msg.info { color:#888; }
+        .dark-mode .fiador-sug { background:#2d2d2d; border-color:#555; } .dark-mode .fiador-sug-item { border-color:#3a3a3a; } .dark-mode .fiador-sug-item:hover, .dark-mode .fiador-sug-item.ativo { background:#3a3a3a; }
         .presc-table tr.presc-row-off td { opacity:.35; }
         .presc-table tr.presc-row-off td:first-child::after { content:" · não incl."; font-size:.62rem; font-weight:400; white-space:nowrap; }
         .dark-mode .mv-cat-select { background-color: #2d2d2d; border-color: #444; color: #e0e0e0; }
@@ -8082,25 +8091,50 @@ body.dark-mode,
                             <!-- Fiador (opcional) — só afeta o Carnê e a Nota Promissória gerados
                                  desta venda; não muda o cliente, Contas a Receber nem histórico. -->
                             <div class="divisor" style="margin-top:14px;"><div class="linha"></div><span><i class="fas fa-user-shield"></i> Fiador (opcional)</span><div class="linha"></div></div>
-                            <div class="form-row">
-                                <div class="form-group">
-                                    <label for="credFiadorNome">Nome completo</label>
-                                    <input type="text" id="credFiadorNome" class="form-control" placeholder="Nome do fiador">
-                                </div>
-                                <div class="form-group">
-                                    <label for="credFiadorCpf">CPF</label>
-                                    <input type="text" id="credFiadorCpf" class="form-control" placeholder="000.000.000-00">
-                                </div>
+                            <div class="form-group" style="position:relative;">
+                                <label for="credFiadorNome">Nome completo <small style="color:#888;font-weight:400;">(digite o nome ou CPF para buscar um cliente cadastrado)</small></label>
+                                <input type="text" id="credFiadorNome" class="form-control" placeholder="Nome ou CPF do fiador" autocomplete="off" oninput="Sales.fiadorBuscar('credFiador')" onblur="Sales.fiadorFecharSug('credFiador')" onkeydown="Sales.fiadorTecla('credFiador', event)">
+                                <div id="credFiadorSug" class="fiador-sug" style="display:none;"></div>
                             </div>
                             <div class="form-row">
-                                <div class="form-group" style="flex:2;">
-                                    <label for="credFiadorEndereco">Endereço completo</label>
-                                    <input type="text" id="credFiadorEndereco" class="form-control" placeholder="Rua, número, bairro, cidade/UF">
+                                <div class="form-group">
+                                    <label for="credFiadorCpf">CPF</label>
+                                    <input type="text" id="credFiadorCpf" class="form-control" inputmode="numeric" placeholder="000.000.000-00" maxlength="14" autocomplete="off" oninput="Sales.fiadorCpfInput('credFiador')">
+                                    <small id="credFiadorCpfMsg" class="fiador-msg"></small>
                                 </div>
                                 <div class="form-group">
                                     <label for="credFiadorTelefone">Telefone (opcional)</label>
-                                    <input type="text" id="credFiadorTelefone" class="form-control" placeholder="(00) 00000-0000">
+                                    <input type="text" id="credFiadorTelefone" class="form-control" inputmode="tel" placeholder="(00) 00000-0000" maxlength="15" oninput="Utils.maskPhone(this)">
                                 </div>
+                            </div>
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label for="credFiadorCep">CEP</label>
+                                    <input type="text" id="credFiadorCep" class="form-control" inputmode="numeric" placeholder="00000-000" maxlength="9" autocomplete="off" oninput="Utils.maskCep(this); Sales.fiadorCepInput('credFiador')">
+                                    <small id="credFiadorCepMsg" class="fiador-msg"></small>
+                                </div>
+                                <div class="form-group" style="max-width:110px;">
+                                    <label for="credFiadorNumero">Número</label>
+                                    <input type="text" id="credFiadorNumero" class="form-control" placeholder="Nº" oninput="Sales.fiadorMontarEndereco('credFiador')">
+                                </div>
+                            </div>
+                            <div class="form-group">
+                                <label for="credFiadorRua">Rua</label>
+                                <input type="text" id="credFiadorRua" class="form-control" placeholder="Rua / Avenida" oninput="Sales.fiadorMontarEndereco('credFiador')">
+                            </div>
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label for="credFiadorBairro">Bairro</label>
+                                    <input type="text" id="credFiadorBairro" class="form-control" placeholder="Bairro" oninput="Sales.fiadorMontarEndereco('credFiador')">
+                                </div>
+                                <div class="form-group">
+                                    <label for="credFiadorCidadeUf">Cidade/UF</label>
+                                    <input type="text" id="credFiadorCidadeUf" class="form-control" placeholder="Cidade/UF" oninput="Sales.fiadorMontarEndereco('credFiador')">
+                                </div>
+                            </div>
+                            <div class="form-group">
+                                <label for="credFiadorEndereco">Endereço no carnê e na promissória</label>
+                                <input type="text" id="credFiadorEndereco" class="form-control" placeholder="Preenchido pelo CEP — você pode ajustar">
                             </div>
                             <!-- Botões de PDF do Crediário -->
                             <div id="crediarioPdfBtns" style="display:none;margin-top:12px;display:flex;gap:8px;flex-wrap:wrap;">
@@ -9901,7 +9935,7 @@ body.dark-mode,
                                 <div class="bkp-status-ic" style="background:#f3f0ff;color:#7c3aed;"><i class="fas fa-code-branch"></i></div>
                                 <div class="txt">
                                     <b>Versão do sistema</b>
-                                    <span>versão <strong>161020260707</strong></span>
+                                    <span>versão <strong>261020262126</strong></span>
                                 </div>
                             </div>
                         </div>
@@ -11404,22 +11438,51 @@ body.dark-mode,
                     sejam emitidos em nome do fiador. Deixe em branco para usar os dados do cliente normalmente.
                 </p>
                 <input type="hidden" id="fiadorSaleId" value="">
-                <div class="form-group">
-                    <label for="fiadorNome">Nome completo</label>
-                    <input type="text" id="fiadorNome" class="form-control" placeholder="Nome do fiador">
-                </div>
-                <div class="form-group">
-                    <label for="fiadorCpf">CPF</label>
-                    <input type="text" id="fiadorCpf" class="form-control" placeholder="000.000.000-00">
-                </div>
-                <div class="form-group">
-                    <label for="fiadorEndereco">Endereço completo</label>
-                    <input type="text" id="fiadorEndereco" class="form-control" placeholder="Rua, número, bairro, cidade/UF">
-                </div>
-                <div class="form-group">
-                    <label for="fiadorTelefone">Telefone (opcional)</label>
-                    <input type="text" id="fiadorTelefone" class="form-control" placeholder="(00) 00000-0000">
-                </div>
+                <div class="form-group" style="position:relative;">
+                                <label for="fiadorNome">Nome completo <small style="color:#888;font-weight:400;">(digite o nome ou CPF para buscar um cliente cadastrado)</small></label>
+                                <input type="text" id="fiadorNome" class="form-control" placeholder="Nome ou CPF do fiador" autocomplete="off" oninput="Sales.fiadorBuscar('fiador')" onblur="Sales.fiadorFecharSug('fiador')" onkeydown="Sales.fiadorTecla('fiador', event)">
+                                <div id="fiadorSug" class="fiador-sug" style="display:none;"></div>
+                            </div>
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label for="fiadorCpf">CPF</label>
+                                    <input type="text" id="fiadorCpf" class="form-control" inputmode="numeric" placeholder="000.000.000-00" maxlength="14" autocomplete="off" oninput="Sales.fiadorCpfInput('fiador')">
+                                    <small id="fiadorCpfMsg" class="fiador-msg"></small>
+                                </div>
+                                <div class="form-group">
+                                    <label for="fiadorTelefone">Telefone (opcional)</label>
+                                    <input type="text" id="fiadorTelefone" class="form-control" inputmode="tel" placeholder="(00) 00000-0000" maxlength="15" oninput="Utils.maskPhone(this)">
+                                </div>
+                            </div>
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label for="fiadorCep">CEP</label>
+                                    <input type="text" id="fiadorCep" class="form-control" inputmode="numeric" placeholder="00000-000" maxlength="9" autocomplete="off" oninput="Utils.maskCep(this); Sales.fiadorCepInput('fiador')">
+                                    <small id="fiadorCepMsg" class="fiador-msg"></small>
+                                </div>
+                                <div class="form-group" style="max-width:110px;">
+                                    <label for="fiadorNumero">Número</label>
+                                    <input type="text" id="fiadorNumero" class="form-control" placeholder="Nº" oninput="Sales.fiadorMontarEndereco('fiador')">
+                                </div>
+                            </div>
+                            <div class="form-group">
+                                <label for="fiadorRua">Rua</label>
+                                <input type="text" id="fiadorRua" class="form-control" placeholder="Rua / Avenida" oninput="Sales.fiadorMontarEndereco('fiador')">
+                            </div>
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label for="fiadorBairro">Bairro</label>
+                                    <input type="text" id="fiadorBairro" class="form-control" placeholder="Bairro" oninput="Sales.fiadorMontarEndereco('fiador')">
+                                </div>
+                                <div class="form-group">
+                                    <label for="fiadorCidadeUf">Cidade/UF</label>
+                                    <input type="text" id="fiadorCidadeUf" class="form-control" placeholder="Cidade/UF" oninput="Sales.fiadorMontarEndereco('fiador')">
+                                </div>
+                            </div>
+                            <div class="form-group">
+                                <label for="fiadorEndereco">Endereço no carnê e na promissória</label>
+                                <input type="text" id="fiadorEndereco" class="form-control" placeholder="Preenchido pelo CEP — você pode ajustar">
+                            </div>
             </div>
             <div class="modal-footer">
                 <button class="btn btn-outline-danger" id="fiadorBtnRemover" style="display:none;" onclick="Sales.removeFiador()"><i class="fas fa-trash"></i> Remover fiador</button>
@@ -31670,6 +31733,7 @@ ${container.innerHTML}
                 document.getElementById('credFiadorCpf').value       = sale.fiador?.cpf     || '';
                 document.getElementById('credFiadorEndereco').value  = sale.fiador?.address || '';
                 document.getElementById('credFiadorTelefone').value  = sale.fiador?.phone   || '';
+                this.fiadorAposCarregar('credFiador');
 
                 // Carregar cliente
                 if (sale.clientId) {
@@ -33185,9 +33249,10 @@ ${container.innerHTML}
                 if (discountEl) { discountEl.value = '0'; }
                 if (additionEl) { additionEl.value = '0'; }
                 if (obsEl) obsEl.value = '';
-                ['credFiadorNome','credFiadorCpf','credFiadorEndereco','credFiadorTelefone'].forEach(id => {
-                    const el = document.getElementById(id); if (el) el.value = '';
+                ['credFiadorNome','credFiadorCpf','credFiadorEndereco','credFiadorTelefone','credFiadorCep','credFiadorNumero','credFiadorRua','credFiadorBairro','credFiadorCidadeUf'].forEach(id => {
+                    const el = document.getElementById(id); if (el) { el.value = ''; if (el.dataset) el.dataset.ultimo = ''; }
                 });
+                this.fiadorAposCarregar('credFiador');
                 if (typeof professionalEl !== 'undefined' && professionalEl) professionalEl.value = '';
                 const clientSelectEl = document.getElementById('clientSelect');
                 if (clientSelectEl) clientSelectEl.innerHTML = '<option value="">Selecione um cliente</option>';
@@ -33318,6 +33383,131 @@ ${container.innerHTML}
                 });
             },
 
+            // ─────────── Fiador: busca de cliente, máscaras e CEP ───────────
+            _fiEl(p, sufixo) { return document.getElementById(p + sufixo); },
+
+            _fiFmtCpf(v) {
+                const d = String(v || '').replace(/\D/g, '').slice(0, 11);
+                return d.replace(/(\d{3})(\d)/, '$1.$2').replace(/(\d{3})(\d)/, '$1.$2').replace(/(\d{3})(\d{1,2})$/, '$1-$2');
+            },
+
+            _fiCpfValido(d) {
+                d = String(d || '').replace(/\D/g, '');
+                if (d.length !== 11 || /^(\d)\1{10}$/.test(d)) return false;
+                const dv = n => { let t = 0; for (let i = 0; i < n; i++) t += parseInt(d[i]) * (n + 1 - i); const r = (t * 10) % 11; return r === 10 ? 0 : r; };
+                return dv(9) === parseInt(d[9]) && dv(10) === parseInt(d[10]);
+            },
+
+            fiadorCpfInput(p) {
+                const el = this._fiEl(p, 'Cpf'), msg = this._fiEl(p, 'CpfMsg');
+                if (!el) return;
+                el.value = this._fiFmtCpf(el.value);
+                const d = el.value.replace(/\D/g, '');
+                if (msg) {
+                    if (d.length === 11) {
+                        const ok = this._fiCpfValido(d);
+                        msg.textContent = ok ? '✓ CPF válido' : 'CPF inválido — confira os números';
+                        msg.className = 'fiador-msg ' + (ok ? 'ok' : 'erro');
+                    } else { msg.textContent = ''; msg.className = 'fiador-msg'; }
+                }
+                el.style.borderColor = d.length === 11 ? (this._fiCpfValido(d) ? '#66bb6a' : '#ef5350') : '';
+            },
+
+            // Lista de clientes cadastrados que combinam com o que foi digitado no Nome (nome ou CPF/telefone)
+            fiadorBuscar(p) {
+                const inp = this._fiEl(p, 'Nome'), box = this._fiEl(p, 'Sug');
+                if (!inp || !box) return;
+                const term = inp.value.trim();
+                if (term.length < 2) { box.style.display = 'none'; return; }
+                const soNum = /^[\d.\-\s()]+$/.test(term);
+                const digs = term.replace(/\D/g, '');
+                const tn = Products._normalizeSearch(term);
+                let res = (state.clients || []).filter(c => {
+                    if (soNum) return digs.length >= 3 && ((c.cpf || '').replace(/\D/g, '').includes(digs) || (c.phone || '').replace(/\D/g, '').includes(digs) || (c.whatsapp || '').replace(/\D/g, '').includes(digs));
+                    return Products._normalizeSearch(c.name || '').includes(tn);
+                });
+                res.sort((a, b) => (Products._normalizeSearch(a.name || '').startsWith(tn) ? 0 : 1) - (Products._normalizeSearch(b.name || '').startsWith(tn) ? 0 : 1));
+                res = res.slice(0, 6);
+                if (!res.length) { box.style.display = 'none'; box.innerHTML = ''; return; }
+                box.innerHTML = res.map(c => {
+                    const tel = c.phone || c.whatsapp || '';
+                    return `<div class="fiador-sug-item" onmousedown="Sales.fiadorEscolher('${p}', '${Utils.sanitizeHTML(String(c.id))}', event)"><span><b>${Utils.sanitizeHTML(c.name || '')}</b><small>${c.cpf ? 'CPF ' + Utils.sanitizeHTML(c.cpf) : 'sem CPF'}${tel ? ' · ' + Utils.sanitizeHTML(tel) : ''}</small></span><span class="fiador-sug-tag">cliente</span></div>`;
+                }).join('');
+                box.style.display = 'block';
+            },
+
+            fiadorFecharSug(p) { setTimeout(() => { const b = this._fiEl(p, 'Sug'); if (b) b.style.display = 'none'; }, 150); },
+
+            fiadorTecla(p, ev) {
+                const box = this._fiEl(p, 'Sug');
+                if (!box || box.style.display === 'none') return;
+                if (ev.key === 'Escape') { box.style.display = 'none'; }
+                else if (ev.key === 'Enter') {
+                    const first = box.querySelector('.fiador-sug-item');
+                    if (first) { ev.preventDefault(); first.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true })); }
+                }
+            },
+
+            fiadorEscolher(p, id, ev) {
+                try { ev.preventDefault(); ev.stopPropagation(); } catch (_e) {}
+                const c = (state.clients || []).find(x => String(x.id) === String(id));
+                if (!c) return;
+                const set = (suf, v) => { const el = this._fiEl(p, suf); if (el) el.value = v || ''; };
+                set('Nome', c.name);
+                set('Cpf', this._fiFmtCpf(c.cpf));
+                this.fiadorCpfInput(p);
+                set('Telefone', c.phone || c.whatsapp || '');
+                const tel = this._fiEl(p, 'Telefone'); if (tel) Utils.maskPhone(tel);
+                set('Cep', c.cep); const cep = this._fiEl(p, 'Cep'); if (cep && cep.value) Utils.maskCep(cep);
+                set('Numero', c.number);
+                set('Rua', c.address);
+                set('Bairro', c.neighborhood);
+                set('CidadeUf', c.city ? (c.city + (c.state ? '/' + c.state : '')) : '');
+                const msg = this._fiEl(p, 'CepMsg'); if (msg) { msg.textContent = ''; msg.className = 'fiador-msg'; }
+                this.fiadorMontarEndereco(p);
+                const box = this._fiEl(p, 'Sug'); if (box) box.style.display = 'none';
+                Toast.show('Dados do cliente preenchidos', 'success');
+                // cliente com CEP mas sem rua cadastrada: completa pelo CEP
+                if (cep && cep.value.replace(/\D/g, '').length === 8 && !(c.address || '').trim()) this.fiadorCepInput(p);
+            },
+
+            // Junta Rua, Número, Bairro e Cidade/UF no texto que vai para o Carnê e a Nota Promissória
+            fiadorMontarEndereco(p) {
+                const v = suf => (this._fiEl(p, suf)?.value || '').trim();
+                const partes = [v('Rua'), v('Numero'), v('Bairro'), v('CidadeUf')].filter(Boolean);
+                const end = this._fiEl(p, 'Endereco');
+                if (end && partes.length) end.value = partes.join(', ');
+            },
+
+            async fiadorCepInput(p) {
+                const el = this._fiEl(p, 'Cep'), msg = this._fiEl(p, 'CepMsg');
+                if (!el) return;
+                const d = el.value.replace(/\D/g, '');
+                if (d.length !== 8) { if (msg) { msg.textContent = ''; msg.className = 'fiador-msg'; } el.dataset.ultimo = ''; return; }
+                if (el.dataset.ultimo === d) return;
+                el.dataset.ultimo = d;
+                if (msg) { msg.textContent = 'buscando…'; msg.className = 'fiador-msg info'; }
+                let r = null;
+                try { r = await App._buscarCepDados(d); } catch (_e) { r = null; }
+                if (el.value.replace(/\D/g, '') !== d) return;   // o usuário já mudou o CEP
+                if (!r) { if (msg) { msg.textContent = 'CEP não encontrado — preencha o endereço'; msg.className = 'fiador-msg erro'; } return; }
+                const set = (suf, v) => { const x = this._fiEl(p, suf); if (x && v) x.value = v; };
+                set('Rua', r.logradouro); set('Bairro', r.bairro);
+                set('CidadeUf', r.localidade ? (r.localidade + (r.uf ? '/' + r.uf : '')) : '');
+                if (msg) { msg.textContent = '✓ achou'; msg.className = 'fiador-msg ok'; }
+                this.fiadorMontarEndereco(p);
+                const num = this._fiEl(p, 'Numero'); if (num && !num.value) num.focus();
+            },
+
+            // Depois de carregar um fiador já salvo: aplica máscaras e limpa os campos de CEP (endereço antigo fica no texto)
+            fiadorAposCarregar(p) {
+                ['Cep', 'Numero', 'Rua', 'Bairro', 'CidadeUf'].forEach(suf => { const el = this._fiEl(p, suf); if (el) { el.value = ''; el.dataset.ultimo = ''; } });
+                ['CepMsg'].forEach(suf => { const el = this._fiEl(p, suf); if (el) { el.textContent = ''; el.className = 'fiador-msg'; } });
+                const cpf = this._fiEl(p, 'Cpf'); if (cpf && cpf.value) this.fiadorCpfInput(p); else if (cpf) { cpf.style.borderColor = ''; const m = this._fiEl(p, 'CpfMsg'); if (m) m.textContent = ''; }
+                const tel = this._fiEl(p, 'Telefone'); if (tel && tel.value) Utils.maskPhone(tel);
+                const box = this._fiEl(p, 'Sug'); if (box) box.style.display = 'none';
+            },
+
             // Lê os campos de fiador do painel de Crediário (venda em andamento,
             // ainda não salva). Retorna null se o nome estiver vazio.
             _fiadorFromForm() {
@@ -33343,6 +33533,7 @@ ${container.innerHTML}
                 document.getElementById('fiadorCpf').value       = sale.fiador?.cpf     || '';
                 document.getElementById('fiadorEndereco').value  = sale.fiador?.address || '';
                 document.getElementById('fiadorTelefone').value  = sale.fiador?.phone   || '';
+                this.fiadorAposCarregar('fiador');
                 const btnRemover = document.getElementById('fiadorBtnRemover');
                 if (btnRemover) btnRemover.style.display = sale.fiador ? '' : 'none';
                 Modal.show('fiadorModal');
