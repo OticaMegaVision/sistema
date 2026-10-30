@@ -9935,7 +9935,7 @@ body.dark-mode,
                                 <div class="bkp-status-ic" style="background:#f3f0ff;color:#7c3aed;"><i class="fas fa-code-branch"></i></div>
                                 <div class="txt">
                                     <b>Versão do sistema</b>
-                                    <span>versão <strong>261020262126</strong></span>
+                                    <span>versão <strong>301020261558</strong></span>
                                 </div>
                             </div>
                         </div>
@@ -11534,6 +11534,11 @@ body.dark-mode,
                                             <div style="font-size:0.62rem;color:#555;text-transform:uppercase;font-weight:700;letter-spacing:0.3px;">Valor Recebido</div>
                                             <div id="compValor" style="font-size:1.15rem;font-weight:900;color:#28a745;margin-top:2px;"></div>
                                         </div>
+                                    </div>
+                                    <div id="compDetalhe" style="display:none;border:1px solid #e3e8ee;border-radius:7px;padding:8px 10px;margin-bottom:10px;font-size:0.8rem;color:#333;">
+                                        <div style="display:flex;justify-content:space-between;"><span>Valor da parcela</span><span id="compDetOrig"></span></div>
+                                        <div style="display:flex;justify-content:space-between;"><span id="compDetLbl">Multa e juros</span><span id="compDetAcresc"></span></div>
+                                        <div style="display:flex;justify-content:space-between;font-weight:800;border-top:1px solid #e3e8ee;margin-top:4px;padding-top:4px;"><span>Total recebido</span><span id="compDetTotal"></span></div>
                                     </div>
                                     <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px;">
                                         <div>
@@ -17221,6 +17226,7 @@ body.dark-mode,
                                         vencimento: p.dueDate || '',
                                         pago: isParcPago,
                                         paidValue: isParcPago ? (p.paidValue || p.value || 0) : undefined,
+                                        valorOrig: isParcPago ? parseFloat(p.value || 0) : undefined,
                                         pagamentosParciais: p.pagamentosParciais || undefined,
                                         _readonly: true
                                     });
@@ -17279,6 +17285,7 @@ body.dark-mode,
                                 vencimento: p.dueDate || '',
                                 pago: isParcPago,
                                 paidValue: isParcPago ? (p.paidValue || p.value || 0) : undefined,
+                                valorOrig: isParcPago ? parseFloat(p.value || 0) : undefined,
                                 pagamentosParciais: p.pagamentosParciais || undefined,
                                 _readonly: true
                             });
@@ -17562,7 +17569,7 @@ body.dark-mode,
                         const formaRecibo   = c.pago ? '' : (ultimoParcial?.forma || '');
                         const obsRecibo     = c.pago ? '' : `Pagamento parcial. Saldo restante: R$ ${parseFloat(c.valor || 0).toFixed(2).replace('.',',')}`;
                         const tituloRecibo  = temParcial ? 'Comprovante do Pagamento Parcial' : 'Comprovante de Pagamento';
-                        reciboVendaBtn = `<button class="ci-action-btn recibo" title="${tituloRecibo}" onclick="ContasManager.gerarComprovanteVenda('${c.id}','${(c.descricao||'').replace(/'/g,"\\'")}',${valorRecibo},'${(c.parte||'').replace(/'/g,"\\'")}','${(c.categoria||'').replace(/'/g,"\\'")}','${c.vencimento||''}','${formaRecibo.replace(/'/g,"\\'")}','${obsRecibo.replace(/'/g,"\\'")}')"><i class="fas fa-receipt"></i></button>`;
+                        reciboVendaBtn = `<button class="ci-action-btn recibo" title="${tituloRecibo}" onclick="ContasManager.gerarComprovanteVenda('${c.id}','${(c.descricao||'').replace(/'/g,"\\'")}',${valorRecibo},'${(c.parte||'').replace(/'/g,"\\'")}','${(c.categoria||'').replace(/'/g,"\\'")}','${c.vencimento||''}','${formaRecibo.replace(/'/g,"\\'")}','${obsRecibo.replace(/'/g,"\\'")}',${(c.pago && c.paidValue && c.valorOrig && parseFloat(c.paidValue) > c.valorOrig + 0.009) ? c.valorOrig : 'null'})"><i class="fas fa-receipt"></i></button>`;
                     }
 
                     return `<div class="${classes}">
@@ -17649,17 +17656,34 @@ body.dark-mode,
                 Dashboard.update().catch(()=>{});
             },
 
+            // Aviso na tela de baixa: parcela vencida → multa + juros = valor atualizado (usa as taxas das Configurações)
+            _sugestaoAtraso(valor, vencimento, idBtn) {
+                try {
+                    if (!vencimento || !(parseFloat(valor) > 0)) return { html: '', fmt: '' };
+                    const j = this._calcAtrasoCobranca({ valor, vencimento });
+                    if (!(j.dias > 0)) return { html: '', fmt: '' };
+                    const f = v => v.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+                    const pct = v => String(v).replace('.', ',');
+                    return {
+                        fmt: f(j.atualizado),
+                        html: `<div style="background:#fff3e0;border:1px solid #ffcc80;border-radius:8px;padding:8px 10px;margin:0 0 12px;font-size:0.78rem;color:#a14a00;">⚠ Vencida há <b>${j.dias} dia${j.dias > 1 ? 's' : ''}</b>: multa ${pct(j.mp)}% (R$ ${f(j.multa)}) + juros (R$ ${f(j.jurosTotal)}) = <b>R$ ${f(j.atualizado)}</b> <a href="#" id="${idBtn}" style="font-weight:700;color:#e65100;text-decoration:underline;white-space:nowrap;">usar este valor</a></div>`
+                    };
+                } catch (_e) { return { html: '', fmt: '' }; }
+            },
+
             async darBaixa(id) {
                 // Profissional: modal com valor recebido + forma de pagamento
                 const contas = await this.getAll();
                 const conta = contas.find(c => c.id === id);
                 if (!conta) return;
                 const defaultVal = parseFloat(conta.valor || 0).toLocaleString('pt-BR', {minimumFractionDigits:2, maximumFractionDigits:2});
+                const sug = conta.tipo === 'receber' ? this._sugestaoAtraso(conta.valor, conta.vencimento, '_bxUsar') : { html: '', fmt: '' };
                 const overlay = document.createElement('div');
                 overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:99999;display:flex;align-items:center;justify-content:center;';
                 overlay.innerHTML = `<div style="background:#fff;border-radius:14px;padding:24px;width:340px;box-shadow:0 8px 32px rgba(0,0,0,0.25);font-family:inherit;">
                     <h3 style="margin:0 0 6px;font-size:1rem;color:#28a745;">💰 Registrar Baixa</h3>
                     <p style="font-size:0.8rem;color:#666;margin:0 0 14px;">${conta.descricao || 'Conta'} — Valor original: <strong>R$ ${defaultVal}</strong></p>
+                    ${sug.html}
                     <label style="font-size:0.8rem;font-weight:700;color:#333;display:block;margin-bottom:4px;">Valor recebido (R$)</label>
                     <input type="text" inputmode="numeric" id="_bxVal" value="${defaultVal}" oninput="Utils.maskMoney(this)"
                         style="width:100%;padding:10px;border:2px solid #28a745;border-radius:8px;font-size:1rem;box-sizing:border-box;margin-bottom:12px;">
@@ -17683,6 +17707,7 @@ body.dark-mode,
                 </div>`;
                 document.body.appendChild(overlay);
                 overlay.querySelector('#_bxCancel').onclick = () => overlay.remove();
+                overlay.querySelector('#_bxUsar')?.addEventListener('click', e => { e.preventDefault(); overlay.querySelector('#_bxVal').value = sug.fmt; });
                 overlay.onclick = e => { if (e.target === overlay) overlay.remove(); };
                 overlay.querySelector('#_bxConfirm').onclick = async function() {
                     if (this._bxExecuting) return;
@@ -17909,11 +17934,14 @@ body.dark-mode,
 
                 // Modal de baixa com valor recebido + forma pagamento
                 const defaultVal = itemValor.toLocaleString('pt-BR', {minimumFractionDigits:2, maximumFractionDigits:2});
+                const ehParcelaBx = /^p\d+$/.test(tipo) || /^dual\d+_p\d+$/.test(tipo);
+                const sug = ehParcelaBx ? this._sugestaoAtraso(itemValor, itemVencimento, '_vbxUsar') : { html: '', fmt: '' };
                 const overlay = document.createElement('div');
                 overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:99999;display:flex;align-items:center;justify-content:center;';
                 overlay.innerHTML = `<div style="background:#fff;border-radius:14px;padding:24px;width:340px;box-shadow:0 8px 32px rgba(0,0,0,0.25);font-family:inherit;">
                     <h3 style="margin:0 0 6px;font-size:1rem;color:#28a745;">💰 Dar Baixa</h3>
                     <p style="font-size:0.8rem;color:#666;margin:0 0 14px;">${itemDescricao} — Valor original: <strong>R$ ${defaultVal}</strong></p>
+                    ${sug.html}
                     <label style="font-size:0.8rem;font-weight:700;color:#333;display:block;margin-bottom:4px;">Valor recebido (R$) *</label>
                     <input type="text" inputmode="numeric" id="_vbxVal" value="${defaultVal}" oninput="Utils.maskMoney(this)"
                         style="width:100%;padding:10px;border:2px solid #28a745;border-radius:8px;font-size:1rem;box-sizing:border-box;margin-bottom:12px;">
@@ -17936,6 +17964,7 @@ body.dark-mode,
                 </div>`;
                 document.body.appendChild(overlay);
                 overlay.querySelector('#_vbxCancel').onclick = () => overlay.remove();
+                overlay.querySelector('#_vbxUsar')?.addEventListener('click', e => { e.preventDefault(); overlay.querySelector('#_vbxVal').value = sug.fmt; });
                 overlay.onclick = e => { if (e.target === overlay) overlay.remove(); };
                 overlay.querySelector('#_vbxConfirm').onclick = function() {
                     if (this._vbxExecuting) return;
@@ -18005,7 +18034,7 @@ body.dark-mode,
                                     parc.paidValue = paidVal; parc.formaPagamento = forma;
                                     if (this.checkPaymentComplete(sale)) sale.paymentStatus = 'pago';
                                     Toast.show(`Parcela ${num} quitada! ✅`, 'success');
-                                    this.gerarComprovanteVenda(itemId, itemDescricao||`Parcela ${num}`, itemValor||valorParc, itemCliente, itemCategoria, itemVencimento, forma, obs);
+                                    this.gerarComprovanteVenda(itemId, itemDescricao||`Parcela ${num}`, paidVal, itemCliente, itemCategoria, itemVencimento, forma, obs, valorParc);
                                 }
                                 sale._updatedAt = new Date().toISOString();
                                 (window.LocalFirst ? LocalFirst.pushItem('sales',sale) : Promise.resolve()).catch(()=>{}).finally(()=>{ ContasManager.renderAll().catch(()=>{}); Dashboard.update().catch(()=>{}); });
@@ -18054,7 +18083,7 @@ body.dark-mode,
                                 parc.paidValue = paidVal; parc.formaPagamento = forma;
                                 if (this.checkPaymentComplete(sale)) sale.paymentStatus = 'pago';
                                 Toast.show(`Parcela ${num} quitada! ✅`, 'success');
-                                this.gerarComprovanteVenda(itemId, itemDescricao||`Parcela ${num}`, itemValor||valorParc, itemCliente, itemCategoria, itemVencimento, forma, obs);
+                                this.gerarComprovanteVenda(itemId, itemDescricao||`Parcela ${num}`, paidVal, itemCliente, itemCategoria, itemVencimento, forma, obs, valorParc);
                             }
                             sale._updatedAt = new Date().toISOString();
                             (window.LocalFirst ? LocalFirst.pushItem('sales',sale) : Promise.resolve()).catch(()=>{}).finally(()=>{ ContasManager.renderAll().catch(()=>{}); Dashboard.update().catch(()=>{}); });
@@ -18099,7 +18128,7 @@ body.dark-mode,
                         sale._updatedAt = new Date().toISOString();
                         (window.LocalFirst ? LocalFirst.pushItem('sales',sale) : Promise.resolve()).catch(()=>{}).finally(()=>{ ContasManager.renderAll().catch(()=>{}); Dashboard.update().catch(()=>{}); });
                         Toast.show('Pagamento na retirada registrado! ✅', 'success');
-                        this.gerarComprovanteVenda(itemId, itemDescricao||'Pagamento na Retirada', itemValor, itemCliente, itemCategoria, itemVencimento, forma, obs);
+                        this.gerarComprovanteVenda(itemId, itemDescricao||'Pagamento na Retirada', paidVal, itemCliente, itemCategoria, itemVencimento, forma, obs, valorRetiradaAtual);
                     }
                 } else if (tipo === 'total') {
                     // ✅ FIX: mesma lógica de baixa parcial aplicada ao pagamento total
@@ -18126,7 +18155,7 @@ body.dark-mode,
                         sale._updatedAt = new Date().toISOString();
                         (window.LocalFirst ? LocalFirst.pushItem('sales',sale) : Promise.resolve()).catch(()=>{}).finally(()=>{ ContasManager.renderAll().catch(()=>{}); Dashboard.update().catch(()=>{}); });
                         Toast.show('Pagamento registrado! ✅', 'success');
-                        this.gerarComprovanteVenda(itemId, itemDescricao||'Pagamento Total', itemValor||sale.total||0, itemCliente, itemCategoria, itemVencimento, forma, obs);
+                        this.gerarComprovanteVenda(itemId, itemDescricao||'Pagamento Total', paidVal, itemCliente, itemCategoria, itemVencimento, forma, obs, valorTotalAtual);
                     }
                 }
             },
@@ -18224,11 +18253,14 @@ body.dark-mode,
                 const contas = await this.getAll();
                 const c = contas.find(x=>x.id===id);
                 if(!c) return;
-                this._exibirComprovanteModal(c);
+                // Conta paga com valor maior que o original (multa/juros): comprovante mostra o valor realmente recebido
+                const pv = parseFloat(c.paidValue), vo = parseFloat(c.valor || 0);
+                if (c.pago && isFinite(pv) && pv > vo + 0.009) this._exibirComprovanteModal({ ...c, valor: pv, valorOriginal: vo });
+                else this._exibirComprovanteModal(c);
             },
 
             // Gera comprovante para itens de venda (parcelas, retirada, total)
-            gerarComprovanteVenda(itemId, descricao, valor, cliente, categoria, vencimento, formaPagamento, obs) {
+            gerarComprovanteVenda(itemId, descricao, valor, cliente, categoria, vencimento, formaPagamento, obs, valorOriginal) {
                 const obj = {
                     tipo: 'receber',
                     descricao: descricao || 'Pagamento de venda',
@@ -18241,7 +18273,22 @@ body.dark-mode,
                     dataPagamento: new Date().toISOString(),
                     formaPagamento: formaPagamento || '—',
                 };
+                if (valorOriginal != null && isFinite(parseFloat(valorOriginal))) obj.valorOriginal = parseFloat(valorOriginal);
                 this._exibirComprovanteModal(obj);
+            },
+
+            // Valor da parcela + multa/juros quando o cliente pagou mais que o valor original
+            _comprovanteAcrescimo(c) {
+                const orig = parseFloat(c && c.valorOriginal), pago = parseFloat(c && c.valor);
+                if (!isFinite(orig) || !isFinite(pago) || orig <= 0 || pago <= orig + 0.009) return { tem: false };
+                let dias = 0;
+                if (c.vencimento) {
+                    const pagoEm = c.dataPagamento ? new Date(c.dataPagamento) : new Date();
+                    const diff = new Date(pagoEm.toLocaleDateString('en-CA') + 'T12:00:00') - new Date(String(c.vencimento).slice(0, 10) + 'T12:00:00');
+                    dias = diff > 0 ? Math.ceil(diff / 86400000) : 0;
+                }
+                return { tem: true, orig, acresc: Math.round((pago - orig) * 100) / 100, total: pago,
+                         lbl: dias > 0 ? `Multa e juros (${dias} dia${dias > 1 ? 's' : ''} de atraso)` : 'Acréscimo' };
             },
 
             _exibirComprovanteModal(c) {
@@ -18272,6 +18319,17 @@ body.dark-mode,
                 set('compVencimento', vencFmt);
                 set('compDataPag', dataPag);
                 set('compEmitidoEm', 'Emitido em: ' + new Date().toLocaleString('pt-BR'));
+                const ac = this._comprovanteAcrescimo(c);
+                const detBox = document.getElementById('compDetalhe');
+                if (detBox) {
+                    detBox.style.display = ac.tem ? 'block' : 'none';
+                    if (ac.tem) {
+                        set('compDetOrig', this.fmt(ac.orig));
+                        set('compDetLbl', ac.lbl);
+                        set('compDetAcresc', '+ ' + this.fmt(ac.acresc));
+                        set('compDetTotal', this.fmt(ac.total));
+                    }
+                }
 
                 const formaPagEl = document.getElementById('compFormaPag');
                 if (formaPagEl) formaPagEl.textContent = c.formaPagamento || '—';
@@ -18348,7 +18406,8 @@ body.dark-mode,
                       <div class="campo verde"><div class="lbl">Valor Recebido</div><div class="val">${this.fmt(c.valor)}</div></div>
                       <div class="campo"><div class="lbl">Data do Pagamento</div><div class="val">${dataPag}</div></div>
                     </div>
-                    <div class="grid2">
+                    ${(() => { const ac = this._comprovanteAcrescimo(c); return ac.tem ? `<div style="border:1px solid #e3e8ee;border-radius:7px;padding:8px 11px;margin-bottom:10px;font-size:0.8rem;color:#333;"><div style="display:flex;justify-content:space-between;"><span>Valor da parcela</span><span>${this.fmt(ac.orig)}</span></div><div style="display:flex;justify-content:space-between;"><span>${ac.lbl}</span><span>+ ${this.fmt(ac.acresc)}</span></div><div style="display:flex;justify-content:space-between;font-weight:800;border-top:1px solid #e3e8ee;margin-top:4px;padding-top:4px;"><span>Total recebido</span><span>${this.fmt(ac.total)}</span></div></div>` : ''; })()}
+                     <div class="grid2">
                       <div class="campo"><div class="lbl">Cliente / Parte</div><div class="val">${c.parte||'—'}</div></div>
                       <div class="campo"><div class="lbl">Categoria</div><div class="val">${c.categoria||'—'}</div></div>
                       <div class="campo"><div class="lbl">Vencimento</div><div class="val">${vencFmt}</div></div>
