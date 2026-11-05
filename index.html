@@ -9935,7 +9935,7 @@ body.dark-mode,
                                 <div class="bkp-status-ic" style="background:#f3f0ff;color:#7c3aed;"><i class="fas fa-code-branch"></i></div>
                                 <div class="txt">
                                     <b>Versão do sistema</b>
-                                    <span>versão <strong>301020261558</strong></span>
+                                    <span>versão <strong>041120262103</strong></span>
                                 </div>
                             </div>
                         </div>
@@ -26081,6 +26081,7 @@ tbody tr td{border:1.5px solid #000;padding:2mm;text-align:center;font-weight:70
                 if (!raw) return 'Sem categoria';
                 const key = raw.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[\s\-]+/g, '_');
                 if (this._CAT_LABELS[key]) return this._CAT_LABELS[key];
+                if (/[A-ZÀ-Ý]/.test(raw)) return raw.replace(/\s+/g, ' ');   // já é um nome de exibição (ex.: Multifocais C.O. Pro HD)
                 const small = ['de', 'da', 'do', 'das', 'dos', 'e'];
                 return raw.replace(/_/g, ' ').replace(/\s+/g, ' ').toLowerCase().split(' ')
                     .map((w, i) => (i > 0 && small.includes(w)) ? w : w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
@@ -29133,14 +29134,24 @@ ${container.innerHTML}
             },
 
             // Popula os selects de lentes, armações e serviços com dados reais do state
+            // Produto é lente? Categoria 'lentes' (cadastro manual) ou nome de categoria de lente do Markup IA.
+            // Armações, óculos de sol e tratamentos nunca entram na lista de lentes.
+            _ehLenteVenda(p) {
+                const raw = String((p && p.category) == null ? '' : p.category);
+                if (raw === 'lentes') return true;
+                const c = raw.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[_\-]+/g, ' ').trim();
+                if (!c || /armac|oculos|tratament/.test(c)) return false;
+                return /lente|multifocal|progressiv|surf|visao simples|technopark|kodak|essilor|pro design|c\.?\s?o\.?\s*(pro|select)/.test(c);
+            },
+
             populateSaleSelects() {
                 const Utils2 = { fmt: v => 'R$ ' + (v || 0).toLocaleString('pt-BR', {minimumFractionDigits:2, maximumFractionDigits:2}) };
 
-                // Lentes: produtos da categoria 'lentes'
+                // Lentes: categoria 'lentes' + categorias de lente criadas pelo Markup IA (Multifocais, Surf, Technopark...)
                 const selLente = document.getElementById('lenteSelect');
                 if (selLente) {
                     selLente.innerHTML = '<option value="">Selecione uma lente</option>';
-                    const lentes = (state.products || []).filter(p => p.category === 'lentes');
+                    const lentes = (state.products || []).filter(p => this._ehLenteVenda(p));
                     if (lentes.length > 0) {
                         lentes.forEach(p => {
                             const opt = document.createElement('option');
