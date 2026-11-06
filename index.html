@@ -6871,9 +6871,9 @@ body.dark-mode,
                                 style="flex:2;min-width:130px;padding:5px 9px;border:1px solid var(--light-gray);border-radius:7px;font-size:0.81rem;background:var(--light);color:var(--dark);">
                             <select id="contasPagarFiltro" onchange="ContasManager.filtrar()"
                                 style="flex:1;min-width:100px;padding:5px 7px;border:1px solid var(--light-gray);border-radius:7px;font-size:0.81rem;background:var(--light);color:var(--dark);">
-                                <option value="todos">Todos</option>
+                                <option value="todos" selected>Todos</option>
                                 <option value="vencida">Vencidas</option>
-                                <option value="pendente" selected>Pendentes</option>
+                                <option value="pendente">Pendentes</option>
                                 <option value="pago">Pagos</option>
                             </select>
                         </div>
@@ -9935,7 +9935,7 @@ body.dark-mode,
                                 <div class="bkp-status-ic" style="background:#f3f0ff;color:#7c3aed;"><i class="fas fa-code-branch"></i></div>
                                 <div class="txt">
                                     <b>Versão do sistema</b>
-                                    <span>versão <strong>061120260621</strong></span>
+                                    <span>versão <strong>061120261628</strong></span>
                                 </div>
                             </div>
                         </div>
@@ -11888,7 +11888,7 @@ body.dark-mode,
                         const url = URL.createObjectURL(blob);
                         const a = document.createElement('a');
                         a.href = url;
-                        a.download = 'backup_' + storeId + '_' + new Date().toISOString().slice(0,10) + '.json.gz';
+                        a.download = 'backup_' + storeId + '_' + Utils.hojeISO() + '.json.gz';
                         a.click();
                         setTimeout(() => URL.revokeObjectURL(url), 3000);
                         Toast.show('✅ Backup exportado (.json.gz)', 'success', 3000);
@@ -11897,7 +11897,7 @@ body.dark-mode,
                         const url = URL.createObjectURL(blob);
                         const a = document.createElement('a');
                         a.href = url;
-                        a.download = 'backup_' + storeId + '_' + new Date().toISOString().slice(0,10) + '.json';
+                        a.download = 'backup_' + storeId + '_' + Utils.hojeISO() + '.json';
                         a.click();
                         setTimeout(() => URL.revokeObjectURL(url), 3000);
                         Toast.show('✅ Backup exportado (.json)', 'success', 3000);
@@ -17160,7 +17160,7 @@ body.dark-mode,
                 const contas = await this.getAll();
                 // ── FIX: Cache global para _filteredExpenses() do Dashboard ──────
                 state._contasManuais = contas;
-                const hoje = new Date().toISOString().split('T')[0];
+                const hoje = Utils.hojeISO();
 
                 // ── Map de clientes por ID para lookup O(1) em vez de O(n) ──────
                 const clientsMapById = new Map((state.clients || []).map(c => [c.id, c]));
@@ -17227,6 +17227,7 @@ body.dark-mode,
                                         pago: isParcPago,
                                         paidValue: isParcPago ? (p.paidValue || p.value || 0) : undefined,
                                         valorOrig: isParcPago ? parseFloat(p.value || 0) : undefined,
+                                        pagoEm: isParcPago ? (p.paidDate || undefined) : undefined,
                                         pagamentosParciais: p.pagamentosParciais || undefined,
                                         _readonly: true
                                     });
@@ -17286,6 +17287,7 @@ body.dark-mode,
                                 pago: isParcPago,
                                 paidValue: isParcPago ? (p.paidValue || p.value || 0) : undefined,
                                 valorOrig: isParcPago ? parseFloat(p.value || 0) : undefined,
+                                pagoEm: isParcPago ? (p.paidDate || undefined) : undefined,
                                 pagamentosParciais: p.pagamentosParciais || undefined,
                                 _readonly: true
                             });
@@ -17473,7 +17475,7 @@ body.dark-mode,
 
             // ✅ NOVO: recalcula e exibe os totais a partir de uma lista de itens
             _atualizarTotais(receber, pagar) {
-                const hoje = this._hoje || new Date().toISOString().split('T')[0];
+                const hoje = this._hoje || Utils.hojeISO();
                 const agora = new Date(); agora.setHours(0,0,0,0);
                 const fmtDate = v => new Date(v+'T12:00:00');
                 const soma = (list, filtro) => list.filter(filtro).reduce((s,c) => s + parseFloat(c.valor||0), 0);
@@ -17495,14 +17497,15 @@ body.dark-mode,
             },
 
             // Filtro em tempo real — padrão de sistemas profissionais (Glasscurvex, OticaManager)
-            // Ao entrar em Financeiro: as duas listas voltam para "Pendentes"
+            // Ao entrar em Financeiro: Receber volta para "Pendentes" e Pagar para "Todos"
             resetFiltrosIniciais() {
-                ['contasReceberFiltro', 'contasPagarFiltro'].forEach(id => { const el = document.getElementById(id); if (el) el.value = 'pendente'; });
+                const fr = document.getElementById('contasReceberFiltro'); if (fr) fr.value = 'pendente';   // Receber: Pendentes (inclui vencidas)
+                const fp = document.getElementById('contasPagarFiltro');   if (fp) fp.value = 'todos';       // Pagar: Todos
                 if (this._allReceber || this._allPagar) this.filtrar();
             },
 
             filtrar() {
-                const hoje = this._hoje || new Date().toISOString().split('T')[0];
+                const hoje = this._hoje || Utils.hojeISO();
                 const buscarec = (document.getElementById('contasReceberBusca')?.value || '').toLowerCase();
                 const filtrorec = document.getElementById('contasReceberFiltro')?.value || 'todos';
                 const buscapag = (document.getElementById('contasPagarBusca')?.value || '').toLowerCase();
@@ -17540,9 +17543,22 @@ body.dark-mode,
                 // Ordem: pendentes/vencidas no topo, pagas abaixo.
                 // Contas a Receber: vencimento mais antigo primeiro. Contas a Pagar: mais recente primeiro.
                 const maisRecentePrimeiro = (elId === 'contasPagarList');
+                // Data em que a conta foi paga (para ordenar as pagas); sem ela, usa o vencimento
+                const dtPago = c => {
+                    const v = c.pagoEm || c.dataPagamento || c.paidDate || '';
+                    const d = String(v).includes('T') ? Utils.dataSP(v) : String(v).slice(0, 10);
+                    return d || c.vencimento || '';
+                };
                 contas.sort((a,b)=>{
                     if(a.pago && !b.pago) return 1;
                     if(!a.pago && b.pago) return -1;
+                    if (a.pago && b.pago && !maisRecentePrimeiro) {
+                        // Contas a Receber, pagos: pagamento mais recente primeiro
+                        const pa = dtPago(a), pb = dtPago(b);
+                        if (pa !== pb) return pa < pb ? 1 : -1;
+                        const xa = a.vencimento||'', xb = b.vencimento||'';
+                        return xa === xb ? 0 : (xa < xb ? 1 : -1);
+                    }
                     const va = a.vencimento||'', vb = b.vencimento||'';
                     if (va === vb) return 0;
                     return (va < vb) === maisRecentePrimeiro ? 1 : -1;
@@ -17611,7 +17627,7 @@ body.dark-mode,
                 document.getElementById('contaTipo').value = tipo;
                 document.getElementById('contaDescricao').value = '';
                 document.getElementById('contaValor').value = '';
-                document.getElementById('contaVencimento').value = new Date().toISOString().split('T')[0];
+                document.getElementById('contaVencimento').value = Utils.hojeISO();
                 document.getElementById('contaParte').value = '';
                 document.getElementById('contaCategoria').value = '';
                 document.getElementById('contaObs').value = '';
@@ -18040,7 +18056,7 @@ body.dark-mode,
                                         (obs ? obs + ' — ' : '') + `Pagamento parcial. Saldo restante: R$ ${saldo.toFixed(2).replace('.',',')}`);
                                 } else {
                                     parc.paid = true; parc.status = 'pago';
-                                    parc.paidDate = new Date().toISOString().slice(0,10);
+                                    parc.paidDate = Utils.hojeISO();
                                     parc.paidValue = paidVal; parc.formaPagamento = forma;
                                     if (this.checkPaymentComplete(sale)) sale.paymentStatus = 'pago';
                                     Toast.show(`Parcela ${num} quitada! ✅`, 'success');
@@ -18089,7 +18105,7 @@ body.dark-mode,
                                     (obs ? obs + ' — ' : '') + `Pagamento parcial. Saldo restante: R$ ${saldo.toFixed(2).replace('.',',')}`);
                             } else {
                                 parc.paid = true; parc.status = 'pago';
-                                parc.paidDate = new Date().toISOString().slice(0,10);
+                                parc.paidDate = Utils.hojeISO();
                                 parc.paidValue = paidVal; parc.formaPagamento = forma;
                                 if (this.checkPaymentComplete(sale)) sale.paymentStatus = 'pago';
                                 Toast.show(`Parcela ${num} quitada! ✅`, 'success');
@@ -18294,7 +18310,7 @@ body.dark-mode,
                 let dias = 0;
                 if (c.vencimento) {
                     const pagoEm = c.dataPagamento ? new Date(c.dataPagamento) : new Date();
-                    const diff = new Date(pagoEm.toLocaleDateString('en-CA') + 'T12:00:00') - new Date(String(c.vencimento).slice(0, 10) + 'T12:00:00');
+                    const diff = new Date(Utils.dataSP(pagoEm) + 'T12:00:00') - new Date(String(c.vencimento).slice(0, 10) + 'T12:00:00');
                     dias = diff > 0 ? Math.ceil(diff / 86400000) : 0;
                 }
                 return { tem: true, orig, acresc: Math.round((pago - orig) * 100) / 100, total: pago,
@@ -18492,7 +18508,7 @@ body.dark-mode,
                 const jurosPct = parseFloat(state.company?.dailyInterest ?? document.getElementById('dailyInterest')?.value ?? 0.033);
                 const mp = isNaN(multaPct) ? 0 : multaPct;
                 const jp = isNaN(jurosPct) ? 0 : jurosPct;
-                const hojeStr = new Date().toLocaleDateString('en-CA');
+                const hojeStr = Utils.hojeISO();
                 let dias = 0;
                 if (c.vencimento) {
                     const diff = new Date(hojeStr + 'T12:00:00') - new Date(String(c.vencimento).slice(0,10) + 'T12:00:00');
@@ -18742,7 +18758,7 @@ body.dark-mode,
                     if ((cfg.paymentDue !== false || cfg.paymentOverdue !== false) && window.ContasManager) {
                         try {
                             const contas = await ContasManager.getAll();
-                            const hoje = new Date().toISOString().slice(0, 10);
+                            const hoje = Utils.hojeISO();
                             (contas || []).forEach(c => {
                                 if (!c || !c.id || c.pago || !c.vencimento) return;
                                 const label = (c.tipo === 'receber' ? '💰 Conta a receber' : '💸 Conta a pagar') + (c.vencimento < hoje ? ' vencida' : ' vence hoje');
@@ -19236,6 +19252,19 @@ body.dark-mode,
                 v = v.replace(/\.(\d{3})(\d)/, '.$1/$2');
                 v = v.replace(/(\d{4})(\d)/, '$1-$2');
                 input.value = v;
+            },
+
+            // Data (AAAA-MM-DD) no horário de São Paulo — evita o erro de virar o dia às 21h (UTC)
+            dataSP(d) {
+                const dt = d instanceof Date ? d : new Date(d);
+                try { return dt.toLocaleDateString('en-CA', { timeZone: 'America/Sao_Paulo' }); }
+                catch (_e) { return new Date(dt.getTime() - 3 * 3600000).toISOString().slice(0, 10); }
+            },
+            hojeISO() { return this.dataSP(new Date()); },
+            // Data (AAAA-MM-DD) de um Date pelos componentes locais (para datas calculadas a partir de "agora")
+            isoLocal(d) {
+                const p = n => String(n).padStart(2, '0');
+                return d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate());
             },
 
             sanitizeHTML(str) {
@@ -20515,7 +20544,7 @@ body.dark-mode,
             async exportClientPrescToPDF() {
                 const clientName   = document.getElementById('clientName')?.value || '___________________';
                 const birthDate    = document.getElementById('clientBirthDate')?.value;
-                const consultDate  = document.getElementById('clientPrescDate')?.value || new Date().toISOString().slice(0,10);
+                const consultDate  = document.getElementById('clientPrescDate')?.value || Utils.hojeISO();
                 const optometrist  = document.getElementById('clientPrescOptometrist')?.value || '___________________';
                 const profType     = document.getElementById('clientPrescProfType')?.value || 'optometrista';
                 const profTypeLabel = Clients.profTypeLabel(profType);
@@ -20885,7 +20914,7 @@ tbody tr td{border:1.5px solid #000;padding:2mm;text-align:center;font-weight:70
                 document.getElementById('expenseForm')?.addEventListener('submit', (e) => { e.preventDefault(); Expenses.save(); });
                 document.getElementById('configForm')?.addEventListener('submit', (e) => { e.preventDefault(); Config.save(); });
                 
-                const today = new Date().toISOString().slice(0, 10);
+                const today = Utils.hojeISO();
                 document.getElementById('expenseDate') && (document.getElementById('expenseDate').value = today);
                 
                 document.getElementById('configPrimaryColor')?.addEventListener('input', (e) => {
@@ -21112,7 +21141,7 @@ tbody tr td{border:1.5px solid #000;padding:2mm;text-align:center;font-weight:70
                         name: 'João Silva', 
                         phone: '(11) 99999-9999', 
                         cpf: '123.456.789-00', 
-                        birthDate: new Date().toISOString().slice(0,10),
+                        birthDate: Utils.hojeISO(),
                         cep: '01310-100',
                         address: 'Av. Paulista',
                         number: '1000',
@@ -21395,7 +21424,7 @@ tbody tr td{border:1.5px solid #000;padding:2mm;text-align:center;font-weight:70
                 const url = URL.createObjectURL(blob);
                 const a = document.createElement('a');
                 a.href = url;
-                a.download = `backup_${new Date().toISOString().slice(0,10)}.json`;
+                a.download = `backup_${Utils.hojeISO()}.json`;
                 a.click();
                 Toast.show('Backup gerado com sucesso!');
             },
@@ -22040,7 +22069,7 @@ tbody tr td{border:1.5px solid #000;padding:2mm;text-align:center;font-weight:70
                 for (let i = 6; i >= 0; i--) {
                     const d = new Date();
                     d.setDate(d.getDate() - i);
-                    days.push(d.toISOString().slice(0, 10));
+                    days.push(Utils.isoLocal(d));
                 }
                 const totals = days.map(day =>
                     (items || []).filter(it => (it[dateKey] || '').slice(0, 10) === day)
@@ -24081,7 +24110,7 @@ tbody tr td{border:1.5px solid #000;padding:2mm;text-align:center;font-weight:70
                 });
 
                 XLSX.utils.book_append_sheet(wb, ws, 'Clientes');
-                XLSX.writeFile(wb, `clientes_${new Date().toISOString().slice(0,10)}.xlsx`);
+                XLSX.writeFile(wb, `clientes_${Utils.hojeISO()}.xlsx`);
                 Toast.show('Clientes exportados em Excel com sucesso!');
             },
 
@@ -24130,7 +24159,7 @@ tbody tr td{border:1.5px solid #000;padding:2mm;text-align:center;font-weight:70
                 const link = document.createElement('a');
                 const url = URL.createObjectURL(blob);
                 link.href = url;
-                link.download = `clientes_${new Date().toISOString().slice(0,10)}.csv`;
+                link.download = `clientes_${Utils.hojeISO()}.csv`;
                 link.click();
                 URL.revokeObjectURL(url);
                 Toast.show('Clientes exportados com sucesso!');
@@ -25289,7 +25318,7 @@ tbody tr td{border:1.5px solid #000;padding:2mm;text-align:center;font-weight:70
             _miaCampanhaBanner() {
                 const c = this._miaCampanha;
                 if (!c) return '';
-                const hoje = new Date().toLocaleDateString('en-CA');
+                const hoje = Utils.hojeISO();
                 const vencida = !!c.fim && c.fim < hoje;
                 const per = c.inicio || c.fim ? `${c.inicio ? 'de <b>' + this._miaDataBR(c.inicio) + '</b> ' : ''}${c.fim ? 'até <b>' + this._miaDataBR(c.fim) + '</b>' : ''}` : '';
                 return `<div style="display:flex;gap:8px;align-items:flex-start;background:${vencida ? '#fdecea' : '#fff3e0'};border:1px solid ${vencida ? '#f5c2bd' : '#ffcc80'};border-radius:8px;padding:8px 12px;margin:8px 0;color:${vencida ? '#a32d2d' : '#a14a00'};font-size:.85rem;">
@@ -25341,7 +25370,7 @@ tbody tr td{border:1.5px solid #000;padding:2mm;text-align:center;font-weight:70
                 if (!confirm(`Aplicar ${total} produtos (${comp.novos.length} novos, ${comp.atualizados.length} atualizados)?`)) return;
                 const camp = this._miaCampanha || null;
                 if (camp) {
-                    const hojeIso = new Date().toLocaleDateString('en-CA');
+                    const hojeIso = Utils.hojeISO();
                     if (camp.fim && camp.fim < hojeIso && !confirm(`⚠️ A campanha${camp.nome ? ' "' + camp.nome + '"' : ''} VENCEU em ${this._miaDataBR(camp.fim)}.\n\nOs preços podem não valer mais. Aplicar mesmo assim?`)) return;
                     if (!confirm(`Campanha${camp.nome ? ' "' + camp.nome + '"' : ''}${camp.fim ? ' — válida até ' + this._miaDataBR(camp.fim) : ''}.\n\nOs custos serão trocados pelos valores PROMOCIONAIS desta campanha. Depois do vencimento o sistema vai avisar para você atualizar.\n\nContinuar?`)) return;
                 }
@@ -25516,7 +25545,7 @@ tbody tr td{border:1.5px solid #000;padding:2mm;text-align:center;font-weight:70
             // pequena diferença de formatação no código digitado.
             _promoBadge(p) {
                 if (!p || !p.promoAte) return '';
-                const hoje = new Date().toLocaleDateString('en-CA');
+                const hoje = Utils.hojeISO();
                 const br = this._miaDataBR(p.promoAte);
                 if (p.promoAte < hoje) return ` <span style="display:inline-block;background:#fdecea;color:#a32d2d;border-radius:6px;padding:0 6px;font-size:.68rem;font-weight:700;white-space:nowrap;" title="Preço promocional vencido em ${br}. Atualize o custo.">⚠ promo vencida</span>`;
                 return ` <span style="display:inline-block;background:#fff3e0;color:#a14a00;border-radius:6px;padding:0 6px;font-size:.68rem;font-weight:700;white-space:nowrap;" title="Preço promocional${p.promoNome ? ' — ' + Utils.sanitizeHTML(p.promoNome) : ''}">🏷 promo até ${br.slice(0, 5)}</span>`;
@@ -25525,7 +25554,7 @@ tbody tr td{border:1.5px solid #000;padding:2mm;text-align:center;font-weight:70
             // Aviso (1x por abertura) se há produtos com preço promocional vencido
             checarPromosVencidas() {
                 if (window._promoAvisoFeito) return;
-                const hoje = new Date().toLocaleDateString('en-CA');
+                const hoje = Utils.hojeISO();
                 const n = (state.products || []).filter(p => p.promoAte && p.promoAte < hoje).length;
                 window._promoAvisoFeito = true;
                 if (n > 0) Toast.show(`⚠️ ${n} produto(s) com preço promocional vencido. Veja em Produtos e atualize o custo.`, 'warning', 8000);
@@ -25855,7 +25884,7 @@ tbody tr td{border:1.5px solid #000;padding:2mm;text-align:center;font-weight:70
                     const ws = XLSX.utils.aoa_to_sheet([headers, ...rows]);
                     ws['!cols'] = headers.map((_,i) => ({ wch: Math.min(Math.max(...rows.map(r=>String(r[i]||'').length), headers[i].length) + 2, 40) }));
                     XLSX.utils.book_append_sheet(wb, ws, 'Produtos');
-                    XLSX.writeFile(wb, 'produtos_' + new Date().toISOString().slice(0,10) + '.xlsx');
+                    XLSX.writeFile(wb, 'produtos_' + Utils.hojeISO() + '.xlsx');
                     Toast.show('Produtos exportados com sucesso!');
                 });
             },
@@ -26604,7 +26633,7 @@ tbody tr td{border:1.5px solid #000;padding:2mm;text-align:center;font-weight:70
             clearForm() {
                 document.getElementById('expenseForm').reset();
                 state.editingId = null;
-                document.getElementById('expenseDate').value = new Date().toISOString().slice(0,10);
+                document.getElementById('expenseDate').value = Utils.hojeISO();
                 document.getElementById('expensePaymentMethod').value = 'dinheiro';
                 document.getElementById('expenseStatus').value = 'pago';
                 const _catOtherInput = document.getElementById('expenseCategoryOther');
@@ -26667,7 +26696,7 @@ tbody tr td{border:1.5px solid #000;padding:2mm;text-align:center;font-weight:70
                 if (tab === 'tarefas')     this.renderTarefas();
                 if (tab === 'clientes')    { this.renderLTV(); this.renderPriorityContacts(); }
                 if (tab === 'funil')       this.renderFunil();
-                if (tab === 'nps')         { this.renderNps(); const d = document.getElementById('crmNpsData'); if (d && !d.value) d.value = new Date().toISOString().slice(0,10); }
+                if (tab === 'nps')         { this.renderNps(); const d = document.getElementById('crmNpsData'); if (d && !d.value) d.value = Utils.hojeISO(); }
                 if (tab === 'campanhas')   this.renderCampanhas();
                 if (tab === 'maladireita') this.renderMalaDiretaPreview();
             },
@@ -26680,7 +26709,7 @@ tbody tr td{border:1.5px solid #000;padding:2mm;text-align:center;font-weight:70
             },
 
             _setDefaultDates() {
-                const today = new Date().toISOString().slice(0,10);
+                const today = Utils.hojeISO();
                 const cd = document.getElementById('crmContatoData');
                 const td = document.getElementById('crmTarefaData');
                 if (cd && !cd.value) cd.value = today;
@@ -26708,7 +26737,7 @@ tbody tr td{border:1.5px solid #000;padding:2mm;text-align:center;font-weight:70
                 const vipCount = ltvVals.filter(v => v >= vipThreshold && v > 0).length;
 
                 // Tarefas vencidas
-                const tarefasVencidas = (state.crmTarefas || []).filter(t => !t.concluida && t.data < today.toISOString().slice(0,10)).length;
+                const tarefasVencidas = (state.crmTarefas || []).filter(t => !t.concluida && t.data < Utils.hojeISO()).length;
 
                 // Contatos este mês
                 const contatosMes = (state.crmContatos || []).filter(c => {
@@ -26913,7 +26942,7 @@ tbody tr td{border:1.5px solid #000;padding:2mm;text-align:center;font-weight:70
                 document.getElementById('crmContatoCanal').value = 'whatsapp';
                 document.getElementById('crmContatoTipo').value = 'ativo';
                 document.getElementById('crmContatoResultado').value = 'positivo';
-                document.getElementById('crmContatoData').value = new Date().toISOString().slice(0,10);
+                document.getElementById('crmContatoData').value = Utils.hojeISO();
             },
 
             editarContato(id) {
@@ -27026,7 +27055,7 @@ tbody tr td{border:1.5px solid #000;padding:2mm;text-align:center;font-weight:70
                 document.getElementById('crmTarefaEditId').value       = '';
                 document.getElementById('crmTarefaTipo').value         = 'ligar';
                 document.getElementById('crmTarefaPrioridade').value   = 'media';
-                document.getElementById('crmTarefaData').value         = new Date().toISOString().slice(0,10);
+                document.getElementById('crmTarefaData').value         = Utils.hojeISO();
             },
 
             editarTarefa(id) {
@@ -27070,7 +27099,7 @@ tbody tr td{border:1.5px solid #000;padding:2mm;text-align:center;font-weight:70
                 const el = document.getElementById('crmTarefasList');
                 if (!el) return;
                 const filtro = document.getElementById('crmTarefaFiltro')?.value || 'pendentes';
-                const hoje   = new Date().toISOString().slice(0,10);
+                const hoje   = Utils.hojeISO();
                 const tipoIcons = { ligar:'📞', whatsapp:'💬', visita:'🏪', orcamento:'📋', cobranca:'💰', outro:'📝' };
 
                 let tarefas = [...(state.crmTarefas || [])].sort((a,b) => a.data.localeCompare(b.data));
@@ -27286,7 +27315,7 @@ tbody tr td{border:1.5px solid #000;padding:2mm;text-align:center;font-weight:70
                 document.getElementById('crmNpsNota').value         = '';
                 document.getElementById('crmNpsComentario').value   = '';
                 document.getElementById('crmNpsEditId').value       = '';
-                document.getElementById('crmNpsData').value         = new Date().toISOString().slice(0,10);
+                document.getElementById('crmNpsData').value         = Utils.hojeISO();
                 document.querySelectorAll('.crm-nps-btn').forEach(b => b.classList.remove('selected'));
             },
 
@@ -28809,7 +28838,7 @@ ${container.innerHTML}
                 const blob = new Blob(['\uFEFF' + rows.join('\n')], { type: 'text/csv;charset=utf-8;' });
                 const a = document.createElement('a');
                 a.href = URL.createObjectURL(blob);
-                a.download = 'relatorio_oticavision_' + new Date().toISOString().slice(0,10) + '.csv';
+                a.download = 'relatorio_oticavision_' + Utils.hojeISO() + '.csv';
                 a.click();
                 Toast.show('CSV exportado com sucesso!', 'success');
             }
@@ -29261,7 +29290,7 @@ ${container.innerHTML}
             },
 
             setDefaultDates() {
-                const today = new Date().toISOString().slice(0, 10);
+                const today = Utils.hojeISO();
                 const nextWeek = new Date();
                 nextWeek.setDate(nextWeek.getDate() + 7);
                 
@@ -29269,7 +29298,7 @@ ${container.innerHTML}
                 const deliveryForecastEl = document.getElementById('deliveryForecast');
                 
                 if (saleDateEl) saleDateEl.value = today;
-                if (deliveryForecastEl) deliveryForecastEl.value = nextWeek.toISOString().slice(0, 10);
+                if (deliveryForecastEl) deliveryForecastEl.value = Utils.isoLocal(nextWeek);
             },
 
             _rhTimer: null,
@@ -29336,7 +29365,7 @@ ${container.innerHTML}
                         const pend = det.parcels.filter(p => !p.paid && p.status !== 'pago' && p.status !== 'paid');
                         if (!pend.length) return { txt: '✅ Quitado', cls: '#28a745' };
                         const saldo = pend.reduce((a, p) => a + parseFloat(p.value || 0), 0);
-                        const venc  = pend.some(p => p.dueDate < new Date().toISOString().slice(0,10));
+                        const venc  = pend.some(p => p.dueDate < Utils.hojeISO());
                         return { txt: (venc ? '⚠️ ' : '') + Utils.formatCurrency(saldo), cls: venc ? '#c62828' : '#e65100' };
                     }
                     // Dual
@@ -30838,7 +30867,7 @@ ${container.innerHTML}
                     if (!firstDate) {
                         const fd = new Date();
                         fd.setDate(fd.getDate() + 30);
-                        firstDate = fd.toISOString().slice(0,10);
+                        firstDate = Utils.isoLocal(fd);
                         const fdEl = document.getElementById('firstDueDate');
                         if (fdEl) fdEl.value = firstDate;
                     }
@@ -31390,7 +31419,7 @@ ${container.innerHTML}
                 if (!firstDate) {
                     const firstDue = new Date(today);
                     firstDue.setDate(firstDue.getDate() + 30);
-                    firstDate = firstDue.toISOString().slice(0, 10);
+                    firstDate = Utils.isoLocal(firstDue);
                     document.getElementById('firstDueDate').value = firstDate;
                 }
                 
@@ -31677,7 +31706,7 @@ ${container.innerHTML}
                 const overlay = document.createElement('div');
                 overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:99999;display:flex;align-items:center;justify-content:center;';
 
-                const hoje = details.parcels[0]?.dueDate || new Date().toISOString().slice(0,10);
+                const hoje = details.parcels[0]?.dueDate || Utils.hojeISO();
                 overlay.innerHTML = `
                     <div style="background:#fff;border-radius:14px;padding:24px;width:320px;box-shadow:0 8px 32px rgba(0,0,0,0.25);font-family:inherit;">
                         <h3 style="margin:0 0 6px;font-size:1rem;color:#ff6b00;">📅 Modificar Todas as Datas</h3>
@@ -31739,7 +31768,7 @@ ${container.innerHTML}
                     const rawVal = overlay.querySelector('#_markPaidInput').value;
                     const paidVal = parseFloat(String(rawVal).replace(',','.'));
                     if (!paidVal || paidVal <= 0) { Toast.show('Informe um valor válido','warning'); return; }
-                    const paidDateStr = new Date().toISOString().slice(0, 10);
+                    const paidDateStr = Utils.hojeISO();
                     // ✅ FIX CRÍTICO #4: preenche paid + status juntos (mesma convenção
                     // já usada em Contas a Receber), evitando parcela paga aparecer como
                     // pendente em telas que só checam um dos dois campos.
@@ -32364,7 +32393,7 @@ ${container.innerHTML}
                             <hr class="separador">
 
                             <!-- Local e data -->
-                            <div class="local-data">${company.city||'____________________'}, ${fmt(new Date().toISOString().slice(0,10))}.</div>
+                            <div class="local-data">${company.city||'____________________'}, ${fmt(Utils.hojeISO())}.</div>
 
                             <!-- Assinaturas -->
                             <div class="assinaturas">
@@ -32660,7 +32689,7 @@ ${container.innerHTML}
                                 </div>
                                 <div class="comp-cell">
                                     <div class="comp-cell-label">Data do Pagamento</div>
-                                    <div class="comp-cell-val">${parcela.paidDate ? fd(parcela.paidDate) : fd(new Date().toISOString().slice(0,10))}</div>
+                                    <div class="comp-cell-val">${parcela.paidDate ? fd(parcela.paidDate) : fd(Utils.hojeISO())}</div>
                                 </div>
                                 <div class="comp-cell">
                                     <div class="comp-cell-label">Vencimento</div>
@@ -33032,7 +33061,7 @@ ${container.innerHTML}
                     .replace(/{{OS}}/g,              sale.number || '')
                     .replace(/{{PARCELA}}/g,         `${parcela.number} de ${details.installments}`)
                     .replace(/{{VENCIMENTO}}/g,      fd(parcela.dueDate))
-                    .replace(/{{DATA_PAGAMENTO}}/g,  parcela.paidDate ? fd(parcela.paidDate) : fd(new Date().toISOString().slice(0,10)))
+                    .replace(/{{DATA_PAGAMENTO}}/g,  parcela.paidDate ? fd(parcela.paidDate) : fd(Utils.hojeISO()))
                     .replace(/{{VALOR}}/g,           Utils.formatCurrency(total))
                     .replace(/{{FORMA_PAGAMENTO}}/g, parcela.paymentMethod || 'Dinheiro')
                     .replace(/{{EMPRESA}}/g,         company.name || '')
@@ -33093,7 +33122,7 @@ ${container.innerHTML}
                     // Gera parcelas para cada forma que for crediário
                     const firstDate = new Date();
                     firstDate.setDate(firstDate.getDate() + 30);
-                    const firstDateStr = firstDate.toISOString().slice(0,10);
+                    const firstDateStr = Utils.isoLocal(firstDate);
                     dualPaymentsToSave = dp.map(slot => ({
                         method:   slot.method,
                         value:    slot.value,
@@ -33293,7 +33322,7 @@ ${container.innerHTML}
                 const currentUnit = window._currentStore || 'barueri';
                 state.currentSale = {
                     number: '',
-                    date: new Date().toISOString().slice(0, 10),
+                    date: Utils.hojeISO(),
                     unit: currentUnit,
                     seller: '',
                     deliveryForecast: '',
@@ -34572,7 +34601,7 @@ ${container.innerHTML}
                     const a = document.createElement('a');
                     a.href = url;
                     // ✅ FIX: nome do arquivo inclui a loja para evitar sobrescrever backup da loja errada
-                    a.download = `oticavision_backup_${lojaLabel}_${new Date().toISOString().split('T')[0]}.json`;
+                    a.download = `oticavision_backup_${lojaLabel}_${Utils.hojeISO()}.json`;
                     a.click();
                     URL.revokeObjectURL(url);
                     
@@ -35514,7 +35543,7 @@ const ImportadorMarketUP = {
                 if (!clienteId) continue;
 
                 // Parsear data
-                let dateFmt = new Date().toISOString().slice(0,10);
+                let dateFmt = Utils.hojeISO();
                 if (os.dataStr) {
                     const raw = os.dataStr.toString().trim().slice(0,10);
                     // Detecta DD/MM/YYYY vs YYYY-MM-DD
