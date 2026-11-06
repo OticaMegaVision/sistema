@@ -9935,7 +9935,7 @@ body.dark-mode,
                                 <div class="bkp-status-ic" style="background:#f3f0ff;color:#7c3aed;"><i class="fas fa-code-branch"></i></div>
                                 <div class="txt">
                                     <b>Versão do sistema</b>
-                                    <span>versão <strong>041120262103</strong></span>
+                                    <span>versão <strong>051120261741</strong></span>
                                 </div>
                             </div>
                         </div>
@@ -17531,11 +17531,14 @@ body.dark-mode,
                 }
                 // Map por nome para lookup O(1) no WhatsApp
                 const clientsByName = new Map((state.clients||[]).map(c => [c.name, c]));
-                // Sort: pendentes primeiro, vencidas em destaque
+                // Ordem (Contas a Receber e a Pagar): pendentes/vencidas no topo, pagas abaixo;
+                // em cada grupo, do vencimento mais recente para o mais antigo
                 contas.sort((a,b)=>{
                     if(a.pago && !b.pago) return 1;
                     if(!a.pago && b.pago) return -1;
-                    return (a.vencimento||'') < (b.vencimento||'') ? -1 : 1;
+                    const va = a.vencimento||'', vb = b.vencimento||'';
+                    if (va === vb) return 0;
+                    return va < vb ? 1 : -1;
                 });
                 el.innerHTML = contas.map(c => {
                     const venc = c.vencimento || '';
