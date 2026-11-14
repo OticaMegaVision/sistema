@@ -9935,7 +9935,7 @@ body.dark-mode,
                                 <div class="bkp-status-ic" style="background:#f3f0ff;color:#7c3aed;"><i class="fas fa-code-branch"></i></div>
                                 <div class="txt">
                                     <b>Versão do sistema</b>
-                                    <span>versão <strong>061120261628</strong></span>
+                                    <span>versão <strong>141120260337</strong></span>
                                 </div>
                             </div>
                         </div>
@@ -13001,6 +13001,7 @@ body.dark-mode,
             _cloudSyncTimer: null,
             _scheduleCloudSync() {
                 clearTimeout(this._cloudSyncTimer);
+                try { window.CloudSync && CloudSync.markDirty && CloudSync.markDirty(); } catch (_e) {}
 
                 // ✅ MELHORIA #1: Background Sync (Service Worker) — quando o usuário
                 // está OFFLINE, o setTimeout normal abaixo não adianta: se a conexão só
@@ -13588,6 +13589,7 @@ body.dark-mode,
             let _awUser         = null;   // usuário autenticado no Appwrite Auth
             let _awUnsubscribe  = null;   // função de cancelamento do Realtime ativo
             let _pushing        = false;
+            let _pushAgain      = false;   // edição pedida enquanto um envio estava em andamento → reenviar 1x ao terminar
             let _pulling        = false;
             let _pushTimer      = null;
             let _pollTimer      = null;
@@ -15192,7 +15194,7 @@ body.dark-mode,
                     if (silent) _showReconnectBanner();
                     return;
                 }
-                if (_pushing) return;
+                if (_pushing) { _pushAgain = true; _markPendingPush(); return; }   // não descarta: reenvia ao terminar
                 _pushing = true; _pushingSince = Date.now();
                 if (silent) _updateWidget('push', '↑ Enviando...');
                 try {
@@ -15280,13 +15282,14 @@ body.dark-mode,
                     _updateStatus('🟢 Enviado às ' + now + ' — polling a cada ' + (POLL_ACTIVE_MS_DRIVE/1000) + 's');
                     _showSyncIndicator('↑ Salvo ' + now);
                     if (!silent) Toast.show('✅ Dados enviados ao Google Drive!', 'success', 2000);
-                    _clearPendingPush(); // ✅ RETRY: sucesso — cancela qualquer retentativa agendada
+                    if (!_pushAgain) _clearPendingPush(); // ✅ RETRY: sucesso — cancela retentativa (se não houve nova edição durante o envio)
                 } catch(e) {
                     if (silent) { _updateWidget('err', '↑ Falha no envio'); _scheduleRetryPush(); }
                     if (!silent) Toast.show('❌ Erro ao enviar ao Drive: ' + e.message, 'danger');
                     else console.warn('[CloudSync] gdrivePush silencioso falhou:', e.message);
                 } finally {
                     _pushing = false; _pushingSince = 0;
+                    if (_pushAgain) { _pushAgain = false; setTimeout(() => { try { _silentPush(); } catch(_e) {} }, 300); }
                 }
             }
 
@@ -15555,7 +15558,7 @@ body.dark-mode,
                     if (!silent) Toast.show('⚠️ Token OneDrive expirado. Reconecte.', 'warning');
                     return;
                 }
-                if (_pushing) return;
+                if (_pushing) { _pushAgain = true; _markPendingPush(); return; }   // não descarta: reenvia ao terminar
                 _pushing = true; _pushingSince = Date.now();
                 try {
                     // ✅ FIX RACE-CONDITION (mesmo problema do Google Drive, ver comentário
@@ -15590,12 +15593,13 @@ body.dark-mode,
                     _updateStatus('🟢 OneDrive — último envio: ' + now);
                     _showSyncIndicator('Salvo na nuvem ' + now);
                     if (!silent) Toast.show('✅ Dados enviados ao OneDrive!', 'success', 2000);
-                    _clearPendingPush(); // ✅ RETRY: sucesso — cancela qualquer retentativa agendada
+                    if (!_pushAgain) _clearPendingPush(); // ✅ RETRY: sucesso — cancela retentativa (se não houve nova edição durante o envio)
                 } catch(e) {
                     if (!silent) Toast.show('❌ Erro ao enviar ao OneDrive: ' + e.message, 'danger');
                     else { console.warn('[CloudSync] onedrivePush silencioso falhou:', e.message); _scheduleRetryPush(); }
                 } finally {
                     _pushing = false; _pushingSince = 0;
+                    if (_pushAgain) { _pushAgain = false; setTimeout(() => { try { _silentPush(); } catch(_e) {} }, 300); }
                 }
             }
 
@@ -15755,7 +15759,7 @@ body.dark-mode,
 
             async function supabasePush(silent) {
                 if (!_sbClient || !_sbUser) return;
-                if (_pushing) return;
+                if (_pushing) { _pushAgain = true; _markPendingPush(); return; }   // não descarta: reenvia ao terminar
                 _pushing = true;
                 try {
                     const storeId = window._currentStore || 'barueri';
@@ -15763,7 +15767,7 @@ body.dark-mode,
                     if (!silent) Toast.show('☁️ Enviado ao Supabase', 'success', 2000);
                     // ✅ FIX RETRY-SUPABASE: sucesso — cancela qualquer nova tentativa
                     // agendada (o Supabase nunca fazia isso, diferente de Drive/OneDrive).
-                    _clearPendingPush();
+                    if (!_pushAgain) _clearPendingPush();
                 } catch(e) {
                     console.warn('[CloudSync] supabasePush falhou:', e.message);
                     if (!silent) Toast.show('⚠️ Falha ao enviar ao Supabase: ' + e.message, 'warning');
@@ -15776,6 +15780,7 @@ body.dark-mode,
                     else _scheduleRetryPush();
                 } finally {
                     _pushing = false;
+                    if (_pushAgain) { _pushAgain = false; setTimeout(() => { try { _silentPush(); } catch(_e) {} }, 300); }
                 }
             }
 
@@ -16194,17 +16199,20 @@ body.dark-mode,
 
             async function appwritePush(silent) {
                 if (!_awDatabases || !_awUser) return;
-                if (_pushing) return;
+                if (_pushing) { _pushAgain = true; _markPendingPush(); return; }   // não descarta: reenvia ao terminar
                 _pushing = true;
                 try {
                     const storeId = window._currentStore || 'barueri';
                     await _appwriteFullPush(storeId);
                     if (!silent) Toast.show('☁️ Enviado ao Appwrite', 'success', 2000);
+                    if (!_pushAgain) _clearPendingPush();
                 } catch(e) {
                     console.warn('[CloudSync] appwritePush falhou:', e.message);
                     if (!silent) Toast.show('⚠️ Falha ao enviar ao Appwrite: ' + e.message, 'warning');
+                    else _scheduleRetryPush();
                 } finally {
                     _pushing = false;
+                    if (_pushAgain) { _pushAgain = false; setTimeout(() => { try { _silentPush(); } catch(_e) {} }, 300); }
                 }
             }
 
@@ -16489,7 +16497,17 @@ body.dark-mode,
             }
 
             // ── Push agendado com debounce (chamado após cada save) ───────────
+            // "Pendente" só vale para a loja em que a edição foi feita (evita enviar a loja errada)
+            function _pendenteDaLojaAtual() {
+                try {
+                    const raw = localStorage.getItem(PENDING_PUSH_KEY);
+                    if (!raw) return false;
+                    let p = null; try { p = JSON.parse(raw); } catch(_e) {}
+                    return !p || !p.store || p.store === (window._currentStore || 'barueri');
+                } catch(_e) { return false; }
+            }
             function _schedulePush() {
+                if (_activeProvider) _markPendingPush();   // grava "há alteração a enviar" já na edição (limpa no sucesso do envio)
                 clearTimeout(_pushTimer);
                 _pushTimer = setTimeout(() => { _pushTimer = null; _silentPush(); }, PUSH_DEBOUNCE_MS);
             }
@@ -16546,7 +16564,7 @@ body.dark-mode,
             if (typeof window !== 'undefined') {
                 window.addEventListener('online', () => {
                     try {
-                        const pending = localStorage.getItem(PENDING_PUSH_KEY);
+                        const pending = _pendenteDaLojaAtual();
                         if (pending) {
                             console.log('[CloudSync] 🌐 Conexão restabelecida — reenviando dados pendentes.');
                             clearTimeout(_retryTimer);
@@ -16846,6 +16864,21 @@ body.dark-mode,
             // Mostra widget após boot do sistema
             window.addEventListener('load', () => setTimeout(_showLocalStatusWidget, 4000));
 
+            let _lastHideFlush = 0;
+            const _enviarAgoraSePendente = () => {
+                try {
+                    if (!_activeProvider || !navigator.onLine || !_pendenteDaLojaAtual()) return;
+                    if (Date.now() - _lastHideFlush < 3000) return;      // visibilitychange + pagehide juntos: só uma vez
+                    _lastHideFlush = Date.now();
+                    clearTimeout(_pushTimer); _pushTimer = null;           // o envio agendado é antecipado, não duplicado
+                    if (window.LocalFirst) clearTimeout(window.LocalFirst._cloudSyncTimer);
+                    if (_pushing) { _pushAgain = true; return; }           // já há envio em andamento: reenvia ao terminar
+                    _silentPush();
+                } catch(_e) {}
+            };
+            document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') _enviarAgoraSePendente(); });
+            window.addEventListener('pagehide', _enviarAgoraSePendente);
+
             // ── Init ─────────────────────────────────────────────────────────
             _loadTokens();
             _loadTombstones(); // FIX DELETE-SYNC: restaura tombstones persistidos
@@ -16855,7 +16888,10 @@ body.dark-mode,
             // assim que houver provedor conectado e rede disponível.
             try {
                 if (localStorage.getItem(PENDING_PUSH_KEY)) {
-                    setTimeout(() => { if (navigator.onLine) _silentPush(); else _scheduleRetryPush(); }, 6000);
+                    setTimeout(() => {
+                        if (!_pendenteDaLojaAtual()) return;   // pendente de outra loja: aguarda ela ser aberta
+                        if (navigator.onLine) _silentPush(); else _scheduleRetryPush();
+                    }, 6000);
                 }
             } catch(_e) {}
             // ✅ FIX FLASH/MISTURA DE LOJA NO BOOT: este bloco fazia _startPolling()
@@ -16958,6 +16994,7 @@ body.dark-mode,
                 pullMediaNow: _pullMediaNow,
                 showTab, _updateUI,
                 autoSync() { _schedulePush(); },
+                markDirty() { if (_activeProvider) _markPendingPush(); },
                 // ✅ Chamado por AuthSystem depois que a loja correta do usuário logado
                 // já foi resolvida (nunca antes disso — ver comentário acima).
                 resumeAutoConnect: _resumeAutoConnect,
