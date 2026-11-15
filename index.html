@@ -7353,6 +7353,10 @@ body.dark-mode,
                                     style="flex:1;padding:8px 4px;border-radius:10px;border:2px solid #ff6b00;background:#ff6b00;color:#fff;font-size:0.75rem;font-weight:700;cursor:pointer;transition:all 0.18s;display:flex;flex-direction:column;align-items:center;gap:3px;">
                                     <i class="fas fa-eye" style="font-size:14px;"></i>Lente
                                 </button>
+                                <button type="button" onclick="Sales.showItemTab('contato')" id="tabBtnContato"
+                                    style="flex:1;padding:8px 4px;border-radius:10px;border:2px solid #ddd;background:#fff;color:#888;font-size:0.75rem;font-weight:700;cursor:pointer;transition:all 0.18s;display:flex;flex-direction:column;align-items:center;gap:3px;">
+                                    <i class="fas fa-circle-dot" style="font-size:14px;"></i>Contato
+                                </button>
                                 <button type="button" onclick="Sales.showItemTab('armacao')" id="tabBtnArmacao"
                                     style="flex:1;padding:8px 4px;border-radius:10px;border:2px solid #ddd;background:#fff;color:#888;font-size:0.75rem;font-weight:700;cursor:pointer;transition:all 0.18s;display:flex;flex-direction:column;align-items:center;gap:3px;">
                                     <i class="fas fa-glasses" style="font-size:14px;"></i>Armação
@@ -7374,7 +7378,7 @@ body.dark-mode,
                                         <div style="width:28px;height:28px;background:#fff3e0;border-radius:8px;display:flex;align-items:center;justify-content:center;">
                                             <i class="fas fa-eye" style="color:#ff6b00;font-size:12px;"></i>
                                         </div>
-                                        <span style="font-weight:700;font-size:0.82rem;color:#e65100;">Selecionar Lente</span>
+                                        <span id="lenteHeaderTxt" style="font-weight:700;font-size:0.82rem;color:#e65100;">Selecionar Lente</span>
                                     </div>
                                     <div class="ss-wrapper">
                                         <input type="text" id="lenteSearch" class="form-control ss-input" placeholder="🔍 Buscar por nome ou código..." autocomplete="off"
@@ -9005,6 +9009,7 @@ body.dark-mode,
                                 <label for="productCategory" class="required">Categoria</label>
                                 <select id="productCategory" class="form-control" required onchange="Products.toggleArmacaoFields()">
                                     <option value="lentes">Lentes</option>
+                                    <option value="lentes_contato">Lentes de Contato</option>
                                     <option value="armacoes">Armações</option>
                                     <option value="oculos_sol">Óculos de Sol</option>
                                     <option value="tratamentos">Tratamentos</option>
@@ -9936,7 +9941,7 @@ body.dark-mode,
                                 <div class="bkp-status-ic" style="background:#f3f0ff;color:#7c3aed;"><i class="fas fa-code-branch"></i></div>
                                 <div class="txt">
                                     <b>Versão do sistema</b>
-                                    <span>versão <strong>151120261012</strong></span>
+                                    <span>versão <strong>151120261635</strong></span>
                                 </div>
                             </div>
                         </div>
@@ -11267,6 +11272,7 @@ body.dark-mode,
                             <label for="qpCategory" class="required">Categoria</label>
                             <select id="qpCategory" class="form-control" required onchange="Sales.toggleQuickArmacaoFields()">
                                 <option value="lentes">Lentes</option>
+                                <option value="lentes_contato">Lentes de Contato</option>
                                 <option value="armacoes">Armações</option>
                                 <option value="oculos_sol">Óculos de Sol</option>
                                 <option value="tratamentos">Tratamentos</option>
@@ -26242,7 +26248,7 @@ tbody tr td{border:1.5px solid #000;padding:2mm;text-align:center;font-weight:70
 
             // ── Categorias: nome de exibição profissional (os dados salvos não mudam) ──
             _CAT_LABELS: {
-                lentes: 'Lentes', lente: 'Lentes',
+                lentes: 'Lentes', lente: 'Lentes', lentes_contato: 'Lentes de Contato', lentes_de_contato: 'Lentes de Contato',
                 armacoes: 'Armações', armacao: 'Armações',
                 oculos_sol: 'Óculos de Sol', oculos_de_sol: 'Óculos de Sol', oculos_solar: 'Óculos de Sol', oculos: 'Óculos',
                 tratamentos: 'Tratamentos', tratamento: 'Tratamentos',
@@ -29179,7 +29185,7 @@ ${container.innerHTML}
                 const options = Array.from(select.options).filter(o => o.value !== '');
 
                 const matches = term
-                    ? options.filter(o => this._ssNormalize(o.textContent).includes(term))
+                    ? options.filter(o => this._ssNormalize((o.textContent || '') + ' ' + (o.dataset.busca || '')).includes(term))
                     : options;
 
                 // Favoritos primeiro (ordenação estável: o restante mantém a ordem de sempre)
@@ -29316,6 +29322,11 @@ ${container.innerHTML}
                 return /lente|multifocal|progressiv|surf|visao simples|technopark|kodak|essilor|pro design|c\.?\s?o\.?\s*(pro|select)/.test(c);
             },
 
+            _ehContato(p) {
+                const c = String((p && p.category) || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+                return /contato/.test(c);
+            },
+
             populateSaleSelects() {
                 const Utils2 = { fmt: v => 'R$ ' + (v || 0).toLocaleString('pt-BR', {minimumFractionDigits:2, maximumFractionDigits:2}) };
 
@@ -29323,13 +29334,14 @@ ${container.innerHTML}
                 const selLente = document.getElementById('lenteSelect');
                 if (selLente) {
                     selLente.innerHTML = '<option value="">Selecione uma lente</option>';
-                    const lentes = (state.products || []).filter(p => this._ehLenteVenda(p));
+                    const lentes = (state.products || []).filter(p => this._ehLenteVenda(p) && (this._lenteModo === 'contato') === this._ehContato(p));
                     if (lentes.length > 0) {
                         lentes.forEach(p => {
                             const opt = document.createElement('option');
                             opt.value = p.id + '|' + p.price;
                             const codeLabel = p.code ? '[' + p.code + '] ' : '';
                             opt.textContent = codeLabel + p.name + ' - ' + Utils2.fmt(p.price) + (p.qty <= 0 ? ' (sem estoque)' : '');
+                            opt.dataset.busca = (typeof Products !== 'undefined' && Products.categoryLabel) ? Products.categoryLabel(p.category) : '';
                             if (p.qty <= 0) opt.disabled = true;
                             selLente.appendChild(opt);
                         });
@@ -30087,6 +30099,20 @@ ${container.innerHTML}
 
             // Troca de aba de item (lente / armação / serviço / tratamento)
             showItemTab(tab) {
+                const isLenteTab = (tab === 'lente' || tab === 'contato');
+                const modoLente = tab === 'contato' ? 'contato' : 'lente';
+                if (tab === 'contato') tab = 'lente';
+                if (isLenteTab) {
+                    if (this._lenteModo !== modoLente) {
+                        this._lenteModo = modoLente;
+                        const sel = document.getElementById('lenteSelect');
+                        if (sel) sel.value = '';
+                        this._ssReset('lenteSearch');
+                        this.populateSaleSelects();
+                    }
+                    const hdr = document.getElementById('lenteHeaderTxt');
+                    if (hdr) hdr.textContent = modoLente === 'contato' ? 'Selecionar Lente de Contato' : 'Selecionar Lente';
+                }
                 const tabs   = { lente:'itemTabLente', armacao:'itemTabArmacao', servico:'itemTabServico', tratamento:'itemTabTratamento' };
                 const btns   = { lente:'tabBtnLente',  armacao:'tabBtnArmacao',  servico:'tabBtnServico', tratamento:'tabBtnTratamento' };
                 // ✅ Paleta unificada (laranja/âmbar/dourado) para casar com a
@@ -30110,6 +30136,19 @@ ${container.innerHTML}
                         btn.style.color = '#888';
                     }
                 });
+                // Botões Lente / Contato: só um fica ativo por vez
+                const paintBtn = (btn, on) => {
+                    if (!btn) return;
+                    btn.style.background = on ? 'linear-gradient(135deg,#ff6b00,#e65100)' : '#fff';
+                    btn.style.borderColor = on ? '#e65100' : '#ddd';
+                    btn.style.color = on ? '#fff' : '#888';
+                };
+                if (isLenteTab) {
+                    paintBtn(document.getElementById('tabBtnLente'), modoLente === 'lente');
+                    paintBtn(document.getElementById('tabBtnContato'), modoLente === 'contato');
+                } else {
+                    paintBtn(document.getElementById('tabBtnContato'), false);
+                }
             },
 
             // ── Cadastrar Produto/Serviço Rápido (a partir da tela de Vendas) ──
